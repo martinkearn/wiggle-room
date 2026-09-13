@@ -5,22 +5,19 @@
 
 import SwiftUI
 
-/// Add/Edit tracker screen (§7.1), scoped for now to manual-entry sources —
-/// Starling and Tesla providers aren't implemented yet.
+/// Add/Edit tracker screen (§7.1).
 ///
-/// Manual entry needs no auth/setup step (`requiresConnection == false`,
-/// §5.1), so there's no *connection*-picking step here — the tracker is
-/// created against `TrackerStore.defaultManualSource` automatically. What
-/// the user does pick is the specific data source (a `SourceTarget`) within
-/// it, since that's what actually varies (e.g. "Car A mileage" vs. "Car B
-/// mileage" reported by the same manual connection). Creating a new one is
-/// a secondary action (a "+" that presents an alert, the same pattern as
-/// "New Folder" elsewhere in iOS) rather than a picker entry, so the
-/// primary flow — adding a tracker — stays uncluttered. A step for picking
-/// between multiple *connections* returns once Starling/Tesla exist, since
-/// those require an actual account connection a user might have more than
-/// one of; that too belongs behind a secondary "manage sources" entry point
-/// (§5.2's Settings → Connected Sources), not inline here.
+/// The user picks a **Source** for the tracker: either "Manual Entry" (they
+/// log readings themselves) or one of the real connections listed in
+/// Settings → Connected Sources (§5.2) — Starling/Tesla aren't implemented
+/// yet, so that list is currently always empty and Manual Entry is the only
+/// option. Manual Entry is a fixed, single choice, not something the user
+/// can add more of — each tracker that uses it simply gets its own
+/// dedicated manual reading log behind the scenes (named after the tracker
+/// itself), created automatically on save. No further picking is needed for
+/// it. A real connected source with multiple targets (e.g. several Starling
+/// accounts) will need a follow-up "which one" picker once such a provider
+/// exists — out of scope while `addedSources` is always empty.
 struct AddTrackerView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -33,11 +30,7 @@ struct AddTrackerView: View {
     @State private var startingValueText = "0"
     @State private var totalAllowanceText = ""
 
-    @State private var availableTargets: [SourceTarget] = []
-    @State private var targetId: String?
-
-    @State private var isPresentingNewSourceAlert = false
-    @State private var newSourceName = ""
+    @State private var selectedSourceId: UUID?
 
     @State private var errorMessage: String?
 
@@ -78,25 +71,14 @@ struct AddTrackerView: View {
                 }
 
                 Section {
-                    if availableTargets.isEmpty {
-                        ProgressView()
-                    } else {
-                        Picker("Source", selection: $targetId) {
-                            ForEach(availableTargets) { target in
-                                Text(target.displayName).tag(target.id as String?)
-                            }
+                    Picker("Source", selection: $selectedSourceId) {
+                        Text("Manual Entry").tag(store.manualEntrySource.id as UUID?)
+                        ForEach(store.addedSources) { source in
+                            Text(source.displayName).tag(source.id as UUID?)
                         }
                     }
-                    Button {
-                        newSourceName = ""
-                        isPresentingNewSourceAlert = true
-                    } label: {
-                        Label("New Source…", systemImage: "plus.circle")
-                    }
-                } header: {
-                    Text("Data Source")
                 } footer: {
-                    Text("Trackers pointed at the same source share its readings, so add a new source to track something separately, like a second car's mileage.")
+                    Text("Manual Entry means you'll log this tracker's readings yourself. Otherwise, pick a source you've added in Settings → Connected Sources.")
                 }
 
                 if let errorMessage {
@@ -117,15 +99,9 @@ struct AddTrackerView: View {
                 }
             }
             .task {
-                loadTargets()
-            }
-            .alert("New Source", isPresented: $isPresentingNewSourceAlert) {
-                TextField("Source name", text: $newSourceName)
-                Button("Cancel", role: .cancel) {}
-                Button("Add") { createTarget() }
-                    .disabled(newSourceName.trimmingCharacters(in: .whitespaces).isEmpty)
-            } message: {
-                Text("Give this source a name, e.g. \"Car A mileage\".")
+                if selectedSourceId == nil {
+                    selectedSourceId = store.manualEntrySource.id
+                }
             }
         }
     }
@@ -145,30 +121,12 @@ struct AddTrackerView: View {
             && endDate > startDate
             && Decimal(string: startingValueText) != nil
             && Decimal(string: totalAllowanceText) != nil
-            && targetId != nil
-    }
-
-    private func loadTargets() {
-        Task {
-            let source = store.defaultManualSource
-            let targets = (try? await store.manualProvider.listAvailableTargets(for: source)) ?? []
-            availableTargets = targets
-            targetId = targets.first?.id
-        }
-    }
-
-    private func createTarget() {
-        let trimmed = newSourceName.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        Task {
-            let target = await store.manualProvider.addTarget(displayName: trimmed, to: store.defaultManualSource)
-            availableTargets.append(target)
-            targetId = target.id
-        }
+            && selectedSourceId != nil
     }
 
     private func save() {
-        guard let targetId,
+        guard let selectedSourceId,
+              let source = store.source(withId: selectedSourceId),
               let startingValue = Decimal(string: startingValueText),
               let totalAllowance = Decimal(string: totalAllowanceText)
         else {
@@ -176,19 +134,33 @@ struct AddTrackerView: View {
             return
         }
 
-        let tracker = Tracker(
-            name: name.trimmingCharacters(in: .whitespaces),
-            unit: unit.trimmingCharacters(in: .whitespaces),
-            direction: direction,
-            connectedSourceId: store.defaultManualSource.id,
-            sourceTargetId: targetId,
-            startDate: startDate,
-            endDate: endDate,
-            startingValue: startingValue,
-            totalAllowance: totalAllowance
-        )
-        store.addTracker(tracker)
-        dismiss()
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let trimmedUnit = unit.trimmingCharacters(in: .whitespaces)
+
+        guard source.providerId == store.manualProvider.providerId else {
+            // No auto-fetch providers exist yet (§9); unreachable until
+            // Starling/Tesla land, since `addedSources` is always empty.
+            errorMessage = "This source isn't supported yet."
+            return
+        }
+
+        Task {
+            let target = await store.manualProvider.addTarget(displayName: trimmedName, to: source)
+
+            let tracker = Tracker(
+                name: trimmedName,
+                unit: trimmedUnit,
+                direction: direction,
+                connectedSourceId: source.id,
+                sourceTargetId: target.id,
+                startDate: startDate,
+                endDate: endDate,
+                startingValue: startingValue,
+                totalAllowance: totalAllowance
+            )
+            store.addTracker(tracker)
+            dismiss()
+        }
     }
 }
 

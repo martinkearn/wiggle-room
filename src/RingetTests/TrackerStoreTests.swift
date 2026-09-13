@@ -10,7 +10,7 @@ final class TrackerStoreTests: XCTestCase {
 
     func testAddTracker_appendsToTrackers() {
         let store = TrackerStore()
-        let source = store.defaultManualSource
+        let source = store.manualEntrySource
         let tracker = Tracker(
             name: "Test",
             unit: "£",
@@ -28,24 +28,36 @@ final class TrackerStoreTests: XCTestCase {
         XCTAssertEqual(store.trackers, [tracker])
     }
 
-    func testDefaultManualSource_usesManualProviderIdAndIsStable() {
+    func testManualEntrySource_usesManualProviderIdAndIsStable() {
         let store = TrackerStore()
 
-        let source = store.defaultManualSource
+        let source = store.manualEntrySource
 
         XCTAssertEqual(source.providerId, "manual")
-        XCTAssertEqual(store.defaultManualSource, source, "should return the same source on repeated access")
+        XCTAssertEqual(store.manualEntrySource, source, "should return the same source on repeated access")
     }
 
-    func testConnectedSources_seededWithDefaultManualSourceAtInit() {
+    func testAddedSources_startsEmpty() {
         let store = TrackerStore()
 
-        XCTAssertEqual(store.connectedSources, [store.defaultManualSource])
+        XCTAssertTrue(store.addedSources.isEmpty, "no external provider is implemented yet, so nothing should be pre-populated")
     }
 
-    func testManualProvider_listsImplicitTargetForDefaultSource() async throws {
+    func testSourceWithId_resolvesManualEntrySource() {
         let store = TrackerStore()
-        let source = store.defaultManualSource
+
+        XCTAssertEqual(store.source(withId: store.manualEntrySource.id), store.manualEntrySource)
+    }
+
+    func testSourceWithId_returnsNilForUnknownId() {
+        let store = TrackerStore()
+
+        XCTAssertNil(store.source(withId: UUID()))
+    }
+
+    func testManualProvider_listsImplicitTargetForManualEntrySource() async throws {
+        let store = TrackerStore()
+        let source = store.manualEntrySource
 
         let targets = try await store.manualProvider.listAvailableTargets(for: source)
 

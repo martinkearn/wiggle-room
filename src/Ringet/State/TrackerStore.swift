@@ -16,20 +16,31 @@ final class TrackerStore {
 
     let manualProvider = ManualEntryProvider()
 
-    /// All connected sources (§5.2), for the Settings → Connected Sources
-    /// screen. A manual entry connection needs no auth/setup step
-    /// (`requiresConnection == false`, §5.1), so one is provisioned
-    /// automatically here rather than requiring a user-facing "add a
-    /// source" step — that step is only meaningful once Starling/Tesla
-    /// exist, since only those require an actual account connection.
-    private(set) var connectedSources: [ConnectedSource]
+    /// The single, fixed "Manual Entry" pseudo-source. Picking it for a
+    /// tracker means the user logs its readings themselves rather than the
+    /// app reading them from anywhere — it isn't a real connection, just
+    /// the provider-abstraction plumbing (§5.1) a `Tracker.connectedSourceId`
+    /// needs to point at. Unlike a real connected source it is never listed
+    /// in Settings → Connected Sources (§5.2) and there is exactly one of
+    /// it — never user-creatable, never duplicated.
+    let manualEntrySource: ConnectedSource
 
-    /// The manual connection every manual tracker is created against for
-    /// now. Always the first entry in `connectedSources`.
-    var defaultManualSource: ConnectedSource { connectedSources[0] }
+    /// Real external connections the user has added (Starling, Tesla, …).
+    /// Starts empty — no such provider is implemented yet (§9); these are
+    /// the only entries Settings → Connected Sources lists or lets the user
+    /// add to.
+    private(set) var addedSources: [ConnectedSource] = []
 
     init() {
-        connectedSources = [ConnectedSource(providerId: manualProvider.providerId, displayName: "Manual entries")]
+        manualEntrySource = ConnectedSource(providerId: manualProvider.providerId, displayName: "Manual Entry")
+    }
+
+    /// The connected source a tracker should point at, given a source
+    /// picker selection that may be the fixed manual entry id or one of
+    /// `addedSources`.
+    func source(withId id: UUID) -> ConnectedSource? {
+        if id == manualEntrySource.id { return manualEntrySource }
+        return addedSources.first { $0.id == id }
     }
 
     func addTracker(_ tracker: Tracker) {

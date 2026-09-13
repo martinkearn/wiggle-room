@@ -14,7 +14,7 @@ struct AddSourceView: View {
         ContentUnavailableView(
             "Coming Soon",
             systemImage: "point.3.filled.connected.trianglepath.dotted",
-            description: Text("Adding Starling, Tesla, or another manual source isn't available yet.")
+            description: Text("Adding a real connection like Starling or Tesla isn't available yet.")
         )
         .navigationTitle("Add Source")
         .inlineNavigationBarIfAvailable()
