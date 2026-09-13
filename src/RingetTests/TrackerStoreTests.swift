@@ -4,19 +4,25 @@
 //
 
 import XCTest
+import SwiftData
 @testable import Ringet
 
+@MainActor
 final class TrackerStoreTests: XCTestCase {
 
-    func testAddTracker_appendsToTrackers() {
-        let store = TrackerStore()
+    func testAddTracker_persistsIt() throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let store = TrackerStore(modelContext: context)
         let source = store.manualEntrySource
+        let id = UUID()
         let tracker = Tracker(
+            id: id,
             name: "Test",
             unit: "£",
             direction: .decreasing,
-            connectedSourceId: source.id,
-            sourceTargetId: ManualEntryProvider.implicitTarget(for: source).id,
+            connectedSource: source,
+            sourceTargetId: id.uuidString,
             startDate: Date(),
             endDate: Date().addingTimeInterval(3600),
             startingValue: 100,
@@ -25,42 +31,80 @@ final class TrackerStoreTests: XCTestCase {
 
         store.addTracker(tracker)
 
-        XCTAssertEqual(store.trackers, [tracker])
+        let fetched = try context.fetch(FetchDescriptor<Tracker>())
+        XCTAssertEqual(fetched.map(\.id), [id])
     }
 
-    func testManualEntrySource_usesManualProviderIdAndIsStable() {
-        let store = TrackerStore()
+    func testDeleteTracker_removesIt() throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let store = TrackerStore(modelContext: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id,
+            name: "Test",
+            unit: "£",
+            direction: .decreasing,
+            connectedSource: store.manualEntrySource,
+            sourceTargetId: id.uuidString,
+            startDate: Date(),
+            endDate: Date().addingTimeInterval(3600),
+            startingValue: 100,
+            totalAllowance: 100
+        )
+        store.addTracker(tracker)
 
-        let source = store.manualEntrySource
+        store.deleteTracker(tracker)
 
-        XCTAssertEqual(source.providerId, "manual")
-        XCTAssertEqual(store.manualEntrySource, source, "should return the same source on repeated access")
+        let fetched = try context.fetch(FetchDescriptor<Tracker>())
+        XCTAssertTrue(fetched.isEmpty)
     }
 
-    func testAddedSources_startsEmpty() {
-        let store = TrackerStore()
+    func testLogReading_appendsToTrackerReadings() {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let store = TrackerStore(modelContext: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id,
+            name: "Test",
+            unit: "£",
+            direction: .decreasing,
+            connectedSource: store.manualEntrySource,
+            sourceTargetId: id.uuidString,
+            startDate: Date(),
+            endDate: Date().addingTimeInterval(3600),
+            startingValue: 100,
+            totalAllowance: 100
+        )
+        store.addTracker(tracker)
 
-        XCTAssertTrue(store.addedSources.isEmpty, "no external provider is implemented yet, so nothing should be pre-populated")
+        store.logReading(value: 80, date: Date(), for: tracker)
+
+        XCTAssertEqual(tracker.sortedReadings.count, 1)
+        XCTAssertEqual(tracker.latestReading?.value, 80)
     }
 
-    func testSourceWithId_resolvesManualEntrySource() {
-        let store = TrackerStore()
+    func testManualEntrySource_usesManualProviderIdAndIsStableAcrossInstances() {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let store = TrackerStore(modelContext: context)
 
-        XCTAssertEqual(store.source(withId: store.manualEntrySource.id), store.manualEntrySource)
+        XCTAssertEqual(store.manualEntrySource.providerId, "manual")
+
+        // A second TrackerStore over the same context (as happens across
+        // app launches sharing one persistent store) must reuse the same
+        // manual-entry source rather than creating a duplicate.
+        let secondStore = TrackerStore(modelContext: context)
+        XCTAssertEqual(secondStore.manualEntrySource.id, store.manualEntrySource.id)
     }
 
-    func testSourceWithId_returnsNilForUnknownId() {
-        let store = TrackerStore()
+    func testManualProvider_listsNoTargetsForManualEntrySource() async throws {
+        let container = makeInMemoryModelContainer()
+        let store = TrackerStore(modelContext: container.mainContext)
 
-        XCTAssertNil(store.source(withId: UUID()))
-    }
+        let targets = try await store.manualProvider.listAvailableTargets(for: store.manualEntrySource)
 
-    func testManualProvider_listsImplicitTargetForManualEntrySource() async throws {
-        let store = TrackerStore()
-        let source = store.manualEntrySource
-
-        let targets = try await store.manualProvider.listAvailableTargets(for: source)
-
-        XCTAssertEqual(targets, [ManualEntryProvider.implicitTarget(for: source)])
+        XCTAssertTrue(targets.isEmpty)
     }
 }

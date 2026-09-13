@@ -4,31 +4,36 @@
 //
 
 import SwiftUI
+import SwiftData
 
 /// Root screen listing all trackers. See spec §7.1.
 struct TrackerListView: View {
     @Environment(TrackerStore.self) private var store
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
+
     @State private var isPresentingAddTracker = false
     @State private var isPresentingSources = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if store.trackers.isEmpty {
+                if trackers.isEmpty {
                     ContentUnavailableView(
                         "No Trackers Yet",
                         systemImage: "circle.circle",
                         description: Text("Add a tracker to start tracking pace against a target.")
                     )
                 } else {
-                    List(store.trackers) { tracker in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(tracker.name)
-                                .font(.headline)
-                            Text("\(tracker.unit) · \(tracker.direction == .decreasing ? "Decreasing" : "Increasing")")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                    List {
+                        ForEach(trackers) { tracker in
+                            NavigationLink {
+                                TrackerDetailView(tracker: tracker)
+                            } label: {
+                                TrackerRow(tracker: tracker)
+                            }
                         }
+                        .onDelete(perform: deleteTrackers)
                     }
                 }
             }
@@ -57,9 +62,38 @@ struct TrackerListView: View {
             }
         }
     }
+
+    private func deleteTrackers(at offsets: IndexSet) {
+        for index in offsets {
+            store.deleteTracker(trackers[index])
+        }
+    }
+}
+
+/// A single row: name/unit/direction plus a small ring-based pace indicator
+/// (§7.1 — "quick ring-based status indicator").
+private struct TrackerRow: View {
+    let tracker: Tracker
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RingsView(tracker: tracker, now: .now, lineWidth: 5)
+                .frame(width: 36, height: 36)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(tracker.name)
+                    .font(.headline)
+                Text("\(tracker.unit) · \(tracker.direction == .decreasing ? "Decreasing" : "Increasing")")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
 }
 
 #Preview {
     TrackerListView()
-        .environment(TrackerStore())
+        .modelContainer(PreviewData.container)
+        .environment(PreviewData.store)
 }

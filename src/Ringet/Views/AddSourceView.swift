@@ -21,18 +21,6 @@ struct AddSourceView: View {
     }
 }
 
-private extension View {
-    /// `.navigationBarTitleDisplayMode` is UIKit-only; this is a no-op on macOS.
-    @ViewBuilder
-    func inlineNavigationBarIfAvailable() -> some View {
-        #if os(iOS)
-        self.navigationBarTitleDisplayMode(.inline)
-        #else
-        self
-        #endif
-    }
-}
-
 #Preview {
     NavigationStack {
         AddSourceView()

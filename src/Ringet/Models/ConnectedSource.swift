@@ -4,14 +4,16 @@
 //
 
 import Foundation
+import SwiftData
 
 /// A configured instance of a provider — e.g. "My Starling account" — kept
 /// separate from individual trackers so multiple trackers can share one
 /// connection. See spec §5.2.
-struct ConnectedSource: Identifiable, Codable, Equatable {
-    var id: UUID
-    var providerId: String
-    var displayName: String
+@Model
+final class ConnectedSource {
+    var id: UUID = UUID()
+    var providerId: String = ""
+    var displayName: String = ""
     var credentialKeychainKey: String?
 
     init(

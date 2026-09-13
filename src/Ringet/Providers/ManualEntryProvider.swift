@@ -4,81 +4,74 @@
 //
 
 import Foundation
+import SwiftData
 
 enum ManualEntryProviderError: Error, Equatable {
     /// `fetchCurrentValue` was called for a target that has never had a
     /// reading logged against it.
     case noReadingsLogged(targetId: String)
+    /// The target's id didn't resolve to a persisted tracker.
+    case trackerNotFound(targetId: String)
 }
 
 /// The manual-entry source provider (§5.5) — used for anything without an
 /// API. `actualValue` is always the most recently logged reading; there is
 /// no automatic refresh.
 ///
-/// A manual `ConnectedSource` starts with a single implicit target (a plain
-/// "Reading" log), usable with no setup, satisfying §5.1's "manual returns
-/// a single implicit target (or a user-named log)". Additional named logs
-/// can be registered per connection via `addTarget`.
+/// Each manual tracker owns its own dedicated reading log (see
+/// `AddTrackerView`'s doc comment) rather than picking from a shared list of
+/// named logs, so a target's id is simply the owning `Tracker`'s own id —
+/// readings live on `Tracker.readings` directly, persisted via SwiftData
+/// (§6) rather than the in-memory store this provider used before.
 ///
-/// Backed by an in-memory store — readings do not yet survive relaunch;
-/// that lands with the SwiftData/CloudKit persistence phase (§6).
-actor ManualEntryProvider: SourceProvider {
+/// In practice, app code that already holds a `Tracker` reference (the
+/// dashboard, the log-reading sheet) reads/writes `tracker.readings`
+/// directly rather than going through this provider — it exists so the
+/// generic `SourceProvider` abstraction has a real manual implementation to
+/// swap alongside a future Starling/Tesla provider, and so provider-shaped
+/// code (tests included) has something to call against target ids alone.
+@MainActor
+final class ManualEntryProvider: SourceProvider {
     nonisolated let providerId = "manual"
     nonisolated let displayName = "Manual entry"
     nonisolated let requiresConnection = false
 
-    /// User-named targets registered per connection, in the order added.
-    /// The implicit default target is never stored here — it's derived on
-    /// demand so a fresh connection needs no setup.
-    private var namedTargetsByConnection: [UUID: [SourceTarget]] = [:]
+    private let modelContext: ModelContext
 
-    /// Logged readings by target id. `fetchCurrentValue`/`logManualReading`
-    /// only carry a target (§5.1), not its owning connection, so a target's
-    /// id alone must be enough to find its readings — true for both the
-    /// implicit target (its id embeds the connection id) and named targets
-    /// (freshly-generated UUIDs).
-    private var readingsByTargetId: [String: [ValueSnapshot]] = [:]
-
-    /// The always-available implicit target for a manual connection.
-    nonisolated static func implicitTarget(for connection: ConnectedSource) -> SourceTarget {
-        SourceTarget(id: "implicit:\(connection.id.uuidString)", displayName: "Reading")
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
     }
 
+    /// Manual entry has no shared list of targets to pick from — each
+    /// tracker gets its own dedicated log created at save time (see
+    /// `AddTrackerView.save()`), so this always returns empty.
     func listAvailableTargets(for connection: ConnectedSource) async throws -> [SourceTarget] {
-        let named = namedTargetsByConnection[connection.id] ?? []
-        return [Self.implicitTarget(for: connection)] + named
-    }
-
-    /// Registers an additional named log for a connection (e.g. "Car A
-    /// mileage" vs. "Car B mileage" on the same manual connected source),
-    /// so it appears in future `listAvailableTargets` calls.
-    @discardableResult
-    func addTarget(displayName: String, to connection: ConnectedSource) -> SourceTarget {
-        let target = SourceTarget(id: UUID().uuidString, displayName: displayName)
-        namedTargetsByConnection[connection.id, default: []].append(target)
-        return target
+        []
     }
 
     func fetchCurrentValue(target: SourceTarget) async throws -> Decimal {
-        guard let latest = latestReading(for: target) else {
+        guard let tracker = try fetchTracker(id: target.id) else {
+            throw ManualEntryProviderError.trackerNotFound(targetId: target.id)
+        }
+        guard let latest = tracker.latestReading else {
             throw ManualEntryProviderError.noReadingsLogged(targetId: target.id)
         }
         return latest.value
     }
 
     func logManualReading(target: SourceTarget, value: Decimal, date: Date) async throws {
-        readingsByTargetId[target.id, default: []].append(ValueSnapshot(value: value, date: date))
+        guard let tracker = try fetchTracker(id: target.id) else {
+            throw ManualEntryProviderError.trackerNotFound(targetId: target.id)
+        }
+        let reading = ValueSnapshot(value: value, date: date)
+        reading.tracker = tracker
+        modelContext.insert(reading)
+        try modelContext.save()
     }
 
-    /// All readings logged for a target, oldest first. Not part of the
-    /// `SourceProvider` protocol — the timestamped history this store
-    /// already keeps (§4.6) is exposed here for zoom levels and trend
-    /// charts to read from later.
-    func readings(for target: SourceTarget) async -> [ValueSnapshot] {
-        (readingsByTargetId[target.id] ?? []).sorted { $0.date < $1.date }
-    }
-
-    private func latestReading(for target: SourceTarget) -> ValueSnapshot? {
-        readingsByTargetId[target.id]?.max { $0.date < $1.date }
+    private func fetchTracker(id: String) throws -> Tracker? {
+        guard let uuid = UUID(uuidString: id) else { return nil }
+        let descriptor = FetchDescriptor<Tracker>(predicate: #Predicate { $0.id == uuid })
+        return try modelContext.fetch(descriptor).first
     }
 }

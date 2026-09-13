@@ -4,37 +4,80 @@
 //
 
 import XCTest
+import SwiftData
 @testable import Ringet
 
+@MainActor
 final class ManualEntryProviderTests: XCTestCase {
 
-    private func connection(name: String = "My mileage log") -> ConnectedSource {
-        ConnectedSource(providerId: "manual", displayName: name)
+    private func makeManualSource(in context: ModelContext) -> ConnectedSource {
+        let source = ConnectedSource(providerId: "manual", displayName: "Manual Entry")
+        context.insert(source)
+        return source
     }
 
-    func testProviderIdentity() async {
-        let provider = ManualEntryProvider()
-        let providerId = await provider.providerId
-        let displayName = await provider.displayName
-        let requiresConnection = await provider.requiresConnection
-
-        XCTAssertEqual(providerId, "manual")
-        XCTAssertEqual(displayName, "Manual entry")
-        XCTAssertFalse(requiresConnection)
+    /// Mirrors how `AddTrackerView.save()` creates a manual tracker: its own
+    /// id doubles as its `sourceTargetId`.
+    private func makeTracker(in context: ModelContext, name: String = "Test tracker") -> Tracker {
+        let source = makeManualSource(in: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id,
+            name: name,
+            unit: "£",
+            direction: .decreasing,
+            connectedSource: source,
+            sourceTargetId: id.uuidString,
+            startDate: Date(),
+            endDate: Date().addingTimeInterval(3600),
+            startingValue: 100,
+            totalAllowance: 100
+        )
+        context.insert(tracker)
+        return tracker
     }
 
-    func testListAvailableTargets_freshConnection_returnsOnlyImplicitTarget() async throws {
-        let provider = ManualEntryProvider()
-        let source = connection()
+    func testProviderIdentity() {
+        let container = makeInMemoryModelContainer()
+        let provider = ManualEntryProvider(modelContext: container.mainContext)
+
+        XCTAssertEqual(provider.providerId, "manual")
+        XCTAssertEqual(provider.displayName, "Manual entry")
+        XCTAssertFalse(provider.requiresConnection)
+    }
+
+    func testListAvailableTargets_isAlwaysEmpty() async throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let provider = ManualEntryProvider(modelContext: context)
+        let source = makeManualSource(in: context)
 
         let targets = try await provider.listAvailableTargets(for: source)
 
-        XCTAssertEqual(targets, [ManualEntryProvider.implicitTarget(for: source)])
+        XCTAssertTrue(targets.isEmpty, "manual entry has no shared target list — each tracker owns its own log")
     }
 
-    func testFetchCurrentValue_beforeAnyLog_throws() async {
-        let provider = ManualEntryProvider()
-        let target = ManualEntryProvider.implicitTarget(for: connection())
+    func testFetchCurrentValue_unknownTrackerId_throwsTrackerNotFound() async {
+        let container = makeInMemoryModelContainer()
+        let provider = ManualEntryProvider(modelContext: container.mainContext)
+        let target = SourceTarget(id: UUID().uuidString, displayName: "Missing")
+
+        do {
+            _ = try await provider.fetchCurrentValue(target: target)
+            XCTFail("expected trackerNotFound to be thrown")
+        } catch ManualEntryProviderError.trackerNotFound(let targetId) {
+            XCTAssertEqual(targetId, target.id)
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    func testFetchCurrentValue_beforeAnyLog_throwsNoReadingsLogged() async throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let provider = ManualEntryProvider(modelContext: context)
+        let tracker = makeTracker(in: context)
+        let target = SourceTarget(id: tracker.sourceTargetId!, displayName: tracker.name)
 
         do {
             _ = try await provider.fetchCurrentValue(target: target)
@@ -47,18 +90,25 @@ final class ManualEntryProviderTests: XCTestCase {
     }
 
     func testLogThenFetch_returnsLoggedValue() async throws {
-        let provider = ManualEntryProvider()
-        let target = ManualEntryProvider.implicitTarget(for: connection())
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let provider = ManualEntryProvider(modelContext: context)
+        let tracker = makeTracker(in: context)
+        let target = SourceTarget(id: tracker.sourceTargetId!, displayName: tracker.name)
 
         try await provider.logManualReading(target: target, value: 12345, date: Date())
 
         let value = try await provider.fetchCurrentValue(target: target)
         XCTAssertEqual(value, 12345)
+        XCTAssertEqual(tracker.sortedReadings.count, 1)
     }
 
     func testFetchCurrentValue_returnsMostRecentByDateNotInsertionOrder() async throws {
-        let provider = ManualEntryProvider()
-        let target = ManualEntryProvider.implicitTarget(for: connection())
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let provider = ManualEntryProvider(modelContext: context)
+        let tracker = makeTracker(in: context)
+        let target = SourceTarget(id: tracker.sourceTargetId!, displayName: tracker.name)
         let earlier = Date(timeIntervalSince1970: 1_000_000)
         let later = Date(timeIntervalSince1970: 2_000_000)
 
@@ -71,63 +121,40 @@ final class ManualEntryProviderTests: XCTestCase {
         XCTAssertEqual(value, 200)
     }
 
-    func testAddTarget_registersNamedLog() async throws {
-        let provider = ManualEntryProvider()
-        let source = connection()
+    func testDifferentTrackers_haveIndependentReadingHistories() async throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let provider = ManualEntryProvider(modelContext: context)
+        let carA = makeTracker(in: context, name: "Car A mileage")
+        let carB = makeTracker(in: context, name: "Car B mileage")
+        let targetA = SourceTarget(id: carA.sourceTargetId!, displayName: carA.name)
+        let targetB = SourceTarget(id: carB.sourceTargetId!, displayName: carB.name)
 
-        let named = await provider.addTarget(displayName: "Car A mileage", to: source)
-        let targets = try await provider.listAvailableTargets(for: source)
+        try await provider.logManualReading(target: targetA, value: 10_000, date: Date())
+        try await provider.logManualReading(target: targetB, value: 50_000, date: Date())
 
-        XCTAssertTrue(targets.contains(named))
-        XCTAssertEqual(targets.first, ManualEntryProvider.implicitTarget(for: source))
-        XCTAssertEqual(targets.count, 2)
-    }
-
-    func testNamedTargets_haveIndependentReadingHistories() async throws {
-        let provider = ManualEntryProvider()
-        let source = connection()
-        let carA = await provider.addTarget(displayName: "Car A mileage", to: source)
-        let carB = await provider.addTarget(displayName: "Car B mileage", to: source)
-
-        try await provider.logManualReading(target: carA, value: 10_000, date: Date())
-        try await provider.logManualReading(target: carB, value: 50_000, date: Date())
-
-        let valueA = try await provider.fetchCurrentValue(target: carA)
-        let valueB = try await provider.fetchCurrentValue(target: carB)
+        let valueA = try await provider.fetchCurrentValue(target: targetA)
+        let valueB = try await provider.fetchCurrentValue(target: targetB)
 
         XCTAssertEqual(valueA, 10_000)
         XCTAssertEqual(valueB, 50_000)
     }
 
-    func testDifferentConnections_haveIndependentImplicitTargets() async throws {
-        let provider = ManualEntryProvider()
-        let sourceA = connection(name: "Account A")
-        let sourceB = connection(name: "Account B")
-
-        try await provider.logManualReading(target: ManualEntryProvider.implicitTarget(for: sourceA), value: 111, date: Date())
-        try await provider.logManualReading(target: ManualEntryProvider.implicitTarget(for: sourceB), value: 222, date: Date())
-
-        let valueA = try await provider.fetchCurrentValue(target: ManualEntryProvider.implicitTarget(for: sourceA))
-        let valueB = try await provider.fetchCurrentValue(target: ManualEntryProvider.implicitTarget(for: sourceB))
-
-        XCTAssertEqual(valueA, 111)
-        XCTAssertEqual(valueB, 222)
-    }
-
-    func testReadings_returnsFullHistoryOldestFirst() async throws {
-        let provider = ManualEntryProvider()
-        let target = ManualEntryProvider.implicitTarget(for: connection())
+    func testTrackerSortedReadings_returnsFullHistoryOldestFirst() async throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let provider = ManualEntryProvider(modelContext: context)
+        let tracker = makeTracker(in: context)
+        let target = SourceTarget(id: tracker.sourceTargetId!, displayName: tracker.name)
         let earlier = Date(timeIntervalSince1970: 1_000_000)
         let later = Date(timeIntervalSince1970: 2_000_000)
 
         try await provider.logManualReading(target: target, value: 200, date: later)
         try await provider.logManualReading(target: target, value: 100, date: earlier)
 
-        let readings = await provider.readings(for: target)
+        let readings = tracker.sortedReadings
 
-        XCTAssertEqual(readings, [
-            ValueSnapshot(value: 100, date: earlier),
-            ValueSnapshot(value: 200, date: later),
-        ])
+        XCTAssertEqual(readings.map(\.value), [100, 200])
+        XCTAssertEqual(readings.map(\.date), [earlier, later])
     }
 }

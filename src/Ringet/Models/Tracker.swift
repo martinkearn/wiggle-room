@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import SwiftData
 
 /// Whether a tracker's value depletes from a starting value (e.g. a bank
 /// balance) or accumulates upward from a baseline (e.g. odometer mileage).
@@ -12,49 +13,67 @@ enum TrackerDirection: String, Codable, Hashable {
     case increasing
 }
 
-/// Placeholder for the recurrence rule design in spec §4.4, which is a later
-/// build phase. Present now only so `Tracker.recurrence` has a concrete type.
-struct RecurrenceRule: Codable, Equatable {
-}
-
 /// A single tracker: a quantity that should move from `startingValue` toward
 /// an end-of-period target at a steady pace. See spec §4.1.
-struct Tracker: Identifiable, Codable, Equatable {
-    var id: UUID
-    var name: String
-    var unit: String
-    var direction: TrackerDirection
-    var connectedSourceId: UUID
+///
+/// Persisted via SwiftData with CloudKit sync (§6). CloudKit requires every
+/// attribute to be optional or have a default, and every relationship to be
+/// optional — hence the `= ...` defaults below even where a real tracker
+/// always has a real value.
+@Model
+final class Tracker {
+    var id: UUID = UUID()
+    var name: String = ""
+    var unit: String = ""
+    var direction: TrackerDirection = TrackerDirection.decreasing
+    var connectedSource: ConnectedSource?
     var sourceTargetId: String?
-    var startDate: Date
-    var endDate: Date
-    var startingValue: Decimal
-    var totalAllowance: Decimal
-    var recurrence: RecurrenceRule?
+    var startDate: Date = Date.now
+    var endDate: Date = Date.now
+    var startingValue: Decimal = 0
+    var totalAllowance: Decimal = 0
+
+    /// Every reading ever logged for this tracker (§4.6 — timestamped
+    /// history, not a single overwritten current value). Optional array for
+    /// CloudKit compatibility; use `sortedReadings`/`latestReading` rather
+    /// than reading this directly.
+    @Relationship(deleteRule: .cascade, inverse: \ValueSnapshot.tracker)
+    var readings: [ValueSnapshot]? = []
 
     init(
         id: UUID = UUID(),
         name: String,
         unit: String,
         direction: TrackerDirection,
-        connectedSourceId: UUID,
+        connectedSource: ConnectedSource,
         sourceTargetId: String? = nil,
         startDate: Date,
         endDate: Date,
         startingValue: Decimal,
-        totalAllowance: Decimal,
-        recurrence: RecurrenceRule? = nil
+        totalAllowance: Decimal
     ) {
         self.id = id
         self.name = name
         self.unit = unit
         self.direction = direction
-        self.connectedSourceId = connectedSourceId
+        self.connectedSource = connectedSource
         self.sourceTargetId = sourceTargetId
         self.startDate = startDate
         self.endDate = endDate
         self.startingValue = startingValue
         self.totalAllowance = totalAllowance
-        self.recurrence = recurrence
+        self.readings = []
+    }
+}
+
+extension Tracker {
+    /// All logged readings, oldest first.
+    var sortedReadings: [ValueSnapshot] {
+        (readings ?? []).sorted { $0.date < $1.date }
+    }
+
+    /// The most recently logged reading, if any.
+    var latestReading: ValueSnapshot? {
+        sortedReadings.last
     }
 }

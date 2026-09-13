@@ -5,45 +5,64 @@
 
 import Foundation
 import Observation
+import SwiftData
 
-/// App-wide, in-memory state: created trackers and the connected sources
-/// they can point at. Not yet backed by persistence — that lands with the
-/// SwiftData/CloudKit phase (§6), at which point this becomes a thin
-/// wrapper over a `ModelContext` rather than an in-memory array.
+/// App-wide actions and the fixed manual-entry source, backed by SwiftData
+/// (§6) rather than in-memory storage. Tracker/source lists themselves are
+/// read via `@Query` directly in views (the idiomatic, auto-updating
+/// SwiftData pattern) — this type holds only what a `@Query` can't express:
+/// the manual-entry singleton, and mutating actions.
 @Observable
 final class TrackerStore {
-    private(set) var trackers: [Tracker] = []
+    private let modelContext: ModelContext
 
-    let manualProvider = ManualEntryProvider()
+    let manualProvider: ManualEntryProvider
 
     /// The single, fixed "Manual Entry" pseudo-source. Picking it for a
     /// tracker means the user logs its readings themselves rather than the
     /// app reading them from anywhere — it isn't a real connection, just
-    /// the provider-abstraction plumbing (§5.1) a `Tracker.connectedSourceId`
-    /// needs to point at. Unlike a real connected source it is never listed
-    /// in Settings → Connected Sources (§5.2) and there is exactly one of
-    /// it — never user-creatable, never duplicated.
+    /// the provider-abstraction plumbing (§5.1) a tracker's connected
+    /// source needs to point at. Unlike a real connected source it is never
+    /// listed in Settings → Connected Sources (§5.2) and there is exactly
+    /// one of it — never user-creatable, never duplicated. Fetched once at
+    /// launch, created the first time only.
     let manualEntrySource: ConnectedSource
 
-    /// Real external connections the user has added (Starling, Tesla, …).
-    /// Starts empty — no such provider is implemented yet (§9); these are
-    /// the only entries Settings → Connected Sources lists or lets the user
-    /// add to.
-    private(set) var addedSources: [ConnectedSource] = []
-
-    init() {
-        manualEntrySource = ConnectedSource(providerId: manualProvider.providerId, displayName: "Manual Entry")
-    }
-
-    /// The connected source a tracker should point at, given a source
-    /// picker selection that may be the fixed manual entry id or one of
-    /// `addedSources`.
-    func source(withId id: UUID) -> ConnectedSource? {
-        if id == manualEntrySource.id { return manualEntrySource }
-        return addedSources.first { $0.id == id }
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+        self.manualProvider = ManualEntryProvider(modelContext: modelContext)
+        self.manualEntrySource = Self.fetchOrCreateManualEntrySource(in: modelContext)
     }
 
     func addTracker(_ tracker: Tracker) {
-        trackers.append(tracker)
+        modelContext.insert(tracker)
+        try? modelContext.save()
+    }
+
+    func deleteTracker(_ tracker: Tracker) {
+        modelContext.delete(tracker)
+        try? modelContext.save()
+    }
+
+    /// Appends a manually-logged reading directly — the dashboard and log
+    /// sheet already hold the `Tracker` reference, so this bypasses the
+    /// target-id indirection `ManualEntryProvider` exists for.
+    func logReading(value: Decimal, date: Date, for tracker: Tracker) {
+        let reading = ValueSnapshot(value: value, date: date)
+        reading.tracker = tracker
+        modelContext.insert(reading)
+        try? modelContext.save()
+    }
+
+    private static func fetchOrCreateManualEntrySource(in context: ModelContext) -> ConnectedSource {
+        let manualProviderId = "manual"
+        let all = (try? context.fetch(FetchDescriptor<ConnectedSource>())) ?? []
+        if let existing = all.first(where: { $0.providerId == manualProviderId }) {
+            return existing
+        }
+        let source = ConnectedSource(providerId: manualProviderId, displayName: "Manual Entry")
+        context.insert(source)
+        try? context.save()
+        return source
     }
 }

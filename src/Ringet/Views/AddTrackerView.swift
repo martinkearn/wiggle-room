@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 private enum SourceOption: Hashable {
     case source(UUID)
@@ -17,19 +18,22 @@ private enum SourceOption: Hashable {
 /// Settings → Connected Sources (§5.2), or "Add New Source…", a shortcut
 /// into the same add-a-source flow Settings uses (`AddSourceView`) — handy
 /// mid-way through creating a tracker rather than backing out to Settings
-/// first. Starling/Tesla aren't implemented yet, so `addedSources` is
-/// currently always empty and Manual Entry is the only real option.
+/// first. Starling/Tesla aren't implemented yet, so the added-sources list
+/// is currently always empty and Manual Entry is the only real option.
 ///
 /// Manual Entry is a fixed, single choice, not something the user can add
 /// more of — each tracker that uses it simply gets its own dedicated manual
-/// reading log behind the scenes (named after the tracker itself), created
+/// reading log (its `sourceTargetId` is just its own id), created
 /// automatically on save. No further picking is needed for it. A real
 /// connected source with multiple targets (e.g. several Starling accounts)
-/// will need a follow-up "which one" picker once such a provider exists —
-/// out of scope while `addedSources` is always empty.
+/// will need a follow-up "which one" picker once such a provider exists.
 struct AddTrackerView: View {
     @Environment(TrackerStore.self) private var store
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+
+    @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
+    private var addedSources: [ConnectedSource]
 
     @State private var name = ""
     @State private var unit = ""
@@ -95,7 +99,7 @@ struct AddTrackerView: View {
                 Section {
                     Picker("Source", selection: $sourceSelection) {
                         Text("Manual Entry").tag(SourceOption.source(store.manualEntrySource.id) as SourceOption?)
-                        ForEach(store.addedSources) { source in
+                        ForEach(addedSources) { source in
                             Text(source.displayName).tag(SourceOption.source(source.id) as SourceOption?)
                         }
                         Text("Add New Source…").tag(SourceOption.addNew as SourceOption?)
@@ -191,7 +195,7 @@ struct AddTrackerView: View {
 
     private func save() {
         guard let selectedSourceId,
-              let source = store.source(withId: selectedSourceId),
+              let source = resolveSource(withId: selectedSourceId),
               let startingValue = Decimal(string: startingValueText),
               let totalAllowance = Decimal(string: totalAllowanceText)
         else {
@@ -209,39 +213,31 @@ struct AddTrackerView: View {
             return
         }
 
-        Task {
-            let target = await store.manualProvider.addTarget(displayName: trimmedName, to: source)
+        let trackerId = UUID()
+        let tracker = Tracker(
+            id: trackerId,
+            name: trimmedName,
+            unit: trimmedUnit,
+            direction: direction,
+            connectedSource: source,
+            sourceTargetId: trackerId.uuidString,
+            startDate: startDate,
+            endDate: endDate,
+            startingValue: startingValue,
+            totalAllowance: totalAllowance
+        )
+        store.addTracker(tracker)
+        dismiss()
+    }
 
-            let tracker = Tracker(
-                name: trimmedName,
-                unit: trimmedUnit,
-                direction: direction,
-                connectedSourceId: source.id,
-                sourceTargetId: target.id,
-                startDate: startDate,
-                endDate: endDate,
-                startingValue: startingValue,
-                totalAllowance: totalAllowance
-            )
-            store.addTracker(tracker)
-            dismiss()
-        }
+    private func resolveSource(withId id: UUID) -> ConnectedSource? {
+        if id == store.manualEntrySource.id { return store.manualEntrySource }
+        return addedSources.first { $0.id == id }
     }
 }
 
 #Preview {
     AddTrackerView()
-        .environment(TrackerStore())
-}
-
-private extension View {
-    /// `.keyboardType` is UIKit-only; this is a no-op on macOS.
-    @ViewBuilder
-    func decimalKeyboardIfAvailable() -> some View {
-        #if os(iOS)
-        self.keyboardType(.decimalPad)
-        #else
-        self
-        #endif
-    }
+        .modelContainer(PreviewData.container)
+        .environment(PreviewData.store)
 }
