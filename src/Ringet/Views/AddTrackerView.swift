@@ -5,19 +5,28 @@
 
 import SwiftUI
 
+private enum SourceOption: Hashable {
+    case source(UUID)
+    case addNew
+}
+
 /// Add/Edit tracker screen (§7.1).
 ///
 /// The user picks a **Source** for the tracker: either "Manual Entry" (they
-/// log readings themselves) or one of the real connections listed in
-/// Settings → Connected Sources (§5.2) — Starling/Tesla aren't implemented
-/// yet, so that list is currently always empty and Manual Entry is the only
-/// option. Manual Entry is a fixed, single choice, not something the user
-/// can add more of — each tracker that uses it simply gets its own
-/// dedicated manual reading log behind the scenes (named after the tracker
-/// itself), created automatically on save. No further picking is needed for
-/// it. A real connected source with multiple targets (e.g. several Starling
-/// accounts) will need a follow-up "which one" picker once such a provider
-/// exists — out of scope while `addedSources` is always empty.
+/// log readings themselves), one of the real connections listed in
+/// Settings → Connected Sources (§5.2), or "Add New Source…", a shortcut
+/// into the same add-a-source flow Settings uses (`AddSourceView`) — handy
+/// mid-way through creating a tracker rather than backing out to Settings
+/// first. Starling/Tesla aren't implemented yet, so `addedSources` is
+/// currently always empty and Manual Entry is the only real option.
+///
+/// Manual Entry is a fixed, single choice, not something the user can add
+/// more of — each tracker that uses it simply gets its own dedicated manual
+/// reading log behind the scenes (named after the tracker itself), created
+/// automatically on save. No further picking is needed for it. A real
+/// connected source with multiple targets (e.g. several Starling accounts)
+/// will need a follow-up "which one" picker once such a provider exists —
+/// out of scope while `addedSources` is always empty.
 struct AddTrackerView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -30,7 +39,8 @@ struct AddTrackerView: View {
     @State private var startingValueText = "0"
     @State private var totalAllowanceText = ""
 
-    @State private var selectedSourceId: UUID?
+    @State private var sourceSelection: SourceOption?
+    @State private var isShowingAddSource = false
 
     @State private var errorMessage: String?
 
@@ -52,30 +62,50 @@ struct AddTrackerView: View {
                     DatePicker("End", selection: $endDate, displayedComponents: .date)
                 }
 
-                Section("Allowance") {
+                Section {
                     LabeledContent("Starting value") {
                         TextField("0", text: $startingValueText)
                             .decimalKeyboardIfAvailable()
                             .multilineTextAlignment(.trailing)
                     }
-                    LabeledContent("Total allowance") {
+                    Text(startingValueHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    LabeledContent("Total budget") {
                         TextField("0", text: $totalAllowanceText)
                             .decimalKeyboardIfAvailable()
                             .multilineTextAlignment(.trailing)
                     }
+                    Text(totalBudgetHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
                     if let hourlyPaceDescription {
                         Text(hourlyPaceDescription)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Text("Budget")
+                } footer: {
+                    Text(budgetFooter)
                 }
 
                 Section {
-                    Picker("Source", selection: $selectedSourceId) {
-                        Text("Manual Entry").tag(store.manualEntrySource.id as UUID?)
+                    Picker("Source", selection: $sourceSelection) {
+                        Text("Manual Entry").tag(SourceOption.source(store.manualEntrySource.id) as SourceOption?)
                         ForEach(store.addedSources) { source in
-                            Text(source.displayName).tag(source.id as UUID?)
+                            Text(source.displayName).tag(SourceOption.source(source.id) as SourceOption?)
                         }
+                        Text("Add New Source…").tag(SourceOption.addNew as SourceOption?)
+                    }
+                    .onChange(of: sourceSelection) { oldValue, newValue in
+                        guard newValue == .addNew else { return }
+                        isShowingAddSource = true
+                        // "Add New Source…" is a shortcut action, not a real
+                        // selection — restore whatever was chosen before.
+                        sourceSelection = oldValue
                     }
                 } footer: {
                     Text("Manual Entry means you'll log this tracker's readings yourself. Otherwise, pick a source you've added in Settings → Connected Sources.")
@@ -99,10 +129,45 @@ struct AddTrackerView: View {
                 }
             }
             .task {
-                if selectedSourceId == nil {
-                    selectedSourceId = store.manualEntrySource.id
+                if sourceSelection == nil {
+                    sourceSelection = .source(store.manualEntrySource.id)
                 }
             }
+            .navigationDestination(isPresented: $isShowingAddSource) {
+                AddSourceView()
+            }
+        }
+    }
+
+    private var selectedSourceId: UUID? {
+        guard case .source(let id) = sourceSelection else { return nil }
+        return id
+    }
+
+    private var startingValueHint: String {
+        switch direction {
+        case .decreasing:
+            return "How much you're starting with, e.g. 3000 for a £3000 budget."
+        case .increasing:
+            return "Your reading at the start, e.g. 0 miles, or today's odometer reading."
+        }
+    }
+
+    private var totalBudgetHint: String {
+        switch direction {
+        case .decreasing:
+            return "The total amount allowed for the whole period — usually the same as starting value."
+        case .increasing:
+            return "How much more you're allowed to add over the whole period."
+        }
+    }
+
+    private var budgetFooter: String {
+        switch direction {
+        case .decreasing:
+            return "Example: for a simple £3000 budget, set both starting value and total budget to 3000. You'll then log your remaining balance over time (e.g. 3000 → 0), not your bank account's own balance unless this tracker follows that account exactly."
+        case .increasing:
+            return "Example: for a 3000-mile lease allowance, set starting value to your odometer reading and total budget to 3000. You'll then log your current odometer reading over time as it rises."
         }
     }
 
