@@ -7,7 +7,7 @@ import Foundation
 
 /// Whether a tracker's value depletes from a starting value (e.g. a bank
 /// balance) or accumulates upward from a baseline (e.g. odometer mileage).
-enum TrackerDirection: String, Codable, Equatable {
+enum TrackerDirection: String, Codable, Hashable {
     case decreasing
     case increasing
 }
