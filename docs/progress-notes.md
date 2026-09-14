@@ -1,32 +1,42 @@
 # Ringet — Progress Notes
 
-Status snapshot for picking this work back up. Last updated 2026-09-14, after
-enabling CloudKit sync (confirmed working end-to-end) and a round of
-dashboard/UX refinements. Read alongside
+Status snapshot for picking this work back up. Last updated 2026-09-14
+(overnight session), after an autonomous pass that added the widget
+extension, watch app, macOS parity, and Shortcuts/Siri integration — see
+**Overnight platform expansion** below for that work; everything above it
+predates that session. Read alongside
 [ringet-build-spec.md](ringet-build-spec.md) — this file tracks *what's
 actually been built*, not the spec itself.
+
+**Scope note**: the overnight session was explicitly told to stay manual-entry
+only — no Starling/Tesla work was done or attempted, despite the new
+platform surfaces (widgets, watch, Shortcuts) being exactly the kind of thing
+that would eventually want live provider data. Every new surface reads
+`Tracker`/`ValueSnapshot` generically, so a future provider needs no changes
+to widgets/watch/Shortcuts — they already work for whatever `actualValue`
+resolves to.
 
 ## What's implemented
 
 ### §4.1 / §4.3 — Tracker model & pace calculations
-- [`Tracker.swift`](../src/Ringet/Models/Tracker.swift) — `Tracker`, a SwiftData `@Model` class (see **Persistence** below), and the `TrackerDirection` enum. Also holds `isCurrencyUnit` and `formattedValue(_:signed:)` — a currency symbol (£, $, €, …) is prefixed with no space ("£1,234.56"); any other unit is suffixed with a space ("1,234 miles"). The `recurrence` field (§4.4 placeholder) was removed — see decision #7.
-- [`TrackerPace.swift`](../src/Ringet/Models/TrackerPace.swift) — `Tracker.pace(actualValue:asOf:)` computing periodHours/hoursElapsed/consumedSoFar/expectedConsumedByNow/difference/target-right-now in one call, so a single snapshot of "now" stays consistent. `hoursElapsed` uses `timeIntervalSince` (wall-clock seconds), which is DST-safe by construction. Also defines `PaceStatus` (`.good`/`.warning`/`.bad`) — the traffic-light read of a tracker's pace — with `.color` (green/amber/red) and `.label(for tracker:)`, which switches to budget language ("Under Budget"/"At Budget"/"Over Budget") specifically for decreasing trackers denominated in currency, and stays neutral ("On Track"/"At Target"/"Needs Attention") otherwise. `.status` is `.warning` ("at") only on an **exact whole-number match** between current and target (pennies/cents don't count) — not a percentage tolerance band, per explicit feedback that a fuzzy "near" reading was confusing. `TrackerPace.displayDifference(for:)` is the one place that decides whether to show a signed value or drop the sign — see decision #4.
+- [`Tracker.swift`](../src/RingetShared/Models/Tracker.swift) — `Tracker`, a SwiftData `@Model` class (see **Persistence** below), and the `TrackerDirection` enum. Also holds `isCurrencyUnit` and `formattedValue(_:signed:)` — a currency symbol (£, $, €, …) is prefixed with no space ("£1,234.56"); any other unit is suffixed with a space ("1,234 miles"). The `recurrence` field (§4.4 placeholder) was removed — see decision #7.
+- [`TrackerPace.swift`](../src/RingetShared/Models/TrackerPace.swift) — `Tracker.pace(actualValue:asOf:)` computing periodHours/hoursElapsed/consumedSoFar/expectedConsumedByNow/difference/target-right-now in one call, so a single snapshot of "now" stays consistent. `hoursElapsed` uses `timeIntervalSince` (wall-clock seconds), which is DST-safe by construction. Also defines `PaceStatus` (`.good`/`.warning`/`.bad`) — the traffic-light read of a tracker's pace — with `.color` (green/amber/red) and `.label(for tracker:)`, which switches to budget language ("Under Budget"/"At Budget"/"Over Budget") specifically for decreasing trackers denominated in currency, and stays neutral ("On Track"/"At Target"/"Needs Attention") otherwise. `.status` is `.warning` ("at") only on an **exact whole-number match** between current and target (pennies/cents don't count) — not a percentage tolerance band, per explicit feedback that a fuzzy "near" reading was confusing. `TrackerPace.displayDifference(for:)` is the one place that decides whether to show a signed value or drop the sign — see decision #4.
 - Tests: [`TrackerPaceTests.swift`](../src/RingetTests/TrackerPaceTests.swift) — both directions, ahead/behind pace, period-start/end edges, one DST-transition regression test.
 
 ### §5.1 / §5.2 / §5.5 — Source provider abstraction & manual entry
-- [`SourceProvider.swift`](../src/Ringet/Providers/SourceProvider.swift) — the protocol, unchanged.
-- [`SourceTarget.swift`](../src/Ringet/Models/SourceTarget.swift) — still a plain (non-persisted) struct; a lightweight DTO for the provider protocol's API shape.
-- [`ConnectedSource.swift`](../src/Ringet/Models/ConnectedSource.swift), [`ValueSnapshot.swift`](../src/Ringet/Models/ValueSnapshot.swift) — SwiftData `@Model` classes. `ConnectedSource.trackers` is the CloudKit-required inverse of `Tracker.connectedSource` — see decision #10, this one cost real debugging time.
-- [`ManualEntryProvider.swift`](../src/Ringet/Providers/ManualEntryProvider.swift) — a `@MainActor` class holding a `ModelContext`; `fetchCurrentValue`/`logManualReading` resolve a target's id back to a `Tracker` (`sourceTargetId == tracker.id.uuidString`) and read/write `tracker.readings` directly. In practice, app code that already holds the `Tracker` (the dashboard, the log-reading sheet) bypasses this indirection and uses `TrackerStore.logReading`/`tracker.latestReading` directly — this provider mainly exists so the abstraction has a real implementation ahead of Starling/Tesla.
+- [`SourceProvider.swift`](../src/RingetShared/Providers/SourceProvider.swift) — the protocol, unchanged.
+- [`SourceTarget.swift`](../src/RingetShared/Models/SourceTarget.swift) — still a plain (non-persisted) struct; a lightweight DTO for the provider protocol's API shape.
+- [`ConnectedSource.swift`](../src/RingetShared/Models/ConnectedSource.swift), [`ValueSnapshot.swift`](../src/RingetShared/Models/ValueSnapshot.swift) — SwiftData `@Model` classes. `ConnectedSource.trackers` is the CloudKit-required inverse of `Tracker.connectedSource` — see decision #10, this one cost real debugging time.
+- [`ManualEntryProvider.swift`](../src/RingetShared/Providers/ManualEntryProvider.swift) — a `@MainActor` class holding a `ModelContext`; `fetchCurrentValue`/`logManualReading` resolve a target's id back to a `Tracker` (`sourceTargetId == tracker.id.uuidString`) and read/write `tracker.readings` directly. In practice, app code that already holds the `Tracker` (the dashboard, the log-reading sheet) bypasses this indirection and uses `TrackerStore.logReading`/`tracker.latestReading` directly — this provider mainly exists so the abstraction has a real implementation ahead of Starling/Tesla.
 - No Starling or Tesla provider exists yet.
 
 ### §6 — Persistence, now with CloudKit sync enabled
 - [`RingetApp.swift`](../src/Ringet/RingetApp.swift) — builds a `ModelContainer` for `[Tracker, ConnectedSource, ValueSnapshot]` using `ModelConfiguration(schema:cloudKitDatabase:.automatic)`, with a local-only `ModelConfiguration` as a defensive fallback (only kicks in if CloudKit container creation throws — e.g. no iCloud account signed in). **This is live now**: the user's Apple Developer Program enrollment went from "Pending" to active partway through this session, and re-enabling CloudKit surfaced (and fixed) a real schema bug — see decision #10.
 - [`Ringet.entitlements`](../src/Ringet/Ringet.entitlements) declares `iCloud.martinkearn.Ringet` + the CloudKit service + `aps-environment` (needed for CloudKit's push-based sync — see **CloudKit** below), and is wired in as the `Ringet` target's `CODE_SIGN_ENTITLEMENTS` build setting (Debug and Release, main app target only — not the test targets).
-- [`TrackerStore.swift`](../src/Ringet/State/TrackerStore.swift) — a thin `@Observable` wrapper around a `ModelContext`: owns `manualEntrySource` (fetched-or-created once) and the `manualProvider`, and exposes `addTracker`/`deleteTracker`/`logReading`/`saveChanges` actions (`saveChanges` flushes in-place edits from `AddTrackerView`'s edit mode). Tracker/source **lists** are not held here — views read them via `@Query` directly (idiomatic SwiftData/SwiftUI, auto-updating).
+- [`TrackerStore.swift`](../src/RingetShared/State/TrackerStore.swift) — a thin `@Observable` wrapper around a `ModelContext`: owns `manualEntrySource` (fetched-or-created once) and the `manualProvider`, and exposes `addTracker`/`deleteTracker`/`logReading`/`saveChanges` actions (`saveChanges` flushes in-place edits from `AddTrackerView`'s edit mode). Tracker/source **lists** are not held here — views read them via `@Query` directly (idiomatic SwiftData/SwiftUI, auto-updating).
 - **Confirmed working this session, including real cross-device sync**: created a tracker with CloudKit enabled, force-quit the app, relaunched — still there. Then signed the Simulator into the user's real iCloud account and saw their actual real-device tracker ("Dublin Pocket Money") appear in the Simulator via CloudKit sync — this is real end-to-end confirmation, not just local-disk persistence. See **CloudKit** below for the capabilities that had to be added to get here.
 
-### §7.1 — Screens (full-screen only; no widgets/Lock Screen/menu bar yet, per instruction)
+### §7.1 — Screens (iOS full-screen; see **Overnight platform expansion** below for widgets/Lock Screen/watch/macOS)
 - [`TrackerListView.swift`](../src/Ringet/Views/TrackerListView.swift) — `@Query`-backed list, empty state, swipe-to-delete, "+" as the primary toolbar action, gear icon (secondary) opening Connected Sources. Each row shows a small `RingsView` pace indicator plus the **difference from target** (via `TrackerPace.displayDifference(for:)`, colored per `PaceStatus`) as the subtitle — not the unit/direction text that used to be there, per explicit user feedback that the difference is the number that matters at a glance.
 - [`AddTrackerView.swift`](../src/Ringet/Views/AddTrackerView.swift) — now doubles as the **edit** screen: pass `existingTracker:` and it prefills every field (including detecting whether the tracker already has a specific time-of-day set) and mutates in place via `store.saveChanges()` on save, rather than creating a new `Tracker`. A tracker's source can't be changed after creation — the edit form shows it read-only. Also has:
   - **Unit is picked from a fixed set of pills only** (£, $, €, mi, km, kg) — no free-text entry. This was quick-pick chips alongside a text field earlier; per feedback it's now the *only* way to set the unit, so every currency/formatting check downstream can rely on an exact string match.
@@ -37,7 +47,7 @@ actually been built*, not the spec itself.
   - Verified a 1-minute-long tracker (Start/End 1 minute apart via the times toggle) doesn't crash — the hourly-rate math degrades to a very large but finite number, and the daily line correctly stays hidden.
 - [`TrackerDetailView.swift`](../src/Ringet/Views/TrackerDetailView.swift) — the tracker dashboard. Two-ring visual with the **difference-from-target as its centerpiece** (large, bold, colored, inside the rings), a `PaceStatus`-driven status word above it (e.g. "OVER BUDGET BY £8.00" for budget trackers — no sign, see decision #4), a trend chart once ≥2 readings exist, and a "…" menu with **Edit Tracker**, **Update History** (manual trackers only — see `ReadingHistoryView` below), and Delete (confirmation first). Below the rings, **Current Balance/Current and Target Right Now are two visually separate cards**, not a shared row — they're different things updated in different ways, and the "Update" button (a capsule, `.controlSize(.large)`, plus-icon — reads as a proper button per Apple HIG, not the cramped two-line label it was before) lives inside the Current Balance card specifically, since that's the only figure it changes. The "Current Balance" vs. "Current" title comes from `Tracker.currentValueLabel` (currency vs. not). Pace figures refresh once a minute (`minuteTimer`); a `secondTimer`-driven "Updates in Xs" caption sits at the **top of the screen**, under the nav title — it reflects the whole screen's live figures (the ring, the difference, Target Right Now), not just one card, so it doesn't belong tucked under a single figure. That countdown's baseline is set in `.onAppear`, not a default `@State` value — see decision #12. A subtle remaining-at-end caption sits under the days-remaining text (same projection as the add/edit form, see above).
 - [`ReadingHistoryView.swift`](../src/Ringet/Views/ReadingHistoryView.swift) — **new**: lists every logged update for a manual tracker, newest first, tap to edit (via `LogReadingView`'s edit mode) or swipe/Edit-mode to delete. Reachable only for `tracker.isManualEntry` trackers — a real provider's history should reflect what it actually reported, not something hand-edited.
-- [`RingsView.swift`](../src/Ringet/Views/RingsView.swift) — the two-ring visual itself (§3.4) — outer neutral-gray pace ring (elapsed-time fraction), inner ring colored per `PaceStatus` (green/amber/red — true traffic-light semantics, not just a green/red binary). Bigger by default (used at 260pt in the dashboard) with the difference figure and a legend as center content; `showsCenterContent: false` gives the bare rings for small uses like the list-row indicator. The legend uses the exact same wording as the figure cards below it ("Current Balance"/"Target Right Now"), in the same left-to-right order — not a separately-worded "Progress"/"Time elapsed" pair the reader had to map onto the figures themselves. Uses a `GeometryReader` to constrain the center text's width so long values shrink to fit rather than overflowing past the ring.
+- [`RingsView.swift`](../src/RingetShared/RingsView.swift) — the two-ring visual itself (§3.4) — outer neutral-gray pace ring (elapsed-time fraction), inner ring colored per `PaceStatus` (green/amber/red — true traffic-light semantics, not just a green/red binary). Bigger by default (used at 260pt in the dashboard) with the difference figure and a legend as center content; `showsCenterContent: false` gives the bare rings for small uses like the list-row indicator. The legend uses the exact same wording as the figure cards below it ("Current Balance"/"Target Right Now"), in the same left-to-right order — not a separately-worded "Progress"/"Time elapsed" pair the reader had to map onto the figures themselves. Uses a `GeometryReader` to constrain the center text's width so long values shrink to fit rather than overflowing past the ring.
 - [`TrendChartView.swift`](../src/Ringet/Views/TrendChartView.swift) — Swift Charts line (§3.5) — a straight gray pace-reference line from start to end, actual logged readings plotted in blue on top.
 - [`LogReadingView.swift`](../src/Ringet/Views/LogReadingView.swift) — the §5.5 value-entry sheet ("Update Current Value" when creating, "Edit Update" when editing an existing one via `existingReading:`, with a Delete action alongside Save). A large, centered numeric input with the unit as a prefix/suffix label replaces the old small trailing-aligned field — bigger, easier to tap, and the whole row focuses it. Uses the same robust decimal parsing as `AddTrackerView`.
 - [`ConnectedSourcesView.swift`](../src/Ringet/Views/ConnectedSourcesView.swift) + [`AddSourceView.swift`](../src/Ringet/Views/AddSourceView.swift) — Settings → Connected Sources (§5.2), `@Query`-backed. `AddSourceView` is still a deliberate stub ("Coming Soon") — no Starling/Tesla setup UI exists yet.
@@ -62,18 +72,12 @@ assuming it's a new problem:
 
 **Confirmed working, end to end**: with the Simulator signed into the user's real iCloud account (Settings app inside the Simulator, same Apple ID as their real device), the user's actual real-device tracker synced down and appeared in the Simulator. This is real cross-device sync, not just local persistence — the main open question from earlier in this session is resolved.
 
-**A one-time snag on this Mac, unrelated to the above**: running tests with
-`-destination 'platform=macOS'` fails with *"Device ... isn't registered in
-your developer account"* — the CloudKit entitlement means the macOS build
-needs a Mac App Development provisioning profile, which needs this specific
-Mac registered as a device on the paid account. `xcodebuild
--allowProvisioningUpdates` could **not** do this registration itself from
-the command line — it needs Xcode's own GUI (open the project, select "My
-Mac" as the run destination, build once; Xcode handles the device
-registration handshake automatically). Until that's done once, **run tests
-against the iOS Simulator destination instead** (see the command below) —
-simulators don't need per-device registration and this now covers all 23
-tests fine.
+**Update from the overnight session**: the note below about macOS needing a
+one-time Xcode GUI device-registration step no longer applies — building for
+`platform=macOS` with `-allowProvisioningUpdates` now succeeds directly from
+the command line (this Mac must have gotten registered at some point between
+sessions). Still, prefer the iOS Simulator destination for routine test runs
+(faster, no signing involved at all).
 
 ## Key decisions worth knowing before you touch this again
 
@@ -98,28 +102,26 @@ tests fine.
 
 - §4.6 zoom levels (This year/This month/This week sub-period views) are not implemented — the dashboard always shows the tracker's full period.
 - No SwiftUI view has automated UI tests — verification has been manual (simulator screenshots + interaction) plus unit tests on the non-UI layers (`TrackerPace`, `ManualEntryProvider`, `TrackerStore` — 23 tests, all passing). Consider `ViewInspector`-style tests or UI tests if this grows much further.
-- This Mac isn't yet registered as a device on the paid developer account (needed only for running/testing the macOS target locally with the CloudKit entitlement — see the CloudKit section above for the one-time Xcode GUI step that fixes this).
+- ~~This Mac isn't yet registered as a device on the paid developer account~~ — resolved during the overnight session: `-allowProvisioningUpdates` now generates a working Mac profile from the command line with no Xcode GUI step needed (see **Overnight platform expansion**).
 - An increasing tracker can't model an open-ended "goal to exceed" (e.g. a savings goal) — see decision #14. Only tested as a cap/allowance (mileage-lease-style), which is what the current pace math supports.
 - The Budget section's example/footer text in `AddTrackerView` is written for the mileage-lease example on increasing trackers regardless of the unit actually chosen (it doesn't adapt to a currency unit) — minor, cosmetic, not fixed this session.
 
 ## Explicitly out of scope so far (per spec, deferred on purpose)
 
 - §4.4 Recurrence, §4.5 multi-tracker source-sharing/dedup (only matters once a second provider exists), §4.6 zoom levels
-- §5.3 Starling, §5.4 Tesla providers (only the manual provider exists)
-- §7.2 macOS-specific UI (sidebar/menu bar), §7.3 watchOS, §8 widgets/Lock Screen — explicitly excluded by the user for this phase ("just focus on what happens when app is full screen")
+- §5.3 Starling, §5.4 Tesla providers (only the manual provider exists) — explicitly kept out of scope for the overnight session too, by direct instruction
+- Live Activities / Dynamic Island — considered during the overnight session and deliberately skipped; see **Overnight platform expansion** for why
 
 ## Suggested next steps (not a commitment, just a sane order)
 
-1. Register this Mac on the developer account via Xcode's GUI, so macOS-destination tests work again locally.
-2. §4.6 zoom levels, once a long-running tracker makes the full-period ring feel too static to be useful day-to-day.
-3. A real source provider (Starling is the simplest per spec's own note in §5.3) — this is what actually exercises the multi-source parts of the Settings screen and the "Add New Source" flow for real.
-4. If a goal-type tracker (exceed-the-target framing, e.g. savings) turns out to matter, it needs new semantics distinct from "increasing" — see decision #14.
+1. §4.6 zoom levels, once a long-running tracker makes the full-period ring feel too static to be useful day-to-day.
+2. A real source provider (Starling is the simplest per spec's own note in §5.3) — this is what actually exercises the multi-source parts of the Settings screen and the "Add New Source" flow for real, and is also what would make the widget/watch/Shortcuts refresh cadence choices (hourly, once-a-day, on-demand) actually matter.
+3. If a goal-type tracker (exceed-the-target framing, e.g. savings) turns out to matter, it needs new semantics distinct from "increasing" — see decision #14.
+4. See **Overnight platform expansion**'s own "Suggested next steps" for widget/watch/macOS-specific follow-ups.
 
 ## Verifying the app still builds and passes tests
 
-Use the iOS Simulator destination — the macOS destination currently needs a
-one-time device registration step in Xcode's GUI first (see the CloudKit
-section above):
+Use the iOS Simulator destination:
 
 ```bash
 cd src
@@ -138,3 +140,129 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
 2. Create a tracker, log a few readings over a couple of days, confirm the dashboard/rings/chart look right and data survives relaunch.
 3. If testing sync, repeat on a second device signed into the same Apple ID — confirmed working this session between a real device and the Simulator, see the **CloudKit** section above.
 4. **A free/personal Apple ID team install expires after ~7 days** and needs re-signing from Xcode; this doesn't apply anymore now the account is on the paid Program, but is worth knowing if a personal team is ever used again for a quick test.
+
+## Overnight platform expansion (2026-09-14)
+
+An autonomous overnight session took the app from "iPhone app, full-screen
+only" to widgets, a watch app, and macOS parity — all still manual-entry
+only, per explicit instruction (no Starling/Tesla work). Functionality over
+visual polish throughout, per the session's own brief; none of this has had
+a design pass.
+
+### New targets
+
+- **RingetWidgets** (`src/RingetWidgets/`) — a WidgetKit extension, embedded
+  in the iOS app's `PlugIns/`. One `AppIntentConfiguration`-based `Widget`
+  covers Home Screen small/medium/large and Lock Screen
+  circular/rectangular/inline (iOS only — WidgetKit's accessory families
+  don't exist on macOS, see below). Each widget instance is independently
+  configurable to a tracker via a `WidgetConfigurationIntent` +
+  `TrackerEntity`/`TrackerEntityQuery` (App Intents), so two widgets can show
+  two different trackers side by side. `WidgetDataStore` opens its own
+  `ModelContainer` against the same CloudKit container on every timeline
+  refresh (no App Group needed — see **Architecture** below) and refreshes
+  hourly. Reuses `RingsView` directly rather than a bespoke widget visual.
+- **RingetWatch** (`src/RingetWatch/`) — a single-target watchOS companion
+  app, embedded in the iOS app via the classic "Embed Watch Content" phase.
+  A tracker list, a detail screen (`RingsView` again, at watch size), and a
+  "Log" action for manual trackers — promoted from the spec's §7.3 "stretch
+  goal" to a real feature, since manual entry is the only provider in scope.
+  Talks to its own `ModelContainer`/CloudKit container independently of the
+  phone being nearby.
+- No separate widget/complication target for the watch was attempted —
+  watchOS complications are WidgetKit widgets too (since watchOS 9), but
+  they'd need their own extension embedded *inside* `RingetWatch`, which is
+  a second round of the same target-surgery done for `RingetWidgets` above.
+  Deferred — see "Suggested next steps" below.
+
+### Architecture: RingetShared
+
+The model/pace layer and a few view/store pieces were moved into a new
+`src/RingetShared/` folder, compiled directly into the app, widget
+extension, and watch app targets (via a `PBXFileSystemSynchronizedRootGroup`
+listed under all three targets — see **Tooling gotchas** below for what that
+actually means and why it needed scripting rather than Xcode's GUI):
+
+- `Models/` — `Tracker`, `ConnectedSource`, `ValueSnapshot`, `TrackerPace`, `SourceTarget` (moved from `src/Ringet/Models/`)
+- `Providers/` — `SourceProvider`, `ManualEntryProvider` (moved from `src/Ringet/Providers/`)
+- `State/TrackerStore.swift` (moved from `src/Ringet/State/`)
+- `RingsView.swift` (moved from `src/Ringet/Views/`) — the two-ring visual, reused verbatim by the widget and watch app
+- `RingetColors.swift` — extracted out of `RingsView.swift` (it used to be a private-ish enum at the bottom of that file) since widgets/watch need it independently; also gained `Color.widgetBackground`, a cross-platform stand-in for `UIColor.systemBackground` (no macOS/watchOS equivalent)
+- `SharedPreviewData.swift` — a `TrackerStore`-free preview fixture for shared views, since the app's own `PreviewData` (in `src/Ringet/PreviewSupport.swift`) pulls in `TrackerStore`, which shared views shouldn't need just to render a preview
+
+**No App Group was needed anywhere.** Widgets and the watch app don't share
+a local store with the phone app — each opens its own `ModelContainer`
+against the same `iCloud.martinkearn.Ringet` CloudKit container (Apple's
+recommended pattern for widgets reading SwiftData+CloudKit data), and
+CloudKit sync is what keeps them consistent, not a shared on-disk file. This
+was flagged as a possible blocking need in the pre-flight check and turned
+out not to be one.
+
+**Shortcuts/Siri** (`src/Ringet/Intents/`) lives in the main app target, not
+`RingetShared` — `LogReadingIntent` (manual trackers only) and
+`ViewTrackerStatusIntent` (read-only), registered via `RingetShortcuts:
+AppShortcutsProvider`. Each opens its own `ModelContainer`
+(`IntentDataStore`) for the same reason widgets do: Shortcuts/Siri can
+invoke an intent while the app isn't running. Has its own
+`TrackerEntity`/`TrackerEntityQuery` rather than reusing the widget
+extension's — App Intents entities aren't shared across extension/module
+boundaries, each target needs its own.
+
+### macOS parity pass
+
+- `MacRootView.swift` — `NavigationSplitView` sidebar + detail (§7.2),
+  reusing `TrackerDetailView` verbatim in the detail pane. `ContentView`
+  branches on `#if os(macOS)` between this and the iOS `TrackerListView`.
+- A `MenuBarExtra` in `RingetApp.swift` (macOS only) — `MenuBarStatusView`/
+  `MenuBarStatusLabel` show one tracker's ahead/behind figure and a small
+  dropdown of its key numbers. Shows the most-recently-started tracker
+  (simplest of the two options §7.2 leaves to the build's judgment — a
+  submenu for multiple trackers is easy to add later if a single pinned
+  tracker turns out not to be enough).
+- Two real, pre-existing macOS build breaks fixed along the way (not new
+  code from tonight, just never previously exercised since macOS hadn't
+  been built with these targets before): `EditButton()` in
+  `ReadingHistoryView` is iOS-only, guarded with `#if !os(macOS)`; and
+  WidgetKit's accessory widget families (`.accessoryCircular/Rectangular/
+  Inline` — Lock Screen only) don't exist on macOS at all, so both the
+  widget's `.supportedFamilies` list and its entry view's family switch are
+  platform-gated.
+- **`-allowProvisioningUpdates` now succeeds for macOS from the command
+  line** — see the updated CloudKit section above; this had previously
+  looked like an Xcode-GUI-only fix.
+- Not attempted: a macOS Dock icon badge for "any tracker behind pace", and
+  a cross-app-crossing-pace notification (§7.2's last two bullets) — both
+  small, but neither is load-bearing and both can be added later without
+  touching anything else.
+
+### Live Activities — deliberately not built
+
+Explicitly requested for exploration tonight, and explicitly out of scope
+in the build spec (§9) before that. Judgment call: skipped. Live Activities
+are designed for short, bounded events (a ride, a delivery, a sports game)
+with a clear start/end shown continuously on the Lock Screen/Dynamic Island
+for that duration — a Ringet tracker runs for days, weeks, or months, so
+"start a Live Activity when the tracker starts" would mean asking the Lock
+Screen to hold a Live Activity open for the entire period, which isn't what
+the API is for and would likely get the activity silently ended early by
+the system. A *narrow* version — surfacing one only in the tracker's final
+24 hours, similar to the existing "Updates in Xs" countdown but system-level
+— could be worth it later, but that's a distinct, smaller feature, not
+"add Live Activities" as asked; flagging the reasoning rather than either
+silently skipping it or building something that doesn't fit the API.
+
+### Tooling gotchas hit tonight (read before touching the `.xcodeproj` again)
+
+17. **This project has no Xcode-GUI access in this environment**, and its `.xcodeproj` uses the newer `PBXFileSystemSynchronizedRootGroup` format (see decision #6) that most third-party Xcode-project tooling doesn't understand. The `xcodeproj` Ruby gem (v1.28.1, installed via `gem install --user-install xcodeproj` — also needed `CFPropertyList -v 3.0.9` pinned for this machine's Ruby 2.6) turned out to round-trip this format losslessly (verified by opening-and-resaving with zero changes before trusting it with anything real) and was used for every target/scheme change tonight. The scripts are kept in `scripts/*.rb` for reference, not because they need running again.
+18. **A `PBXFileSystemSynchronizedRootGroup` can be listed under more than one target's `fileSystemSynchronizedGroups`** — that's how `RingetShared` ends up compiled into three different targets/modules without three copies of the files on disk, and without a separate framework target. Each target gets its own independently-compiled copy of the same source (not a shared binary) — fine for a folder this small.
+19. **`xcodebuild -destination` could not discover *any* watchOS simulator destination** for `RingetWatch`, even a booted, paired one, and even after adding a real shared `.xcscheme` (autocreated schemes aren't enough for `xcodebuild` to resolve watchOS destinations reliably when the project has never been opened in Xcode.app itself). Building the target directly bypasses this: `xcodebuild -target RingetWatch -sdk watchsimulator build`. **Caveat**: `-sdk <sdk>` on the command line force-overrides `SDKROOT` for *every* target in the build graph, including dependencies with their own different `SDKROOT` — this silently corrupted `RingetWatch`'s generated `Info.plist` (wrong `UIDeviceFamily`) when building `-target Ringet -sdk iphonesimulator` (which also builds the embedded `RingetWatch` dependency). The scheme+`-destination` route doesn't have this problem, once the matching simulator runtime is installed — see #20.
+20. **A scheme containing an embedded watch app refuses to `build` (not just run) unless a simulator runtime matching the *SDK* version is installed** — not the app's `WATCHOS_DEPLOYMENT_TARGET`. This machine had watchOS SDK 26.5 but only runtimes up to 26.4 installed, so `xcodebuild -scheme Ringet -destination 'platform=iOS Simulator,...' build` failed with *"This scheme builds an embedded Apple Watch app. watchOS 26.5 must be installed"* even though the watch target's own deployment target was set to 26.4. Fixed by running `xcodebuild -downloadPlatform watchOS` (network access confirmed available; ran in the background for the rest of the session). Building for **macOS** never hit this at all, since RingetWatch is correctly excluded there — see #21.
+21. **A macOS build fails outright if it embeds a watchOS binary** — "This target is built for macOS but contains embedded content (RingetWatch.app) built for watchOS, which is not allowed." Fixed with Xcode's **platform filter** mechanism (`platform_filters = ['ios']` via the `xcodeproj` gem) on *both* the `PBXTargetDependency` and the `PBXBuildFile` inside the "Embed Watch Content" copy-files phase — this is exactly what Xcode's own multiplatform-target wizard sets up, just applied by script instead.
+22. **A single-target watchOS app's generated `Info.plist` needs `UIDeviceFamily: [4]` explicitly** — `GENERATE_INFOPLIST_FILE = YES` did not reliably infer it from `TARGETED_DEVICE_FAMILY = 4` in this setup, and the Simulator's install step fails with a clear ("WatchKit 2.0 app's UIDeviceFamily key does not specify...") but easy-to-miss error if it's wrong. Set directly in `RingetWatch/Info.plist` rather than relying on the generated-plist inference.
+
+### Suggested next steps (widget/watch/macOS-specific)
+
+1. A real watch complication (a second WidgetKit extension embedded inside `RingetWatch`, using the same accessory families as the Lock Screen widgets) — the natural next step now the plumbing for #17–21 above is understood.
+2. A macOS Dock badge + cross-pace notification (§7.2's last two bullets) — small, deferred, not started.
+3. Once a live simulator screenshot/interaction pass is done on the widget and watch app (see the overnight report for exactly what was and wasn't visually verified), a first real design pass — this was explicitly functionality-first tonight.
+4. `EditButton()`-equivalent delete-by-swipe on macOS's `ReadingHistoryView` list currently has no visible affordance (macOS `List` supports `.onDelete` via a selected row + Delete key, but the list has no `selection:` binding yet) — small follow-up.

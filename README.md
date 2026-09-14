@@ -22,18 +22,23 @@ non-trivial change.
 
 ## Status
 
-Early build. See the spec's own section list for the rough shape of
-what's implemented vs. still to come:
+See [`docs/progress-notes.md`](docs/progress-notes.md) for the detailed,
+continuously-updated log of what's built, key decisions, and known gaps.
+Rough shape of what's implemented vs. still to come:
 
-- [ ] Core Tracker model & pace/consumption calculations
-- [ ] Starling provider
-- [ ] Manual entry provider
-- [ ] Tesla provider
-- [ ] SwiftData + CloudKit sync
-- [ ] iOS dashboard & rings visual
-- [ ] Widgets (Home Screen, Lock Screen)
-- [ ] macOS UI (sidebar, menu bar item)
-- [ ] watchOS companion app & complication
+- [x] Core Tracker model & pace/consumption calculations
+- [ ] Starling provider (not started — deliberately out of scope so far)
+- [x] Manual entry provider
+- [ ] Tesla provider (not started — deliberately out of scope so far)
+- [x] SwiftData + CloudKit sync
+- [x] iOS dashboard & rings visual
+- [x] Widgets (Home Screen, Lock Screen — configurable per tracker)
+- [x] macOS UI (sidebar, menu bar item)
+- [x] watchOS companion app (embedded in the iOS app)
+- [ ] watchOS complication (companion app only so far — see progress notes)
+- [x] Siri/Shortcuts (log a reading, check a tracker's status)
+- [ ] Live Activities (deliberately skipped — see progress notes for why)
+- [ ] §4.6 zoom levels (This year/This month/This week sub-periods)
 
 ## Requirements
 
@@ -49,18 +54,32 @@ what's implemented vs. still to come:
 ## Getting started
 
 1. Open `src/Ringet.xcodeproj` (or `.xcworkspace`, if present) in Xcode.
-2. Build and run on the iOS or macOS simulator.
+2. Build and run on the iOS, macOS, or watchOS simulator — pick the
+   `Ringet` scheme for the iPhone/Mac app (the watch app and widgets embed
+   automatically), or `RingetWatch`/`RingetWidgets` directly to iterate on
+   just one of them.
 3. Provider credentials are entered in-app under Settings → Connected
    Sources — never hardcode tokens in source or commit them to this
-   repo.
+   repo. (Not yet relevant in practice — no real provider ships yet.)
 
 ## Project structure
 
 ```
 ringet/
 ├── docs/
-│   └── ringet-build-spec.md   — the build spec (source of truth)
+│   ├── ringet-build-spec.md   — the build spec (source of truth)
+│   └── progress-notes.md      — what's actually been built, decisions, gaps
+├── scripts/                   — one-off Xcode-project-surgery scripts (see
+│                                 progress-notes.md; not part of the app)
 ├── src/                       — Xcode project & app source
-│   └── Ringet.xcodeproj
+│   ├── Ringet.xcodeproj
+│   ├── Ringet/                — the iOS/iPadOS/macOS app + Shortcuts intents
+│   ├── RingetShared/          — model/pace layer + RingsView, shared by
+│   │                             every target below (no App Group — each
+│   │                             target syncs independently via CloudKit)
+│   ├── RingetWidgets/         — WidgetKit extension (Home Screen, Lock Screen)
+│   ├── RingetWatch/           — watchOS companion app
+│   ├── RingetTests/
+│   └── RingetUITests/
 └── README.md
 ```
