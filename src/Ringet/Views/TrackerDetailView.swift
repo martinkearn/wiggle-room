@@ -22,7 +22,12 @@ struct TrackerDetailView: View {
     @State private var isPresentingEditTracker = false
     @State private var isPresentingDeleteConfirmation = false
     @State private var now = Date.now
-    @State private var nextUpdateAt = Date.now.addingTimeInterval(60)
+    // Set from `.onAppear`, not here: a default value initializes whenever
+    // SwiftUI happens to construct this struct, which can be well before
+    // the screen actually becomes visible (e.g. NavigationLink destinations
+    // are sometimes built ahead of the tap) — that made the countdown start
+    // already expired.
+    @State private var nextUpdateAt = Date.now
     @State private var secondsUntilUpdate = 60
 
     /// Recomputes the live pace/target figures once a minute — the period
@@ -45,16 +50,9 @@ struct TrackerDetailView: View {
 
                 figuresRow
 
-                VStack(spacing: 2) {
-                    Text(periodRemainingText)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    if now < tracker.endDate {
-                        Text("Updates in \(secondsUntilUpdate)s")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
+                Text(periodRemainingText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
                 if tracker.latestReading == nil {
                     Text("No readings logged yet — log one to see your pace.")
@@ -67,16 +65,6 @@ struct TrackerDetailView: View {
                         .frame(height: 220)
                         .padding(.horizontal)
                 }
-
-                Button {
-                    isPresentingLogReading = true
-                } label: {
-                    Label("Update Current Value", systemImage: "pencil.circle.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding(.horizontal)
             }
             .padding(.bottom, 32)
         }
@@ -118,6 +106,12 @@ struct TrackerDetailView: View {
         } message: {
             Text("This removes the tracker and all its logged readings. This can't be undone.")
         }
+        .onAppear {
+            let appearedAt = Date.now
+            now = appearedAt
+            nextUpdateAt = appearedAt.addingTimeInterval(60)
+            secondsUntilUpdate = 60
+        }
         .onReceive(minuteTimer) { date in
             now = date
             nextUpdateAt = date.addingTimeInterval(60)
@@ -127,22 +121,62 @@ struct TrackerDetailView: View {
         }
     }
 
+    /// Two visually separate cards, not one shared row — Current Balance
+    /// and Target Right Now are different things updated in different ways
+    /// (one by logging a reading, one automatically by the clock), and the
+    /// "Update Current Value" button belongs specifically to the first one,
+    /// not to the pair of them together.
     private var figuresRow: some View {
-        HStack {
-            figure(title: "Current", value: pace.currentValue)
-            Spacer()
-            figure(title: "Target Right Now", value: pace.targetValueToday)
+        HStack(alignment: .top, spacing: 12) {
+            card {
+                figureContent(title: tracker.currentValueLabel, value: pace.currentValue)
+                Button {
+                    isPresentingLogReading = true
+                } label: {
+                    Label("Update Current Value", systemImage: "pencil.circle.fill")
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+            card {
+                figureContent(title: "Target Right Now", value: pace.targetValueToday, caption: targetUpdateCaption)
+            }
         }
         .padding(.horizontal)
     }
 
-    private func figure(title: String, value: Decimal) -> some View {
+    private func card(@ViewBuilder content: () -> some View) -> some View {
+        VStack(spacing: 12) {
+            content()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(16)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// The target is what actually changes every minute — everything else
+    /// on screen (current value, difference) only moves when a new reading
+    /// is logged — so the countdown belongs directly under it, not off by
+    /// itself near the days-remaining text.
+    private var targetUpdateCaption: String? {
+        guard now < tracker.endDate else { return nil }
+        return "Updates in \(secondsUntilUpdate)s"
+    }
+
+    private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {
         VStack(spacing: 4) {
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(tracker.formattedValue(value))
                 .font(.title2.monospacedDigit().weight(.semibold))
+            if let caption {
+                Text(caption)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .frame(maxWidth: .infinity)
     }
