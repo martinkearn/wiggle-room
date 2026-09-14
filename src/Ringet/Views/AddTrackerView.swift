@@ -93,18 +93,14 @@ struct AddTrackerView: View {
 
                 Section {
                     LabeledContent("Starting value") {
-                        TextField("0", text: $startingValueText)
-                            .decimalKeyboardIfAvailable()
-                            .multilineTextAlignment(.trailing)
+                        unitValueField(text: $startingValueText)
                     }
                     Text(startingValueHint)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
                     LabeledContent("Total budget") {
-                        TextField("0", text: $totalAllowanceText)
-                            .decimalKeyboardIfAvailable()
-                            .multilineTextAlignment(.trailing)
+                        unitValueField(text: $totalAllowanceText)
                     }
                     Text(totalBudgetHint)
                         .font(.caption)
@@ -228,6 +224,28 @@ struct AddTrackerView: View {
         .listRowInsets(EdgeInsets())
         .padding(.horizontal)
         .padding(.vertical, 2)
+    }
+
+    /// A budget number field with the chosen unit shown alongside it —
+    /// prefixed with no space for a currency symbol ("£3000"), suffixed
+    /// otherwise ("3000 mi"), matching `Tracker.formattedValue`'s styling
+    /// elsewhere in the app.
+    private func unitValueField(text: Binding<String>) -> some View {
+        HStack(spacing: 4) {
+            Spacer(minLength: 0)
+            if Tracker.isCurrencyUnit(unit) {
+                Text(unit)
+                    .foregroundStyle(.secondary)
+            }
+            TextField("0", text: text)
+                .decimalKeyboardIfAvailable()
+                .multilineTextAlignment(.trailing)
+                .fixedSize()
+            if !unit.isEmpty && !Tracker.isCurrencyUnit(unit) {
+                Text(unit)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var selectedSourceId: UUID? {
