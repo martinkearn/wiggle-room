@@ -61,6 +61,13 @@ final class TrackerStore {
         try? modelContext.save()
     }
 
+    /// Removes a single previously-logged reading (manual trackers only —
+    /// see `Tracker.isManualEntry`).
+    func deleteReading(_ reading: ValueSnapshot) {
+        modelContext.delete(reading)
+        try? modelContext.save()
+    }
+
     private static func fetchOrCreateManualEntrySource(in context: ModelContext) -> ConnectedSource {
         let manualProviderId = "manual"
         let all = (try? context.fetch(FetchDescriptor<ConnectedSource>())) ?? []
