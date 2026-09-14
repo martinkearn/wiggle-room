@@ -8,22 +8,29 @@ import SwiftData
 import Combine
 
 /// Tracker detail / dashboard (§7.1): the two-ring visual as the primary
-/// visual, current value, target value today, ahead/behind figure, days
-/// remaining, a "Log a Reading" button (manual sources only — no
-/// auto-fetch providers exist yet, so no refresh button), and a trend
-/// chart once at least one reading exists.
+/// visual (with the difference-from-target as its centerpiece — that's the
+/// key number, per §3.2), current value, live target, days remaining, an
+/// "Update Current Value" button (manual sources only — no auto-fetch
+/// providers exist yet, so no refresh button), and a trend chart once at
+/// least one reading exists.
 struct TrackerDetailView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     let tracker: Tracker
 
     @State private var isPresentingLogReading = false
+    @State private var isPresentingEditTracker = false
     @State private var isPresentingDeleteConfirmation = false
     @State private var now = Date.now
+    @State private var nextUpdateAt = Date.now.addingTimeInterval(60)
+    @State private var secondsUntilUpdate = 60
 
-    /// Keeps hours-remaining/pace figures live while the dashboard is open,
-    /// without needing any actual data refresh (manual sources have none).
-    private let refreshTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    /// Recomputes the live pace/target figures once a minute — the period
+    /// is fixed, so each minute has one exact target value, no finer-grained
+    /// updates are needed. `secondTimer` only drives the visible countdown
+    /// to that update, so a user watching the screen sees it's still live.
+    private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    private let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var pace: TrackerPace {
         tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
@@ -33,16 +40,21 @@ struct TrackerDetailView: View {
         ScrollView {
             VStack(spacing: 28) {
                 RingsView(tracker: tracker, now: now)
-                    .frame(width: 220, height: 220)
+                    .frame(width: 260, height: 260)
                     .padding(.top, 12)
-
-                statusLabel
 
                 figuresRow
 
-                Text(periodRemainingText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 2) {
+                    Text(periodRemainingText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if now < tracker.endDate {
+                        Text("Updates in \(secondsUntilUpdate)s")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
 
                 if tracker.latestReading == nil {
                     Text("No readings logged yet — log one to see your pace.")
@@ -59,7 +71,7 @@ struct TrackerDetailView: View {
                 Button {
                     isPresentingLogReading = true
                 } label: {
-                    Label("Log a Reading", systemImage: "plus.circle.fill")
+                    Label("Update Current Value", systemImage: "pencil.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -73,6 +85,11 @@ struct TrackerDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    Button {
+                        isPresentingEditTracker = true
+                    } label: {
+                        Label("Edit Tracker", systemImage: "pencil")
+                    }
                     Button(role: .destructive) {
                         isPresentingDeleteConfirmation = true
                     } label: {
@@ -86,6 +103,9 @@ struct TrackerDetailView: View {
         .sheet(isPresented: $isPresentingLogReading) {
             LogReadingView(tracker: tracker)
         }
+        .sheet(isPresented: $isPresentingEditTracker) {
+            AddTrackerView(existingTracker: tracker)
+        }
         .confirmationDialog(
             "Delete \u{201C}\(tracker.name)\u{201D}?",
             isPresented: $isPresentingDeleteConfirmation,
@@ -98,57 +118,33 @@ struct TrackerDetailView: View {
         } message: {
             Text("This removes the tracker and all its logged readings. This can't be undone.")
         }
-        .onReceive(refreshTimer) { now = $0 }
-    }
-
-    private var statusLabel: some View {
-        Text(statusText)
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(statusColor)
-    }
-
-    private var statusText: String {
-        guard tracker.latestReading != nil else { return "No data yet" }
-        return pace.isAheadOfPace ? "Ahead of pace" : "Behind pace"
-    }
-
-    private var statusColor: Color {
-        guard tracker.latestReading != nil else { return .secondary }
-        return pace.isAheadOfPace ? RingetColors.aheadOfPace : RingetColors.behindPace
+        .onReceive(minuteTimer) { date in
+            now = date
+            nextUpdateAt = date.addingTimeInterval(60)
+        }
+        .onReceive(secondTimer) { date in
+            secondsUntilUpdate = max(0, Int(nextUpdateAt.timeIntervalSince(date).rounded()))
+        }
     }
 
     private var figuresRow: some View {
         HStack {
             figure(title: "Current", value: pace.currentValue)
             Spacer()
-            figure(title: "Target today", value: pace.targetValueToday)
-            Spacer()
-            figure(
-                title: "Difference",
-                value: pace.difference,
-                signed: true,
-                tint: pace.isAheadOfPace ? RingetColors.aheadOfPace : RingetColors.behindPace
-            )
+            figure(title: "Target Right Now", value: pace.targetValueToday)
         }
         .padding(.horizontal)
     }
 
-    private func figure(title: String, value: Decimal, signed: Bool = false, tint: Color = .primary) -> some View {
+    private func figure(title: String, value: Decimal) -> some View {
         VStack(spacing: 4) {
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text(formatted(value, signed: signed))
+            Text(tracker.formattedValue(value))
                 .font(.title2.monospacedDigit().weight(.semibold))
-                .foregroundStyle(tint)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    private func formatted(_ value: Decimal, signed: Bool = false) -> String {
-        let magnitude = value.formatted(.number.precision(.fractionLength(0...2)))
-        let sign = (signed && value >= 0) ? "+" : ""
-        return "\(sign)\(magnitude) \(tracker.unit)"
     }
 
     private var periodRemainingText: String {

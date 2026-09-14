@@ -32,6 +32,11 @@ struct AddTrackerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    /// When set, the form edits this tracker in place instead of creating a
+    /// new one. Its source can't be changed here — only the details,
+    /// period, and budget.
+    var existingTracker: Tracker?
+
     @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
     private var addedSources: [ConnectedSource]
 
@@ -40,6 +45,10 @@ struct AddTrackerView: View {
     @State private var direction: TrackerDirection = .decreasing
     @State private var startDate = Date.now
     @State private var endDate = Calendar.current.date(byAdding: .month, value: 1, to: .now) ?? .now
+    /// Whether the period's start/end carry a specific time of day. Off by
+    /// default — most trackers just care about the day — in which case
+    /// `startDate`/`endDate` are normalized to midnight.
+    @State private var includesTime = false
     @State private var startingValueText = "0"
     @State private var totalAllowanceText = ""
 
@@ -51,19 +60,36 @@ struct AddTrackerView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Details") {
+                Section {
                     TextField("Name", text: $name)
                     TextField("Unit (e.g. £, mi)", text: $unit)
+                    unitQuickPicks
                     Picker("Direction", selection: $direction) {
                         Text("Decreasing").tag(TrackerDirection.decreasing)
                         Text("Increasing").tag(TrackerDirection.increasing)
                     }
                     .pickerStyle(.segmented)
+                } header: {
+                    Text("Details")
+                } footer: {
+                    Text("£ isn't on every keyboard by default — tap a symbol above to fill it in, or long-press $ on the on-screen keyboard.")
                 }
 
-                Section("Period") {
-                    DatePicker("Start", selection: $startDate, displayedComponents: .date)
-                    DatePicker("End", selection: $endDate, displayedComponents: .date)
+                Section {
+                    let components: DatePicker.Components = includesTime ? [.date, .hourAndMinute] : [.date]
+                    DatePicker("Start", selection: $startDate, displayedComponents: components)
+                    DatePicker("End", selection: $endDate, displayedComponents: components)
+                    Toggle("Set specific times", isOn: $includesTime)
+                        .onChange(of: includesTime) { _, newValue in
+                            guard !newValue else { return }
+                            let calendar = Calendar.current
+                            startDate = calendar.startOfDay(for: startDate)
+                            endDate = calendar.startOfDay(for: endDate)
+                        }
+                } header: {
+                    Text("Period")
+                } footer: {
+                    Text("Off by default — the period runs from midnight to midnight. Turn this on to start or end at a specific time instead.")
                 }
 
                 Section {
@@ -96,23 +122,31 @@ struct AddTrackerView: View {
                     Text(budgetFooter)
                 }
 
-                Section {
-                    Picker("Source", selection: $sourceSelection) {
-                        Text("Manual Entry").tag(SourceOption.source(store.manualEntrySource.id) as SourceOption?)
-                        ForEach(addedSources) { source in
-                            Text(source.displayName).tag(SourceOption.source(source.id) as SourceOption?)
+                if existingTracker == nil {
+                    Section {
+                        Picker("Source", selection: $sourceSelection) {
+                            Text("Manual Entry").tag(SourceOption.source(store.manualEntrySource.id) as SourceOption?)
+                            ForEach(addedSources) { source in
+                                Text(source.displayName).tag(SourceOption.source(source.id) as SourceOption?)
+                            }
+                            Text("Add New Source…").tag(SourceOption.addNew as SourceOption?)
                         }
-                        Text("Add New Source…").tag(SourceOption.addNew as SourceOption?)
+                        .onChange(of: sourceSelection) { oldValue, newValue in
+                            guard newValue == .addNew else { return }
+                            isShowingAddSource = true
+                            // "Add New Source…" is a shortcut action, not a real
+                            // selection — restore whatever was chosen before.
+                            sourceSelection = oldValue
+                        }
+                    } footer: {
+                        Text("Manual Entry means you'll log this tracker's readings yourself. Otherwise, pick a source you've added in Settings → Connected Sources.")
                     }
-                    .onChange(of: sourceSelection) { oldValue, newValue in
-                        guard newValue == .addNew else { return }
-                        isShowingAddSource = true
-                        // "Add New Source…" is a shortcut action, not a real
-                        // selection — restore whatever was chosen before.
-                        sourceSelection = oldValue
+                } else {
+                    Section {
+                        LabeledContent("Source", value: existingTracker?.connectedSource?.displayName ?? "Manual Entry")
+                    } footer: {
+                        Text("A tracker's source can't be changed after it's created.")
                     }
-                } footer: {
-                    Text("Manual Entry means you'll log this tracker's readings yourself. Otherwise, pick a source you've added in Settings → Connected Sources.")
                 }
 
                 if let errorMessage {
@@ -122,7 +156,7 @@ struct AddTrackerView: View {
                     }
                 }
             }
-            .navigationTitle("New Tracker")
+            .navigationTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -133,7 +167,22 @@ struct AddTrackerView: View {
                 }
             }
             .task {
-                if sourceSelection == nil {
+                if let existingTracker {
+                    name = existingTracker.name
+                    unit = existingTracker.unit
+                    direction = existingTracker.direction
+                    startDate = existingTracker.startDate
+                    endDate = existingTracker.endDate
+                    let calendar = Calendar.current
+                    includesTime = !calendar.isDate(startDate, equalTo: calendar.startOfDay(for: startDate), toGranularity: .minute)
+                        || !calendar.isDate(endDate, equalTo: calendar.startOfDay(for: endDate), toGranularity: .minute)
+                    // No grouping separator here: it round-trips through
+                    // `Decimal(string:)` on save, which doesn't understand
+                    // "3,000" and would silently truncate it to "3".
+                    startingValueText = existingTracker.startingValue.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+                    totalAllowanceText = existingTracker.totalAllowance.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+                    sourceSelection = .source(existingTracker.connectedSource?.id ?? store.manualEntrySource.id)
+                } else if sourceSelection == nil {
                     sourceSelection = .source(store.manualEntrySource.id)
                 }
             }
@@ -141,6 +190,33 @@ struct AddTrackerView: View {
                 AddSourceView()
             }
         }
+    }
+
+    /// Common unit symbols as tappable chips, so setting a currency symbol
+    /// isn't dependent on the keyboard layout having easy access to it.
+    private static let unitQuickPickOptions = ["£", "$", "€", "mi", "km", "kg"]
+
+    private var unitQuickPicks: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Self.unitQuickPickOptions, id: \.self) { symbol in
+                    Button {
+                        unit = symbol
+                    } label: {
+                        Text(symbol)
+                            .font(.subheadline.weight(.medium))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(unit == symbol ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())
+                            .foregroundStyle(unit == symbol ? .white : .primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .listRowInsets(EdgeInsets())
+        .padding(.horizontal)
+        .padding(.vertical, 2)
     }
 
     private var selectedSourceId: UUID? {
@@ -175,8 +251,23 @@ struct AddTrackerView: View {
         }
     }
 
+    /// Parses a decimal typed or pasted by the user. Plain `Decimal(string:)`
+    /// doesn't understand grouping separators ("3,000") and silently
+    /// truncates at the comma instead of failing — this tries locale-aware
+    /// parsing first (handles "3,000" and "3.000" correctly depending on
+    /// locale) before falling back to the plain parse.
+    private static func parseDecimal(_ text: String) -> Decimal? {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.generatesDecimalNumbers = true
+        if let number = formatter.number(from: text) {
+            return number.decimalValue
+        }
+        return Decimal(string: text)
+    }
+
     private var hourlyPaceDescription: String? {
-        guard let totalAllowance = Decimal(string: totalAllowanceText), endDate > startDate else { return nil }
+        guard let totalAllowance = Self.parseDecimal(totalAllowanceText), endDate > startDate else { return nil }
         let periodHours = endDate.timeIntervalSince(startDate) / 3600
         guard periodHours > 0 else { return nil }
         let hourlyRate = totalAllowance / Decimal(periodHours)
@@ -188,16 +279,14 @@ struct AddTrackerView: View {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
             && !unit.trimmingCharacters(in: .whitespaces).isEmpty
             && endDate > startDate
-            && Decimal(string: startingValueText) != nil
-            && Decimal(string: totalAllowanceText) != nil
+            && Self.parseDecimal(startingValueText) != nil
+            && Self.parseDecimal(totalAllowanceText) != nil
             && selectedSourceId != nil
     }
 
     private func save() {
-        guard let selectedSourceId,
-              let source = resolveSource(withId: selectedSourceId),
-              let startingValue = Decimal(string: startingValueText),
-              let totalAllowance = Decimal(string: totalAllowanceText)
+        guard let startingValue = Self.parseDecimal(startingValueText),
+              let totalAllowance = Self.parseDecimal(totalAllowanceText)
         else {
             errorMessage = "Please fill in all fields correctly."
             return
@@ -205,6 +294,34 @@ struct AddTrackerView: View {
 
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedUnit = unit.trimmingCharacters(in: .whitespaces)
+
+        // When no specific time was set, the period should run midnight to
+        // midnight — not whatever time the form happened to be created at.
+        if !includesTime {
+            let calendar = Calendar.current
+            startDate = calendar.startOfDay(for: startDate)
+            endDate = calendar.startOfDay(for: endDate)
+        }
+
+        if let existingTracker {
+            existingTracker.name = trimmedName
+            existingTracker.unit = trimmedUnit
+            existingTracker.direction = direction
+            existingTracker.startDate = startDate
+            existingTracker.endDate = endDate
+            existingTracker.startingValue = startingValue
+            existingTracker.totalAllowance = totalAllowance
+            store.saveChanges()
+            dismiss()
+            return
+        }
+
+        guard let selectedSourceId,
+              let source = resolveSource(withId: selectedSourceId)
+        else {
+            errorMessage = "Please fill in all fields correctly."
+            return
+        }
 
         guard source.providerId == store.manualProvider.providerId else {
             // No auto-fetch providers exist yet (§9); unreachable until

@@ -44,6 +44,13 @@ final class TrackerStore {
         try? modelContext.save()
     }
 
+    /// Persists in-place edits to an existing `@Model` object (e.g. from
+    /// editing a tracker's details) — SwiftData tracks the mutation, this
+    /// just flushes it.
+    func saveChanges() {
+        try? modelContext.save()
+    }
+
     /// Appends a manually-logged reading directly — the dashboard and log
     /// sheet already hold the `Tracker` reference, so this bypasses the
     /// target-id indirection `ManualEntryProvider` exists for.

@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-/// "Log a reading" (§5.5): the user enters a value and a timestamp
+/// "Update current value" (§5.5): the user enters a value and a timestamp
 /// (defaulting to now) for a manual tracker. This is how `actualValue`
 /// (§4.2) gets set for any manual tracker — there is no automatic refresh.
 struct LogReadingView: View {
@@ -31,7 +31,7 @@ struct LogReadingView: View {
                     Text(footerHint)
                 }
             }
-            .navigationTitle("Log a Reading")
+            .navigationTitle("Update Current Value")
             .inlineNavigationBarIfAvailable()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -39,7 +39,7 @@ struct LogReadingView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(Decimal(string: valueText) == nil)
+                        .disabled(Self.parseDecimal(valueText) == nil)
                 }
             }
         }
@@ -54,8 +54,20 @@ struct LogReadingView: View {
         }
     }
 
+    /// See `AddTrackerView.parseDecimal` — plain `Decimal(string:)` silently
+    /// truncates at a grouping separator ("2,800" → 2) instead of failing.
+    private static func parseDecimal(_ text: String) -> Decimal? {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.generatesDecimalNumbers = true
+        if let number = formatter.number(from: text) {
+            return number.decimalValue
+        }
+        return Decimal(string: text)
+    }
+
     private func save() {
-        guard let value = Decimal(string: valueText) else { return }
+        guard let value = Self.parseDecimal(valueText) else { return }
         store.logReading(value: value, date: date, for: tracker)
         dismiss()
     }
