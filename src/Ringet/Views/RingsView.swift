@@ -77,18 +77,21 @@ struct RingsView: View {
     private var centerContent: some View {
         if tracker.latestReading != nil {
             VStack(spacing: 4) {
-                Text(status.label(for: tracker).uppercased())
+                Text(centerStatusLine.uppercased())
                     .font(.caption.weight(.bold))
                     .tracking(0.5)
                     .foregroundStyle(statusColor)
-                Text(tracker.formattedValue(pace.difference, signed: true))
+                    .multilineTextAlignment(.center)
+                Text(centerAmountText)
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundStyle(statusColor)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
-                Text("difference from target")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                if !tracker.usesBudgetLanguage || status == .warning {
+                    Text("difference from target")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
         } else {
             Text("No data yet")
@@ -97,10 +100,29 @@ struct RingsView: View {
         }
     }
 
+    /// For a budget tracker that's actually over or under (not just at) —
+    /// "Over Budget by", "Under Budget by" — the color and word already say
+    /// which direction, so the amount itself doesn't need to. Everything
+    /// else keeps the plain status label.
+    private var centerStatusLine: String {
+        let label = status.label(for: tracker)
+        guard tracker.usesBudgetLanguage, status != .warning else { return label }
+        return "\(label) by"
+    }
+
+    private var centerAmountText: String {
+        pace.displayDifference(for: tracker)
+    }
+
+    /// Uses the exact same wording as the figure cards below (§7.1's
+    /// Current Balance/Target Right Now), in the same left-to-right order,
+    /// so it's unambiguous which ring is which — not a separately-worded
+    /// "Progress"/"Time elapsed" pair a reader has to map onto the figures
+    /// themselves.
     private var legend: some View {
         HStack(spacing: 20) {
-            legendItem(color: RingetColors.paceRing, label: "Time elapsed")
-            legendItem(color: statusColor, label: "Progress")
+            legendItem(color: statusColor, label: tracker.currentValueLabel)
+            legendItem(color: RingetColors.paceRing, label: "Target Right Now")
         }
         .font(.caption)
         .foregroundStyle(.secondary)

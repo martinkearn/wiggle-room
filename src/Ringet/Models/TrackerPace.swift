@@ -42,6 +42,17 @@ struct TrackerPace: Equatable {
         }
         return difference >= 0 ? .good : .bad
     }
+
+    /// The at-a-glance difference figure, formatted for `tracker`. For a
+    /// budget tracker that's genuinely over or under (not just at), this
+    /// drops the +/- sign: the color and status word already say which
+    /// direction, so a sign on top of that is redundant, not clarifying.
+    func displayDifference(for tracker: Tracker) -> String {
+        guard tracker.usesBudgetLanguage, status != .warning else {
+            return tracker.formattedValue(difference, signed: true)
+        }
+        return tracker.formattedValue(abs(difference))
+    }
 }
 
 /// Traffic-light reading of a tracker's pace (§3.2), independent of
@@ -67,11 +78,10 @@ enum PaceStatus {
     /// tracker shape (increasing, or non-currency units like mileage) keeps
     /// the neutral wording.
     func label(for tracker: Tracker) -> String {
-        let usesBudgetLanguage = tracker.direction == .decreasing && tracker.isCurrencyUnit
         switch self {
-        case .good: return usesBudgetLanguage ? "Under Budget" : "On Track"
-        case .warning: return usesBudgetLanguage ? "At Budget" : "At Target"
-        case .bad: return usesBudgetLanguage ? "Over Budget" : "Needs Attention"
+        case .good: return tracker.usesBudgetLanguage ? "Under Budget" : "On Track"
+        case .warning: return tracker.usesBudgetLanguage ? "At Budget" : "At Target"
+        case .bad: return tracker.usesBudgetLanguage ? "Over Budget" : "Needs Attention"
         }
     }
 }

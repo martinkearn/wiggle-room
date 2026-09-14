@@ -92,7 +92,7 @@ private struct TrackerRow: View {
                 Text(tracker.name)
                     .font(.headline)
                 if tracker.latestReading != nil {
-                    Text(tracker.formattedValue(pace.difference, signed: true))
+                    Text(pace.displayDifference(for: tracker))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(status.color)
                 } else {

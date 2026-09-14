@@ -91,12 +91,34 @@ extension Tracker {
         Tracker.currencySymbols.contains(unit)
     }
 
+    /// A decreasing tracker denominated in currency reads naturally as a
+    /// budget ("under/over budget"), which draws a much clearer good/bad
+    /// line for money than generic on-track language does. Every other
+    /// tracker shape (increasing, or non-currency units like mileage) keeps
+    /// the neutral wording instead.
+    var usesBudgetLanguage: Bool {
+        direction == .decreasing && isCurrencyUnit
+    }
+
+    /// "Current Balance" reads naturally for a currency tracker (it's a
+    /// bank balance, a budget remaining); plain "Current" stays for
+    /// everything else (mileage, etc.), where "balance" wouldn't make
+    /// sense. Shared by the dashboard's figure card and the ring legend so
+    /// they always say exactly the same thing about the same ring.
+    var currentValueLabel: String {
+        isCurrencyUnit ? "Current Balance" : "Current"
+    }
+
     /// Formats a value in this tracker's unit, placing a currency symbol on
     /// the left with no space (e.g. "£1,234.56") or any other unit on the
     /// right with a space (e.g. "1,234 miles"). `signed` prefixes a "+" for
-    /// non-negative values (negative values always show their own "-").
+    /// non-negative values (negative values always show their own "-"). A
+    /// whole number shows no decimal places ("£684"); anything with a
+    /// fractional part always shows exactly 2 ("£692.40", never "£692.4").
     func formattedValue(_ value: Decimal, signed: Bool = false) -> String {
-        let magnitude = abs(value).formatted(.number.precision(.fractionLength(0...2)))
+        let absoluteValue = abs(value)
+        let isWhole = (absoluteValue as NSDecimalNumber).doubleValue.truncatingRemainder(dividingBy: 1) == 0
+        let magnitude = absoluteValue.formatted(.number.precision(.fractionLength(isWhole ? 0 : 2)))
         let sign: String
         if value < 0 {
             sign = "-"
