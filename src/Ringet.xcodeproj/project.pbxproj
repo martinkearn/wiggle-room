@@ -6,7 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		293C1E388C1A2543A9D0ADC2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0BCFAD5620138EFA3C3DD43 /* Foundation.framework */; };
+		951FF7F25912393137B09B3B /* RingetWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0390A05B6F76AA646812AE87 /* RingetWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		DE91F17B1E6F689A2D0537C4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EF63B10E3056875D0092FD24 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0320B8BADB9D2DE52BE08FB8;
+			remoteInfo = RingetWidgets;
+		};
 		EF63B1243056875F0092FD24 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = EF63B10E3056875D0092FD24 /* Project object */;
@@ -23,13 +35,36 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		55273DB0609129562CC867EA /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				951FF7F25912393137B09B3B /* RingetWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		0390A05B6F76AA646812AE87 /* RingetWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RingetWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0BCFAD5620138EFA3C3DD43 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		EF63B1163056875D0092FD24 /* Ringet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ringet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF63B1233056875F0092FD24 /* RingetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RingetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF63B12D3056875F0092FD24 /* RingetUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RingetUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EECA2B78D83627749202006F /* Exceptions for "RingetWidgets" folder in "RingetWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0320B8BADB9D2DE52BE08FB8 /* RingetWidgets */;
+		};
 		EF9703A8305855EA007A44AB /* Exceptions for "Ringet" folder in "Ringet" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -40,6 +75,19 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		0028FDCFB48782B4201280F1 /* RingetShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = RingetShared;
+			sourceTree = "<group>";
+		};
+		2C11B2FC0E9DCE55D7D7F125 /* RingetWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EECA2B78D83627749202006F /* Exceptions for "RingetWidgets" folder in "RingetWidgets" target */,
+			);
+			path = RingetWidgets;
+			sourceTree = "<group>";
+		};
 		EF63B1183056875D0092FD24 /* Ringet */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -61,6 +109,14 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		489892905DF9D552F285EA27 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				293C1E388C1A2543A9D0ADC2 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EF63B1133056875D0092FD24 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -85,6 +141,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1F07D5D8B9C96ACA8A2298B4 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				D0BCFAD5620138EFA3C3DD43 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 		EF63B10D3056875D0092FD24 = {
 			isa = PBXGroup;
 			children = (
@@ -92,6 +156,9 @@
 				EF63B1263056875F0092FD24 /* RingetTests */,
 				EF63B1303056875F0092FD24 /* RingetUITests */,
 				EF63B1173056875D0092FD24 /* Products */,
+				0028FDCFB48782B4201280F1 /* RingetShared */,
+				2C11B2FC0E9DCE55D7D7F125 /* RingetWidgets */,
+				EFF366F10D5F57DCF7C2B819 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -101,13 +168,43 @@
 				EF63B1163056875D0092FD24 /* Ringet.app */,
 				EF63B1233056875F0092FD24 /* RingetTests.xctest */,
 				EF63B12D3056875F0092FD24 /* RingetUITests.xctest */,
+				0390A05B6F76AA646812AE87 /* RingetWidgets.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		EFF366F10D5F57DCF7C2B819 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1F07D5D8B9C96ACA8A2298B4 /* iOS */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0320B8BADB9D2DE52BE08FB8 /* RingetWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A4FE6C6967F5972E75AE1075 /* Build configuration list for PBXNativeTarget "RingetWidgets" */;
+			buildPhases = (
+				49E5668BF14094AB39EA214A /* Sources */,
+				489892905DF9D552F285EA27 /* Frameworks */,
+				04ACF90D9CCAA9BB21C4AC9E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0028FDCFB48782B4201280F1 /* RingetShared */,
+				2C11B2FC0E9DCE55D7D7F125 /* RingetWidgets */,
+			);
+			name = RingetWidgets;
+			productName = RingetWidgets;
+			productReference = 0390A05B6F76AA646812AE87 /* RingetWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		EF63B1153056875D0092FD24 /* Ringet */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = EF63B1373056875F0092FD24 /* Build configuration list for PBXNativeTarget "Ringet" */;
@@ -115,17 +212,18 @@
 				EF63B1123056875D0092FD24 /* Sources */,
 				EF63B1133056875D0092FD24 /* Frameworks */,
 				EF63B1143056875D0092FD24 /* Resources */,
+				55273DB0609129562CC867EA /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D4964E0E82BA1E8D8401CA0E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				0028FDCFB48782B4201280F1 /* RingetShared */,
 				EF63B1183056875D0092FD24 /* Ringet */,
 			);
 			name = Ringet;
-			packageProductDependencies = (
-			);
 			productName = Ringet;
 			productReference = EF63B1163056875D0092FD24 /* Ringet.app */;
 			productType = "com.apple.product-type.application";
@@ -147,8 +245,6 @@
 				EF63B1263056875F0092FD24 /* RingetTests */,
 			);
 			name = RingetTests;
-			packageProductDependencies = (
-			);
 			productName = RingetTests;
 			productReference = EF63B1233056875F0092FD24 /* RingetTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -170,8 +266,6 @@
 				EF63B1303056875F0092FD24 /* RingetUITests */,
 			);
 			name = RingetUITests;
-			packageProductDependencies = (
-			);
 			productName = RingetUITests;
 			productReference = EF63B12D3056875F0092FD24 /* RingetUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -216,11 +310,19 @@
 				EF63B1153056875D0092FD24 /* Ringet */,
 				EF63B1223056875F0092FD24 /* RingetTests */,
 				EF63B12C3056875F0092FD24 /* RingetUITests */,
+				0320B8BADB9D2DE52BE08FB8 /* RingetWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		04ACF90D9CCAA9BB21C4AC9E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EF63B1143056875D0092FD24 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -245,6 +347,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		49E5668BF14094AB39EA214A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EF63B1123056875D0092FD24 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -269,6 +378,12 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		D4964E0E82BA1E8D8401CA0E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RingetWidgets;
+			target = 0320B8BADB9D2DE52BE08FB8 /* RingetWidgets */;
+			targetProxy = DE91F17B1E6F689A2D0537C4 /* PBXContainerItemProxy */;
+		};
 		EF63B1253056875F0092FD24 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = EF63B1153056875D0092FD24 /* Ringet */;
@@ -282,6 +397,59 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		53B51C3DC8532438DC5C9D7F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = RingetWidgets/RingetWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KP8NBNSB5M;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RingetWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Ringet Widgets";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = martinkearn.Ringet.RingetWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+			};
+			name = Debug;
+		};
+		5C311CD13FA2AEA6BE605763 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = RingetWidgets/RingetWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KP8NBNSB5M;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RingetWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Ringet Widgets";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = martinkearn.Ringet.RingetWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		EF63B1353056875F0092FD24 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -595,6 +763,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A4FE6C6967F5972E75AE1075 /* Build configuration list for PBXNativeTarget "RingetWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C311CD13FA2AEA6BE605763 /* Release */,
+				53B51C3DC8532438DC5C9D7F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		EF63B1113056875D0092FD24 /* Build configuration list for PBXProject "Ringet" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
