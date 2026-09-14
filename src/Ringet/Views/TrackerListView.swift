@@ -70,22 +70,36 @@ struct TrackerListView: View {
     }
 }
 
-/// A single row: name/unit/direction plus a small ring-based pace indicator
-/// (§7.1 — "quick ring-based status indicator").
+/// A single row: name plus a small ring-based pace indicator and the
+/// difference from target — the key at-a-glance number (§3.2, §7.1).
 private struct TrackerRow: View {
     let tracker: Tracker
 
+    private var pace: TrackerPace {
+        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: .now)
+    }
+
+    private var status: PaceStatus {
+        pace.status(totalAllowance: tracker.totalAllowance)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            RingsView(tracker: tracker, now: .now, lineWidth: 5)
+            RingsView(tracker: tracker, now: .now, lineWidth: 5, showsCenterContent: false)
                 .frame(width: 36, height: 36)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(tracker.name)
                     .font(.headline)
-                Text("\(tracker.unit) · \(tracker.direction == .decreasing ? "Decreasing" : "Increasing")")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                if tracker.latestReading != nil {
+                    Text(tracker.formattedValue(pace.difference, signed: true))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(status.color)
+                } else {
+                    Text("No data yet")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.vertical, 4)

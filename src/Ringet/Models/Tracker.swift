@@ -77,3 +77,34 @@ extension Tracker {
         sortedReadings.last
     }
 }
+
+extension Tracker {
+    /// Units that read as currency (symbol prefixed directly onto the
+    /// number, e.g. "£1,234.56") rather than a suffix unit (e.g.
+    /// "1,234 miles"). Anything not in this list is treated as a suffix
+    /// unit.
+    private static let currencySymbols: Set<String> = [
+        "£", "$", "€", "¥", "₹", "₩", "₽", "₺", "₪", "R$", "kr", "Fr"
+    ]
+
+    var isCurrencyUnit: Bool {
+        Tracker.currencySymbols.contains(unit)
+    }
+
+    /// Formats a value in this tracker's unit, placing a currency symbol on
+    /// the left with no space (e.g. "£1,234.56") or any other unit on the
+    /// right with a space (e.g. "1,234 miles"). `signed` prefixes a "+" for
+    /// non-negative values (negative values always show their own "-").
+    func formattedValue(_ value: Decimal, signed: Bool = false) -> String {
+        let magnitude = abs(value).formatted(.number.precision(.fractionLength(0...2)))
+        let sign: String
+        if value < 0 {
+            sign = "-"
+        } else if signed {
+            sign = "+"
+        } else {
+            sign = ""
+        }
+        return isCurrencyUnit ? "\(sign)\(unit)\(magnitude)" : "\(sign)\(magnitude) \(unit)"
+    }
+}

@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 /// A snapshot of a tracker's derived pace calculations at a single point in
 /// time, given an `actualValue` read from its source. See spec §4.3.
@@ -28,6 +29,50 @@ struct TrackerPace: Equatable {
 
     /// `difference >= 0` means ahead of pace; `< 0` means behind.
     var isAheadOfPace: Bool { difference >= 0 }
+
+    /// Traffic-light status (§3.2), within a small tolerance band around
+    /// the target so being right on pace doesn't read as a hard pass/fail.
+    /// `totalAllowance` sizes that tolerance relative to the tracker's own
+    /// scale rather than an absolute amount.
+    func status(totalAllowance: Decimal, toleranceFraction: Decimal = 0.05) -> PaceStatus {
+        let tolerance = abs(totalAllowance) * toleranceFraction
+        if abs(difference) <= tolerance {
+            return .warning
+        }
+        return difference >= 0 ? .good : .bad
+    }
+}
+
+/// Traffic-light reading of a tracker's pace (§3.2), independent of
+/// direction — `.good` always means "green", regardless of whether that's a
+/// decreasing tracker running under budget or an increasing one running
+/// under its cap.
+enum PaceStatus {
+    case good
+    case warning
+    case bad
+
+    var color: Color {
+        switch self {
+        case .good: RingetColors.good
+        case .warning: RingetColors.warning
+        case .bad: RingetColors.bad
+        }
+    }
+
+    /// A decreasing tracker denominated in currency reads naturally as a
+    /// budget ("under/over budget"), which draws a much clearer good/bad
+    /// line for money than the generic on-track language does. Every other
+    /// tracker shape (increasing, or non-currency units like mileage) keeps
+    /// the neutral wording.
+    func label(for tracker: Tracker) -> String {
+        let usesBudgetLanguage = tracker.direction == .decreasing && tracker.isCurrencyUnit
+        switch self {
+        case .good: return usesBudgetLanguage ? "Under Budget" : "On Track"
+        case .warning: return usesBudgetLanguage ? "Near Budget" : "Near Target"
+        case .bad: return usesBudgetLanguage ? "Over Budget" : "Needs Attention"
+        }
+    }
 }
 
 extension Tracker {

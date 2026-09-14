@@ -8,22 +8,32 @@ import Foundation
 
 /// The primary two-ring visualization (§3.4), functionally accurate rather
 /// than decorative:
-/// - **Outer ring ("pace")** fills according to elapsed time within the
+/// - **Outer ring ("elapsed")** fills according to elapsed time within the
 ///   period. Always neutral gray — it's a clock, not a status indicator.
-/// - **Inner ring ("actual")** fills according to how much of the total
-///   budget has actually been consumed so far. Green if ahead of pace,
-///   amber-red if behind (§3.2).
+/// - **Inner ring ("progress")** fills according to how much of the total
+///   budget has actually been consumed so far. Colored traffic-light style
+///   per `PaceStatus` (§3.2): green on track, amber near target, red needs
+///   attention.
 ///
-/// Reads less filled than the outer ring → ahead of pace (less consumed
-/// than elapsed time implies). More filled → behind pace.
+/// There are only ever these two rings — no more are added for additional
+/// trackers or metrics. `showsCenterContent` hides the difference/status
+/// overlay and legend for small indicator-sized uses (e.g. list rows),
+/// where there isn't room for them to be legible.
 struct RingsView: View {
     let tracker: Tracker
     let now: Date
-    var lineWidth: CGFloat = 14
+    var lineWidth: CGFloat = 20
+    var showsCenterContent: Bool = true
 
     private var pace: TrackerPace {
         tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
     }
+
+    private var status: PaceStatus {
+        pace.status(totalAllowance: tracker.totalAllowance)
+    }
+
+    private var statusColor: Color { status.color }
 
     private var paceFraction: Double {
         guard pace.periodHours > 0 else { return 0 }
@@ -36,15 +46,70 @@ struct RingsView: View {
         return min(max((ratio as NSDecimalNumber).doubleValue, 0), 1)
     }
 
-    private var actualColor: Color {
-        pace.isAheadOfPace ? RingetColors.aheadOfPace : RingetColors.behindPace
+    var body: some View {
+        VStack(spacing: 14) {
+            GeometryReader { geometry in
+                let side = min(geometry.size.width, geometry.size.height)
+                ZStack {
+                    ring(fraction: paceFraction, color: RingetColors.paceRing)
+                    ring(fraction: actualFraction, color: statusColor)
+                        .padding(lineWidth + 10)
+
+                    if showsCenterContent {
+                        // Constrained to the ring's own inner diameter so long
+                        // values shrink to fit instead of overflowing past it.
+                        centerContent
+                            .frame(width: side - (lineWidth + 10) * 2 - 24)
+                    }
+                }
+                .frame(width: side, height: side)
+                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            }
+            .aspectRatio(1, contentMode: .fit)
+
+            if showsCenterContent {
+                legend
+            }
+        }
     }
 
-    var body: some View {
-        ZStack {
-            ring(fraction: paceFraction, color: RingetColors.paceRing)
-            ring(fraction: actualFraction, color: actualColor)
-                .padding(lineWidth + 6)
+    @ViewBuilder
+    private var centerContent: some View {
+        if tracker.latestReading != nil {
+            VStack(spacing: 4) {
+                Text(status.label(for: tracker).uppercased())
+                    .font(.caption.weight(.bold))
+                    .tracking(0.5)
+                    .foregroundStyle(statusColor)
+                Text(tracker.formattedValue(pace.difference, signed: true))
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .foregroundStyle(statusColor)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                Text("difference from target")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Text("No data yet")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var legend: some View {
+        HStack(spacing: 20) {
+            legendItem(color: RingetColors.paceRing, label: "Time elapsed")
+            legendItem(color: statusColor, label: "Progress")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+
+    private func legendItem(color: Color, label: String) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(label)
         }
     }
 
@@ -60,18 +125,21 @@ struct RingsView: View {
     }
 }
 
-/// Shared color language for pace status (§3.2) — calm, not alarming.
+/// Shared color language for pace status (§3.2) — calm, not alarming, but
+/// unambiguously traffic-light: green/amber/red map to `PaceStatus`.
 enum RingetColors {
     /// Outer ring — a clock, not a status indicator.
     static let paceRing = Color.gray
-    /// Calm, confident green — avoid neon/alert greens.
-    static let aheadOfPace = Color(red: 0.20, green: 0.60, blue: 0.40)
-    /// Amber-leaning red — corrective, not alarming.
-    static let behindPace = Color(red: 0.80, green: 0.40, blue: 0.25)
+    /// On track.
+    static let good = Color(red: 0.20, green: 0.60, blue: 0.40)
+    /// Near target — a small tolerance band, not yet a problem.
+    static let warning = Color(red: 0.85, green: 0.60, blue: 0.10)
+    /// Needs attention.
+    static let bad = Color(red: 0.80, green: 0.25, blue: 0.20)
 }
 
 #Preview {
     RingsView(tracker: PreviewData.makeSampleTracker(), now: .now)
-        .frame(width: 220, height: 220)
+        .frame(width: 260, height: 260)
         .padding()
 }
