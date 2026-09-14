@@ -30,7 +30,7 @@ struct RingsView: View {
     }
 
     private var status: PaceStatus {
-        pace.status(totalAllowance: tracker.totalAllowance)
+        pace.status
     }
 
     private var statusColor: Color { status.color }

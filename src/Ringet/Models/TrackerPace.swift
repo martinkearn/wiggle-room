@@ -30,13 +30,14 @@ struct TrackerPace: Equatable {
     /// `difference >= 0` means ahead of pace; `< 0` means behind.
     var isAheadOfPace: Bool { difference >= 0 }
 
-    /// Traffic-light status (§3.2), within a small tolerance band around
-    /// the target so being right on pace doesn't read as a hard pass/fail.
-    /// `totalAllowance` sizes that tolerance relative to the tracker's own
-    /// scale rather than an absolute amount.
-    func status(totalAllowance: Decimal, toleranceFraction: Decimal = 0.05) -> PaceStatus {
-        let tolerance = abs(totalAllowance) * toleranceFraction
-        if abs(difference) <= tolerance {
+    /// Traffic-light status (§3.2): below, at, or above the target.
+    /// "At" is an exact match on the whole-number part only (pennies/cents
+    /// don't count) — not a percentage tolerance band, so it's only true
+    /// when the current value has genuinely landed on the target.
+    var status: PaceStatus {
+        let currentWhole = (currentValue as NSDecimalNumber).intValue
+        let targetWhole = (targetValueToday as NSDecimalNumber).intValue
+        if currentWhole == targetWhole {
             return .warning
         }
         return difference >= 0 ? .good : .bad
@@ -69,7 +70,7 @@ enum PaceStatus {
         let usesBudgetLanguage = tracker.direction == .decreasing && tracker.isCurrencyUnit
         switch self {
         case .good: return usesBudgetLanguage ? "Under Budget" : "On Track"
-        case .warning: return usesBudgetLanguage ? "Near Budget" : "Near Target"
+        case .warning: return usesBudgetLanguage ? "At Budget" : "At Target"
         case .bad: return usesBudgetLanguage ? "Over Budget" : "Needs Attention"
         }
     }

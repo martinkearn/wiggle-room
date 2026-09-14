@@ -80,7 +80,7 @@ private struct TrackerRow: View {
     }
 
     private var status: PaceStatus {
-        pace.status(totalAllowance: tracker.totalAllowance)
+        pace.status
     }
 
     var body: some View {
