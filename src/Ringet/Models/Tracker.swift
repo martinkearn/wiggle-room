@@ -88,7 +88,19 @@ extension Tracker {
     ]
 
     var isCurrencyUnit: Bool {
-        Tracker.currencySymbols.contains(unit)
+        Tracker.isCurrencyUnit(unit)
+    }
+
+    static func isCurrencyUnit(_ unit: String) -> Bool {
+        currencySymbols.contains(unit)
+    }
+
+    /// Whether this tracker is manually logged (as opposed to a real
+    /// auto-fetching connection) — the only source type that supports
+    /// hand-editing/deleting individual readings, since a real provider's
+    /// history should reflect what it actually reported.
+    var isManualEntry: Bool {
+        connectedSource?.providerId == "manual"
     }
 
     /// A decreasing tracker denominated in currency reads naturally as a
@@ -116,6 +128,13 @@ extension Tracker {
     /// whole number shows no decimal places ("£684"); anything with a
     /// fractional part always shows exactly 2 ("£692.40", never "£692.4").
     func formattedValue(_ value: Decimal, signed: Bool = false) -> String {
+        Tracker.formattedValue(value, unit: unit, signed: signed)
+    }
+
+    /// Unit-string version of `formattedValue(_:signed:)`, usable before a
+    /// `Tracker` exists yet — e.g. while a user is still filling in the "New
+    /// Tracker" form.
+    static func formattedValue(_ value: Decimal, unit: String, signed: Bool = false) -> String {
         let absoluteValue = abs(value)
         let isWhole = (absoluteValue as NSDecimalNumber).doubleValue.truncatingRemainder(dividingBy: 1) == 0
         let magnitude = absoluteValue.formatted(.number.precision(.fractionLength(isWhole ? 0 : 2)))
@@ -127,6 +146,23 @@ extension Tracker {
         } else {
             sign = ""
         }
-        return isCurrencyUnit ? "\(sign)\(unit)\(magnitude)" : "\(sign)\(magnitude) \(unit)"
+        return isCurrencyUnit(unit) ? "\(sign)\(unit)\(magnitude)" : "\(sign)\(magnitude) \(unit)"
+    }
+}
+
+extension Tracker {
+    /// How much would be left over at the end of the period given the
+    /// current starting value and total budget — only meaningful for a
+    /// decreasing (spend-down) tracker, and only worth surfacing when it's
+    /// not simply zero (i.e. starting value and budget aren't the same).
+    /// A negative result means the budget exceeds the starting value.
+    static func projectedRemainder(direction: TrackerDirection, startingValue: Decimal, totalAllowance: Decimal) -> Decimal? {
+        guard direction == .decreasing else { return nil }
+        let remainder = startingValue - totalAllowance
+        return remainder != 0 ? remainder : nil
+    }
+
+    var projectedRemainder: Decimal? {
+        Tracker.projectedRemainder(direction: direction, startingValue: startingValue, totalAllowance: totalAllowance)
     }
 }

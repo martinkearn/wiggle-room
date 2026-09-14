@@ -62,8 +62,7 @@ struct AddTrackerView: View {
             Form {
                 Section {
                     TextField("Name", text: $name)
-                    TextField("Unit (e.g. £, mi)", text: $unit)
-                    unitQuickPicks
+                    unitPicker
                     Picker("Direction", selection: $direction) {
                         Text("Decreasing").tag(TrackerDirection.decreasing)
                         Text("Increasing").tag(TrackerDirection.increasing)
@@ -72,7 +71,7 @@ struct AddTrackerView: View {
                 } header: {
                     Text("Details")
                 } footer: {
-                    Text("£ isn't on every keyboard by default — tap a symbol above to fill it in, or long-press $ on the on-screen keyboard.")
+                    Text("Choose the unit this tracker is measured in.")
                 }
 
                 Section {
@@ -114,6 +113,16 @@ struct AddTrackerView: View {
                     if let hourlyPaceDescription {
                         Text(hourlyPaceDescription)
                             .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let dailyPaceDescription {
+                        Text(dailyPaceDescription)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let remainingAtEndDescription {
+                        Text(remainingAtEndDescription)
+                            .font(.footnote.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
                 } header: {
@@ -192,14 +201,16 @@ struct AddTrackerView: View {
         }
     }
 
-    /// Common unit symbols as tappable chips, so setting a currency symbol
-    /// isn't dependent on the keyboard layout having easy access to it.
-    private static let unitQuickPickOptions = ["£", "$", "€", "mi", "km", "kg"]
+    /// The only units a tracker can be created with — picking from a fixed
+    /// set (rather than free text) means `Tracker.isCurrencyUnit` and every
+    /// piece of currency-aware formatting/wording can rely on an exact
+    /// match, with no risk of a typo'd or inconsistent unit string.
+    private static let unitOptions = ["£", "$", "€", "mi", "km", "kg"]
 
-    private var unitQuickPicks: some View {
+    private var unitPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(Self.unitQuickPickOptions, id: \.self) { symbol in
+                ForEach(Self.unitOptions, id: \.self) { symbol in
                     Button {
                         unit = symbol
                     } label: {
@@ -273,6 +284,34 @@ struct AddTrackerView: View {
         let hourlyRate = totalAllowance / Decimal(periodHours)
         let displayUnit = unit.isEmpty ? "units" : unit
         return "≈ \(hourlyRate.formatted(.number.precision(.fractionLength(0...2)))) \(displayUnit) / hour"
+    }
+
+    /// Only worth showing alongside the hourly rate once a tracker runs
+    /// longer than a day — for anything shorter, "per day" isn't a
+    /// meaningful way to think about the pace.
+    private var dailyPaceDescription: String? {
+        guard let totalAllowance = Self.parseDecimal(totalAllowanceText), endDate > startDate else { return nil }
+        let periodHours = endDate.timeIntervalSince(startDate) / 3600
+        guard periodHours > 24 else { return nil }
+        let dailyRate = totalAllowance / Decimal(periodHours / 24)
+        let displayUnit = unit.isEmpty ? "units" : unit
+        return "≈ \(dailyRate.formatted(.number.precision(.fractionLength(0...2)))) \(displayUnit) / day"
+    }
+
+    /// See `Tracker.projectedRemainder` — how much would be left over at the
+    /// end given the current form values, shown only when starting value and
+    /// total budget actually differ.
+    private var remainingAtEndDescription: String? {
+        guard let startingValue = Self.parseDecimal(startingValueText),
+              let totalAllowance = Self.parseDecimal(totalAllowanceText),
+              let remainder = Tracker.projectedRemainder(direction: direction, startingValue: startingValue, totalAllowance: totalAllowance)
+        else { return nil }
+        let displayUnit = unit.isEmpty ? "units" : unit
+        if remainder > 0 {
+            return "\(Tracker.formattedValue(remainder, unit: displayUnit)) will remain at the end of the tracker."
+        } else {
+            return "This budget exceeds the starting value by \(Tracker.formattedValue(abs(remainder), unit: displayUnit))."
+        }
     }
 
     private var isValid: Bool {

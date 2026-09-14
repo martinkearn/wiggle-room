@@ -21,6 +21,7 @@ struct TrackerDetailView: View {
     @State private var isPresentingLogReading = false
     @State private var isPresentingEditTracker = false
     @State private var isPresentingDeleteConfirmation = false
+    @State private var isPresentingReadingHistory = false
     @State private var now = Date.now
     // Set from `.onAppear`, not here: a default value initializes whenever
     // SwiftUI happens to construct this struct, which can be well before
@@ -44,15 +45,32 @@ struct TrackerDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
+                // The whole screen's figures update on this cadence (Target
+                // Right Now, the ring, the difference) — not just one card —
+                // so the countdown lives up top rather than tucked under a
+                // single figure.
+                if let screenUpdateCaption {
+                    Text(screenUpdateCaption)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 4)
+                }
+
                 RingsView(tracker: tracker, now: now)
                     .frame(width: 260, height: 260)
-                    .padding(.top, 12)
 
                 figuresRow
 
-                Text(periodRemainingText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 2) {
+                    Text(periodRemainingText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if let remainingAtEndCaption {
+                        Text(remainingAtEndCaption)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
 
                 if tracker.latestReading == nil {
                     Text("No readings logged yet — log one to see your pace.")
@@ -78,6 +96,13 @@ struct TrackerDetailView: View {
                     } label: {
                         Label("Edit Tracker", systemImage: "pencil")
                     }
+                    if tracker.isManualEntry {
+                        Button {
+                            isPresentingReadingHistory = true
+                        } label: {
+                            Label("Update History", systemImage: "clock")
+                        }
+                    }
                     Button(role: .destructive) {
                         isPresentingDeleteConfirmation = true
                     } label: {
@@ -93,6 +118,11 @@ struct TrackerDetailView: View {
         }
         .sheet(isPresented: $isPresentingEditTracker) {
             AddTrackerView(existingTracker: tracker)
+        }
+        .sheet(isPresented: $isPresentingReadingHistory) {
+            NavigationStack {
+                ReadingHistoryView(tracker: tracker)
+            }
         }
         .confirmationDialog(
             "Delete \u{201C}\(tracker.name)\u{201D}?",
@@ -133,15 +163,18 @@ struct TrackerDetailView: View {
                 Button {
                     isPresentingLogReading = true
                 } label: {
-                    Label("Update Current Value", systemImage: "pencil.circle.fill")
-                        .font(.subheadline)
+                    Label("Update", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
                 }
                 .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.large)
             }
 
             card {
-                figureContent(title: "Target Right Now", value: pace.targetValueToday, caption: targetUpdateCaption)
+                figureContent(title: "Target Right Now", value: pace.targetValueToday)
             }
         }
         .padding(.horizontal)
@@ -156,13 +189,24 @@ struct TrackerDetailView: View {
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
     }
 
-    /// The target is what actually changes every minute — everything else
-    /// on screen (current value, difference) only moves when a new reading
-    /// is logged — so the countdown belongs directly under it, not off by
-    /// itself near the days-remaining text.
-    private var targetUpdateCaption: String? {
+    /// The whole screen's live figures (the ring, the difference, Target
+    /// Right Now) recompute on this cadence — not just one card — so this
+    /// sits at the very top of the screen rather than under a single figure.
+    private var screenUpdateCaption: String? {
         guard now < tracker.endDate else { return nil }
         return "Updates in \(secondsUntilUpdate)s"
+    }
+
+    /// How much would be left over at the end of the tracker's period, shown
+    /// only when the starting value and total budget actually differ (the
+    /// "spend it all" case needs no extra explanation).
+    private var remainingAtEndCaption: String? {
+        guard let remainder = tracker.projectedRemainder else { return nil }
+        if remainder > 0 {
+            return "\(tracker.formattedValue(remainder)) will remain at the end"
+        } else {
+            return "Budget exceeds starting value by \(tracker.formattedValue(abs(remainder)))"
+        }
     }
 
     private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {
