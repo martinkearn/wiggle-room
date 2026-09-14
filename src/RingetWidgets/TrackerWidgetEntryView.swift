@@ -29,12 +29,14 @@ struct TrackerWidgetEntryView: View {
             mediumHomeScreen(tracker)
         case .systemLarge:
             largeHomeScreen(tracker)
+        #if !os(macOS)
         case .accessoryCircular:
             circularLockScreen(tracker)
         case .accessoryRectangular:
             rectangularLockScreen(tracker)
         case .accessoryInline:
             inlineLockScreen(tracker)
+        #endif
         default:
             smallHomeScreen(tracker)
         }
@@ -69,7 +71,7 @@ struct TrackerWidgetEntryView: View {
                 .minimumScaleFactor(0.7)
         }
         .padding()
-        .containerBackground(for: .widget) { Color(.systemBackground) }
+        .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
     private func mediumHomeScreen(_ tracker: Tracker) -> some View {
@@ -92,7 +94,7 @@ struct TrackerWidgetEntryView: View {
             Spacer(minLength: 0)
         }
         .padding()
-        .containerBackground(for: .widget) { Color(.systemBackground) }
+        .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
     private func largeHomeScreen(_ tracker: Tracker) -> some View {
@@ -104,9 +106,10 @@ struct TrackerWidgetEntryView: View {
                 .frame(width: 160, height: 160)
         }
         .padding()
-        .containerBackground(for: .widget) { Color(.systemBackground) }
+        .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
+    #if !os(macOS)
     private func circularLockScreen(_ tracker: Tracker) -> some View {
         let p = pace(for: tracker)
         let fraction = p.periodHours > 0 ? min(max(p.hoursElapsed / p.periodHours, 0), 1) : 0
@@ -139,4 +142,5 @@ struct TrackerWidgetEntryView: View {
         Text("\(tracker.name): \(pace(for: tracker).displayDifference(for: tracker))")
             .containerBackground(for: .widget) { Color.clear }
     }
+    #endif
 }

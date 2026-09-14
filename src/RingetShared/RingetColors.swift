@@ -19,3 +19,18 @@ enum RingetColors {
     /// Needs attention.
     static let bad = Color(red: 0.80, green: 0.25, blue: 0.20)
 }
+
+extension Color {
+    /// Cross-platform "the system's default window/card background" —
+    /// `UIColor.systemBackground` on iOS has no direct macOS equivalent, so
+    /// widgets/extensions that need a background reach for this instead.
+    static var widgetBackground: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #elseif os(watchOS)
+        Color.black
+        #else
+        Color(uiColor: .systemBackground)
+        #endif
+    }
+}

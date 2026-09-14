@@ -10,7 +10,11 @@ import SwiftData
 
 struct ContentView: View {
     var body: some View {
+        #if os(macOS)
+        MacRootView()
+        #else
         TrackerListView()
+        #endif
     }
 }
 

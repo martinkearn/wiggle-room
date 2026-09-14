@@ -52,11 +52,13 @@ struct ReadingHistoryView: View {
         .navigationTitle("Update History")
         .inlineNavigationBarIfAvailable()
         .toolbar {
+            #if !os(macOS)
             if !readingsNewestFirst.isEmpty {
                 ToolbarItem(placement: .primaryAction) {
                     EditButton()
                 }
             }
+            #endif
         }
         .sheet(item: $editingReading) { reading in
             LogReadingView(tracker: tracker, existingReading: reading)

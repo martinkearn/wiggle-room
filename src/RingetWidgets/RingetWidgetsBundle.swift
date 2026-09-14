@@ -26,9 +26,13 @@ struct TrackerWidget: Widget {
         }
         .configurationDisplayName("Tracker")
         .description("Shows a tracker's pace at a glance.")
+        #if os(macOS)
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        #else
         .supportedFamilies([
             .systemSmall, .systemMedium, .systemLarge,
             .accessoryCircular, .accessoryRectangular, .accessoryInline,
         ])
+        #endif
     }
 }

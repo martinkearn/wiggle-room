@@ -8,11 +8,19 @@
 
 /* Begin PBXBuildFile section */
 		293C1E388C1A2543A9D0ADC2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0BCFAD5620138EFA3C3DD43 /* Foundation.framework */; };
+		4B9BEC6E86E3038255B3C542 /* RingetWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AC013DBE5CBD724972D4B331 /* RingetWatch.app */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9391A7D9A0377A729C701CD2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DA585E7618392675CF6D760 /* Foundation.framework */; };
 		951FF7F25912393137B09B3B /* RingetWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0390A05B6F76AA646812AE87 /* RingetWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		5B6172D4BC984B4F7D80D757 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EF63B10E3056875D0092FD24 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2E72304D8C979446738D729C;
+			remoteInfo = RingetWatch;
+		};
 		DE91F17B1E6F689A2D0537C4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = EF63B10E3056875D0092FD24 /* Project object */;
@@ -48,6 +56,17 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5A87B6A9F195D51A9434406D /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				4B9BEC6E86E3038255B3C542 /* RingetWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -72,7 +91,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				RingetWatch.entitlements,
 			);
 			target = 2E72304D8C979446738D729C /* RingetWatch */;
 		};
@@ -262,8 +280,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				469C2E2453225A08530C046C /* RingetWatch */,
 				0028FDCFB48782B4201280F1 /* RingetShared */,
+				469C2E2453225A08530C046C /* RingetWatch */,
 			);
 			name = RingetWatch;
 			productName = RingetWatch;
@@ -278,11 +296,13 @@
 				EF63B1133056875D0092FD24 /* Frameworks */,
 				EF63B1143056875D0092FD24 /* Resources */,
 				55273DB0609129562CC867EA /* Embed Foundation Extensions */,
+				5A87B6A9F195D51A9434406D /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				D4964E0E82BA1E8D8401CA0E /* PBXTargetDependency */,
+				C6DBCE2B792836BDD7628365 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				0028FDCFB48782B4201280F1 /* RingetShared */,
@@ -458,6 +478,15 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		C6DBCE2B792836BDD7628365 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RingetWatch;
+			platformFilters = (
+				ios,
+			);
+			target = 2E72304D8C979446738D729C /* RingetWatch */;
+			targetProxy = 5B6172D4BC984B4F7D80D757 /* PBXContainerItemProxy */;
+		};
 		D4964E0E82BA1E8D8401CA0E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = RingetWidgets;

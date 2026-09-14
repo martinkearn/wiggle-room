@@ -42,5 +42,17 @@ struct RingetApp: App {
                 .environment(store)
         }
         .modelContainer(modelContainer)
+
+        #if os(macOS)
+        MenuBarExtra {
+            MenuBarStatusView()
+                .environment(store)
+                .modelContainer(modelContainer)
+        } label: {
+            MenuBarStatusLabel()
+                .modelContainer(modelContainer)
+        }
+        .menuBarExtraStyle(.menu)
+        #endif
     }
 }
