@@ -275,3 +275,40 @@ silently skipping it or building something that doesn't fit the API.
 2. A macOS Dock badge + cross-pace notification (§7.2's last two bullets) — small, deferred, not started.
 3. A first real design pass — this was explicitly functionality-first tonight, and the "not verified live" gaps above (actual widget rendering on a Home Screen, the macOS window) are exactly where a design pass would want to start looking.
 4. `EditButton()`-equivalent delete-by-swipe on macOS's `ReadingHistoryView` list currently has no visible affordance (macOS `List` supports `.onDelete` via a selected row + Delete key, but the list has no `selection:` binding yet) — small follow-up.
+
+## Follow-up feedback round (2026-09-15)
+
+A batch of feedback after trying the widget/watch/macOS work above:
+
+- **Widgets/complications were reading stale data.** Nothing ever told
+  WidgetKit a tracker's figures had changed. Fixed two ways:
+  `TrackerStore`'s mutation methods now call
+  `WidgetCenter.shared.reloadAllTimelines()` (covers the app and
+  Shortcuts, both of which always go through `TrackerStore`); and a new
+  `CloudSyncWidgetRefresher` observes `NSPersistentStoreRemoteChange` and
+  reloads widgets when CloudKit syncs a change down from another device
+  while the app is simply open — a case that never touches
+  `TrackerStore` at all.
+- **Amber ring threshold changed** from an exact "landed exactly on
+  target" match to a percentage-of-allowance band (1-5% behind pace) —
+  see decision below and `TrackerPace.status`.
+- **Fixed a real visual bug**: the inner ring at small sizes (list rows,
+  widgets) was reduced to an unreadable "blob" by a flat
+  `lineWidth + 10` gap between the rings, sized fine at the 260pt
+  dashboard but consuming most of a 36pt row. Made proportional
+  (`lineWidth` alone).
+- **Trend chart now colors the actual-value line green/red** per
+  segment (ahead/behind pace at that point), reusing
+  `TrackerPace.isAheadOfPace` rather than a flat blue line.
+- **Add/Edit Tracker's number fields** (Starting value, Total budget)
+  only had the tiny digits themselves as a tap target, with a `Spacer`
+  next to them absorbing taps that did nothing. Made the whole row
+  tappable, same pattern already used by `LogReadingView`.
+- **Unit pills**: expanded then immediately trimmed back per follow-up
+  feedback — settled on £/$/€ plus mi/km/kg/L/hrs, not an exhaustive
+  currency/unit list.
+
+### Key decisions
+
+26. **Amber is now a percentage-of-total-allowance band (1-5% behind pace), not an exact match** — reverses part of an earlier explicit decision (§ decision #4/#16's "below, at, or above — only true if the pounds match") based on new feedback that a genuine early-warning zone is more useful than a zero-tolerance snap. `TrackerPace` gained a `totalAllowance` field so `status` can express "behind" relative to the whole rather than an absolute amount (meaningless to compare a £50 tracker's absolute pounds-behind to a £5,000 one's). If this needs tuning again, the two boundary numbers (currently 1 and 5) are the only things to change, in one place (`TrackerPace.status`).
+27. **A ring's inner/outer gap must scale with the size it's drawn at, not a flat constant** — `RingsView` is reused from a 36pt list-row indicator up to a 260pt dashboard hero and everything in between (widgets, watch); any spacing constant in it needs to be proportional (here, tied to `lineWidth`, which callers already scale per context) or it silently breaks at whichever end of that size range wasn't visually checked.
