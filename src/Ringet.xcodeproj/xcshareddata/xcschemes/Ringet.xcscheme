@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "0320B8BADB9D2DE52BE08FB8"
-               BuildableName = "RingetWidgets.appex"
-               BlueprintName = "RingetWidgets"
+               BlueprintIdentifier = "EF63B1153056875D0092FD24"
+               BuildableName = "Ringet.app"
+               BlueprintName = "Ringet"
                ReferencedContainer = "container:Ringet.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -30,13 +30,33 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "0320B8BADB9D2DE52BE08FB8"
-            BuildableName = "RingetWidgets.appex"
-            BlueprintName = "RingetWidgets"
+            BlueprintIdentifier = "EF63B1153056875D0092FD24"
+            BuildableName = "Ringet.app"
+            BlueprintName = "Ringet"
             ReferencedContainer = "container:Ringet.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "EF63B1223056875F0092FD24"
+               BuildableName = "RingetTests.xctest"
+               BlueprintName = "RingetTests"
+               ReferencedContainer = "container:Ringet.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "EF63B12C3056875F0092FD24"
+               BuildableName = "RingetUITests.xctest"
+               BlueprintName = "RingetUITests"
+               ReferencedContainer = "container:Ringet.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
@@ -59,15 +79,6 @@
             ReferencedContainer = "container:Ringet.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <MacroExpansion>
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "0320B8BADB9D2DE52BE08FB8"
-            BuildableName = "RingetWidgets.appex"
-            BlueprintName = "RingetWidgets"
-            ReferencedContainer = "container:Ringet.xcodeproj">
-         </BuildableReference>
-      </MacroExpansion>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -79,9 +90,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "0320B8BADB9D2DE52BE08FB8"
-            BuildableName = "RingetWidgets.appex"
-            BlueprintName = "RingetWidgets"
+            BlueprintIdentifier = "EF63B1153056875D0092FD24"
+            BuildableName = "Ringet.app"
+            BlueprintName = "Ringet"
             ReferencedContainer = "container:Ringet.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
