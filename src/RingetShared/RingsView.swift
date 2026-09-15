@@ -46,6 +46,15 @@ struct RingsView: View {
         return min(max((ratio as NSDecimalNumber).doubleValue, 0), 1)
     }
 
+    /// The gap between the outer and inner ring, scaled to `lineWidth`
+    /// rather than a flat constant — a flat gap (previously `lineWidth +
+    /// 10`) is barely noticeable on the 260pt dashboard but swallows nearly
+    /// the whole inner ring at list-row/widget sizes (e.g. a 36pt row with
+    /// `lineWidth: 5` was left with a 30pt total inset, shrinking the inner
+    /// ring to an unreadable blob). Proportional to `lineWidth` keeps the
+    /// same visual relationship at every size this view is used at.
+    private var ringGap: CGFloat { lineWidth }
+
     var body: some View {
         VStack(spacing: 14) {
             GeometryReader { geometry in
@@ -53,13 +62,13 @@ struct RingsView: View {
                 ZStack {
                     ring(fraction: paceFraction, color: RingetColors.paceRing)
                     ring(fraction: actualFraction, color: statusColor)
-                        .padding(lineWidth + 10)
+                        .padding(ringGap)
 
                     if showsCenterContent {
                         // Constrained to the ring's own inner diameter so long
                         // values shrink to fit instead of overflowing past it.
                         centerContent
-                            .frame(width: side - (lineWidth + 10) * 2 - 24)
+                            .frame(width: side - ringGap * 2 - 24)
                     }
                 }
                 .frame(width: side, height: side)

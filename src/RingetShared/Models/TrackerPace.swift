@@ -27,20 +27,33 @@ struct TrackerPace: Equatable {
     /// in the tracker's own terms (e.g. "target balance today").
     let targetValueToday: Decimal
 
+    /// The tracker's total allowance for the period — carried alongside the
+    /// other figures so `status` can express "behind" as a percentage of
+    /// the whole, rather than an absolute amount that means very different
+    /// things for a £50 tracker and a £5,000 one.
+    let totalAllowance: Decimal
+
     /// `difference >= 0` means ahead of pace; `< 0` means behind.
     var isAheadOfPace: Bool { difference >= 0 }
 
-    /// Traffic-light status (§3.2): below, at, or above the target.
-    /// "At" is an exact match on the whole-number part only (pennies/cents
-    /// don't count) — not a percentage tolerance band, so it's only true
-    /// when the current value has genuinely landed on the target.
+    /// How far behind pace, as a percentage of the total allowance —
+    /// `0` when on pace or ahead.
+    private var percentBehind: Double {
+        guard totalAllowance != 0 else { return 0 }
+        let behindAmount = max(-difference, 0)
+        return ((behindAmount / abs(totalAllowance)) as NSDecimalNumber).doubleValue * 100
+    }
+
+    /// Traffic-light status (§3.2): on pace, drifting behind, or badly
+    /// behind. Amber is a genuine early-warning band — behind pace by
+    /// between 1% and 5% of the total allowance — not an exact "landed on
+    /// the target" match: ahead of pace, or behind by less than 1%, reads
+    /// as green; behind by more than 5% reads as red.
     var status: PaceStatus {
-        let currentWhole = (currentValue as NSDecimalNumber).intValue
-        let targetWhole = (targetValueToday as NSDecimalNumber).intValue
-        if currentWhole == targetWhole {
-            return .warning
-        }
-        return difference >= 0 ? .good : .bad
+        let percent = percentBehind
+        if percent > 5 { return .bad }
+        if percent >= 1 { return .warning }
+        return .good
     }
 
     /// The at-a-glance difference figure, formatted for `tracker`. For a
@@ -80,7 +93,7 @@ enum PaceStatus {
     func label(for tracker: Tracker) -> String {
         switch self {
         case .good: return tracker.usesBudgetLanguage ? "Under Budget" : "On Track"
-        case .warning: return tracker.usesBudgetLanguage ? "At Budget" : "At Target"
+        case .warning: return tracker.usesBudgetLanguage ? "Close to Over Budget" : "Slightly Behind"
         case .bad: return tracker.usesBudgetLanguage ? "Over Budget" : "Needs Attention"
         }
     }
@@ -140,7 +153,8 @@ extension Tracker {
             expectedConsumedByNow: expectedConsumedByNow,
             difference: difference,
             currentValue: actualValue,
-            targetValueToday: targetValueToday
+            targetValueToday: targetValueToday,
+            totalAllowance: totalAllowance
         )
     }
 }

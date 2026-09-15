@@ -75,6 +75,39 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.targetValueToday, 1500)
     }
 
+    // MARK: - Status thresholds (§3.2 amber early-warning band)
+
+    func testStatus_aheadOfPace_isGood() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let halfway = date(2026, 1, 16)
+        let pace = tracker.pace(actualValue: 1600, asOf: halfway) // 100 ahead, of 3000
+        XCTAssertEqual(pace.status, .good)
+    }
+
+    func testStatus_behindByLessThanOnePercent_isGood() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let halfway = date(2026, 1, 16)
+        // Expected consumed 1500; behind by 20 (~0.67% of 3000) stays green.
+        let pace = tracker.pace(actualValue: 1480, asOf: halfway)
+        XCTAssertEqual(pace.status, .good)
+    }
+
+    func testStatus_behindByOneToFivePercent_isWarning() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let halfway = date(2026, 1, 16)
+        // Expected consumed 1500; behind by 60 (2% of 3000).
+        let pace = tracker.pace(actualValue: 1440, asOf: halfway)
+        XCTAssertEqual(pace.status, .warning)
+    }
+
+    func testStatus_behindByMoreThanFivePercent_isBad() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let halfway = date(2026, 1, 16)
+        // Expected consumed 1500; behind by 300 (10% of 3000).
+        let pace = tracker.pace(actualValue: 1200, asOf: halfway)
+        XCTAssertEqual(pace.status, .bad)
+    }
+
     // MARK: - Increasing (mileage) tracker
 
     func testIncreasingTracker_aheadOfPace() {
