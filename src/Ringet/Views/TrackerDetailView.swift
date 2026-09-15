@@ -159,7 +159,7 @@ struct TrackerDetailView: View {
     private var figuresRow: some View {
         HStack(alignment: .top, spacing: 12) {
             card {
-                figureContent(title: tracker.currentValueLabel, value: pace.currentValue)
+                figureContent(title: tracker.currentValueLabel, value: pace.currentValue, caption: remainingInAllowanceCaption)
                 Button {
                     isPresentingLogReading = true
                 } label: {
@@ -195,6 +195,19 @@ struct TrackerDetailView: View {
     private var screenUpdateCaption: String? {
         guard now < tracker.endDate else { return nil }
         return "Updates in \(secondsUntilUpdate)s"
+    }
+
+    /// How much of the total allowance is left to use *right now* — e.g.
+    /// "£100 left in this budget" after spending £400 of a £500 budget.
+    /// Distinct from `remainingAtEndCaption` below, which projects a fixed
+    /// starting-value-vs-budget gap independent of actual spending; this one
+    /// moves as readings come in. Omitted once the allowance is already
+    /// used up — the ring/status wording already covers being over.
+    private var remainingInAllowanceCaption: String? {
+        let remaining = tracker.totalAllowance - pace.consumedSoFar
+        guard remaining > 0 else { return nil }
+        let formatted = tracker.formattedValue(remaining)
+        return tracker.usesBudgetLanguage ? "\(formatted) left in this budget" : "\(formatted) left to use"
     }
 
     /// How much would be left over at the end of the tracker's period, shown
