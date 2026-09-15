@@ -57,6 +57,11 @@ struct AddTrackerView: View {
 
     @State private var errorMessage: String?
 
+    private enum NumberField {
+        case startingValue, totalAllowance
+    }
+    @FocusState private var focusedNumberField: NumberField?
+
     var body: some View {
         NavigationStack {
             Form {
@@ -93,14 +98,14 @@ struct AddTrackerView: View {
 
                 Section {
                     LabeledContent("Starting value") {
-                        unitValueField(text: $startingValueText)
+                        unitValueField(text: $startingValueText, field: .startingValue)
                     }
                     Text(startingValueHint)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
                     LabeledContent("Total budget") {
-                        unitValueField(text: $totalAllowanceText)
+                        unitValueField(text: $totalAllowanceText, field: .totalAllowance)
                     }
                     Text(totalBudgetHint)
                         .font(.caption)
@@ -200,8 +205,10 @@ struct AddTrackerView: View {
     /// The only units a tracker can be created with — picking from a fixed
     /// set (rather than free text) means `Tracker.isCurrencyUnit` and every
     /// piece of currency-aware formatting/wording can rely on an exact
-    /// match, with no risk of a typo'd or inconsistent unit string.
-    private static let unitOptions = ["£", "$", "€", "mi", "km", "kg"]
+    /// match, with no risk of a typo'd or inconsistent unit string. Just the
+    /// three most common currencies, plus a few other everyday
+    /// depleting/accumulating allowances beyond money and mileage.
+    private static let unitOptions = ["£", "$", "€", "mi", "km", "kg", "L", "hrs"]
 
     private var unitPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -229,8 +236,11 @@ struct AddTrackerView: View {
     /// A budget number field with the chosen unit shown alongside it —
     /// prefixed with no space for a currency symbol ("£3000"), suffixed
     /// otherwise ("3000 mi"), matching `Tracker.formattedValue`'s styling
-    /// elsewhere in the app.
-    private func unitValueField(text: Binding<String>) -> some View {
+    /// elsewhere in the app. The whole row (not just the digits themselves)
+    /// is tappable to focus the field — a value like "0" is otherwise a tiny
+    /// target sitting flush against the row's trailing edge, with the
+    /// `Spacer` next to it absorbing taps that land just to its left.
+    private func unitValueField(text: Binding<String>, field: NumberField) -> some View {
         HStack(spacing: 4) {
             Spacer(minLength: 0)
             if Tracker.isCurrencyUnit(unit) {
@@ -241,11 +251,15 @@ struct AddTrackerView: View {
                 .decimalKeyboardIfAvailable()
                 .multilineTextAlignment(.trailing)
                 .fixedSize()
+                .focused($focusedNumberField, equals: field)
             if !unit.isEmpty && !Tracker.isCurrencyUnit(unit) {
                 Text(unit)
                     .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .contentShape(Rectangle())
+        .onTapGesture { focusedNumberField = field }
     }
 
     private var selectedSourceId: UUID? {
