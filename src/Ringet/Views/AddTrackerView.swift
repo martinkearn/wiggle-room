@@ -415,6 +415,11 @@ struct AddTrackerView: View {
             totalAllowance: totalAllowance
         )
         store.addTracker(tracker)
+        // Seed the reading history with the starting value itself, dated at
+        // the tracker's own start — otherwise a brand new tracker shows "No
+        // readings logged yet" and a blank ring until the user manually logs
+        // one, even though the starting value is already a real data point.
+        store.logReading(value: startingValue, date: startDate, for: tracker)
         dismiss()
     }
 
