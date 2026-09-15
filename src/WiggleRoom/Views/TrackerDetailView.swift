@@ -197,17 +197,8 @@ struct TrackerDetailView: View {
         return "Updates in \(secondsUntilUpdate)s"
     }
 
-    /// How much of the total allowance is left to use *right now* — e.g.
-    /// "£100 left in this budget" after spending £400 of a £500 budget.
-    /// Distinct from `remainingAtEndCaption` below, which projects a fixed
-    /// starting-value-vs-budget gap independent of actual spending; this one
-    /// moves as readings come in. Omitted once the allowance is already
-    /// used up — the ring/status wording already covers being over.
     private var remainingInAllowanceCaption: String? {
-        let remaining = tracker.totalAllowance - pace.consumedSoFar
-        guard remaining > 0 else { return nil }
-        let formatted = tracker.formattedValue(remaining)
-        return tracker.usesBudgetLanguage ? "\(formatted) left in this budget" : "\(formatted) left to use"
+        pace.remainingInAllowanceCaption(for: tracker)
     }
 
     /// How much would be left over at the end of the tracker's period, shown

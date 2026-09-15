@@ -78,6 +78,19 @@ struct TrackerPace: Equatable {
         guard tracker.usesBudgetLanguage, status != .warning else { return label }
         return "\(label) by"
     }
+
+    /// How much of the total allowance is left to use *right now* — e.g.
+    /// "£100 left in this budget" after spending £400 of a £500 budget.
+    /// This moves as readings come in, unlike `Tracker.projectedRemainder`,
+    /// which projects a fixed starting-value-vs-budget gap independent of
+    /// actual spending. `nil` once the allowance is already used up or
+    /// exceeded — the ring/status wording already covers being over.
+    func remainingInAllowanceCaption(for tracker: Tracker) -> String? {
+        let remaining = totalAllowance - consumedSoFar
+        guard remaining > 0 else { return nil }
+        let formatted = tracker.formattedValue(remaining)
+        return tracker.usesBudgetLanguage ? "\(formatted) left in this budget" : "\(formatted) left to use"
+    }
 }
 
 /// Traffic-light reading of a tracker's pace (§3.2), independent of

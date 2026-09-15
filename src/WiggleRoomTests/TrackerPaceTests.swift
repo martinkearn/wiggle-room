@@ -177,6 +177,93 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.expectedConsumedByNow, tracker.totalAllowance)
     }
 
+    // MARK: - displayDifference(for:) sign/wording rules
+
+    func testDisplayDifference_budgetTracker_good_showsUnsignedMagnitude() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let pace = tracker.pace(actualValue: 1600, asOf: date(2026, 1, 16)) // 100 ahead
+        XCTAssertEqual(pace.status, .good)
+        XCTAssertEqual(pace.displayDifference(for: tracker), "£100", "good/bad status colors already convey direction, so the sign would be redundant")
+    }
+
+    func testDisplayDifference_budgetTracker_bad_showsUnsignedMagnitude() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let pace = tracker.pace(actualValue: 1200, asOf: date(2026, 1, 16)) // 300 behind (10%)
+        XCTAssertEqual(pace.status, .bad)
+        XCTAssertEqual(pace.displayDifference(for: tracker), "£300")
+    }
+
+    func testDisplayDifference_budgetTracker_warning_showsSignedValue() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let pace = tracker.pace(actualValue: 1440, asOf: date(2026, 1, 16)) // 60 behind (2%)
+        XCTAssertEqual(pace.status, .warning)
+        XCTAssertEqual(pace.displayDifference(for: tracker), "-£60", "the early-warning band isn't a clean over/under yet, so it keeps the sign")
+    }
+
+    func testDisplayDifference_nonBudgetTracker_alwaysShowsSignedValue() {
+        let tracker = mileageTracker()
+        let ahead = tracker.pace(actualValue: 11400, asOf: date(2026, 1, 16)) // 100 ahead
+        let behind = tracker.pace(actualValue: 11700, asOf: date(2026, 1, 16)) // 200 behind
+
+        XCTAssertEqual(ahead.displayDifference(for: tracker), "+100 mi")
+        XCTAssertEqual(behind.displayDifference(for: tracker), "-200 mi")
+    }
+
+    // MARK: - statusLine(for:) wording rules
+
+    func testStatusLine_budgetTracker_good_appendsBy() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let pace = tracker.pace(actualValue: 1600, asOf: date(2026, 1, 16))
+        XCTAssertEqual(pace.statusLine(for: tracker), "Under Budget by")
+    }
+
+    func testStatusLine_budgetTracker_bad_appendsBy() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let pace = tracker.pace(actualValue: 1200, asOf: date(2026, 1, 16))
+        XCTAssertEqual(pace.statusLine(for: tracker), "Over Budget by")
+    }
+
+    func testStatusLine_budgetTracker_warning_omitsBy() {
+        let tracker = moneyTracker(totalAllowance: 3000)
+        let pace = tracker.pace(actualValue: 1440, asOf: date(2026, 1, 16))
+        XCTAssertEqual(pace.statusLine(for: tracker), "Close to Over Budget", "the warning label already reads as a complete phrase")
+    }
+
+    func testStatusLine_nonBudgetTracker_neverAppendsBy() {
+        let tracker = mileageTracker()
+        let ahead = tracker.pace(actualValue: 11400, asOf: date(2026, 1, 16)) // 100 ahead
+        let behind = tracker.pace(actualValue: 11700, asOf: date(2026, 1, 16)) // 200 behind (~6.7%, .bad)
+
+        XCTAssertEqual(ahead.statusLine(for: tracker), "On Track")
+        XCTAssertEqual(behind.statusLine(for: tracker), "Needs Attention")
+    }
+
+    // MARK: - remainingInAllowanceCaption(for:)
+
+    func testRemainingInAllowanceCaption_budgetTracker_reportsAmountLeft() {
+        let tracker = moneyTracker(startingValue: 500, totalAllowance: 500)
+        let pace = tracker.pace(actualValue: 400, asOf: date(2026, 1, 16)) // spent 100 of 500
+        XCTAssertEqual(pace.remainingInAllowanceCaption(for: tracker), "£400 left in this budget")
+    }
+
+    func testRemainingInAllowanceCaption_nonBudgetTracker_usesGenericWording() {
+        let tracker = mileageTracker(totalAllowance: 3000)
+        let pace = tracker.pace(actualValue: 11000, asOf: date(2026, 1, 16)) // used 1000 of 3000
+        XCTAssertEqual(pace.remainingInAllowanceCaption(for: tracker), "2,000 mi left to use")
+    }
+
+    func testRemainingInAllowanceCaption_allowanceFullyUsed_isNil() {
+        let tracker = moneyTracker(startingValue: 500, totalAllowance: 500)
+        let pace = tracker.pace(actualValue: 0, asOf: date(2026, 1, 31)) // spent exactly 500
+        XCTAssertNil(pace.remainingInAllowanceCaption(for: tracker))
+    }
+
+    func testRemainingInAllowanceCaption_allowanceExceeded_isNil() {
+        let tracker = moneyTracker(startingValue: 500, totalAllowance: 500)
+        let pace = tracker.pace(actualValue: -50, asOf: date(2026, 1, 31)) // overspent by 50
+        XCTAssertNil(pace.remainingInAllowanceCaption(for: tracker), "should not show a negative amount as if it were 'left'")
+    }
+
     // MARK: - DST-safe elapsed hours (spec §4.3)
 
     /// Builds start/end dates for the local calendar day containing the next
