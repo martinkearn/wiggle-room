@@ -66,6 +66,18 @@ struct TrackerPace: Equatable {
         }
         return tracker.formattedValue(abs(difference))
     }
+
+    /// The status wording shown alongside the difference figure — "Over
+    /// Budget by", "Under Budget by" for a budget tracker that's genuinely
+    /// over/under (not just close), or the plain status label otherwise.
+    /// Shared by the dashboard ring's center content and the tracker list
+    /// row so the two read identically rather than the list using a bare
+    /// number with no status word at all.
+    func statusLine(for tracker: Tracker) -> String {
+        let label = status.label(for: tracker)
+        guard tracker.usesBudgetLanguage, status != .warning else { return label }
+        return "\(label) by"
+    }
 }
 
 /// Traffic-light reading of a tracker's pace (§3.2), independent of

@@ -109,14 +109,8 @@ struct RingsView: View {
         }
     }
 
-    /// For a budget tracker that's actually over or under (not just at) —
-    /// "Over Budget by", "Under Budget by" — the color and word already say
-    /// which direction, so the amount itself doesn't need to. Everything
-    /// else keeps the plain status label.
     private var centerStatusLine: String {
-        let label = status.label(for: tracker)
-        guard tracker.usesBudgetLanguage, status != .warning else { return label }
-        return "\(label) by"
+        pace.statusLine(for: tracker)
     }
 
     private var centerAmountText: String {

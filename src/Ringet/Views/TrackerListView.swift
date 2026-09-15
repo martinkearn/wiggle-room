@@ -92,9 +92,11 @@ private struct TrackerRow: View {
                 Text(tracker.name)
                     .font(.headline)
                 if tracker.latestReading != nil {
-                    Text(pace.displayDifference(for: tracker))
+                    Text("\(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(status.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 } else {
                     Text("No data yet")
                         .font(.subheadline)
