@@ -3,6 +3,7 @@
 //  RingetWatch
 //
 
+import Combine
 import SwiftUI
 
 /// The glanceable detail screen — reuses `RingsView` (identical to the
