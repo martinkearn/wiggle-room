@@ -39,12 +39,42 @@ enum WidgetDataStore {
         }
     }
 
+    /// A plain, immediate fetch with no retry — for `placeholder(in:)`,
+    /// which WidgetKit expects to return instantly and doesn't award any
+    /// extra time budget to. Fine for it to come back empty on a cold
+    /// extension process; the placeholder is a generic skeleton, not the
+    /// figure a user is actually trying to read.
     @MainActor
-    static func fetchAllTrackers() throws -> [Tracker] {
+    static func fetchAllTrackersImmediately() throws -> [Tracker] {
+        let container = try makeContainer()
+        let descriptor = FetchDescriptor<Tracker>(sortBy: [SortDescriptor(\.name)])
+        return try container.mainContext.fetch(descriptor)
+    }
+
+    /// The very first time this extension's sandboxed container talks to
+    /// CloudKit (a fresh install, a fresh Simulator container), SwiftData's
+    /// initial history import runs asynchronously in the background — the
+    /// `ModelContainer` can finish initializing and a fetch can legitimately
+    /// see zero rows before that import lands, even though the real data
+    /// already exists in iCloud. Reported as the widget's "choose a
+    /// tracker" picker flashing "Loading" and coming back empty. Polling
+    /// briefly here (instead of accepting the first empty result) is a
+    /// one-time cold-start cost per extension process — once
+    /// `cachedContainer` above is warm, later calls return immediately.
+    @MainActor
+    static func fetchAllTrackers() async throws -> [Tracker] {
         do {
-            let container = try makeContainer()
-            let descriptor = FetchDescriptor<Tracker>(sortBy: [SortDescriptor(\.name)])
-            return try container.mainContext.fetch(descriptor)
+            var trackers = try fetchAllTrackersImmediately()
+            guard trackers.isEmpty else { return trackers }
+            for attempt in 1...8 {
+                try await Task.sleep(nanoseconds: 500_000_000)
+                trackers = try fetchAllTrackersImmediately()
+                if !trackers.isEmpty {
+                    logger.notice("Trackers appeared after waiting for initial CloudKit import (attempt \(attempt)).")
+                    break
+                }
+            }
+            return trackers
         } catch {
             logger.error("Failed to fetch trackers: \(error, privacy: .public)")
             throw error
@@ -52,7 +82,7 @@ enum WidgetDataStore {
     }
 
     @MainActor
-    static func fetchTracker(id: UUID) throws -> Tracker? {
-        try fetchAllTrackers().first { $0.id == id }
+    static func fetchTracker(id: UUID) async throws -> Tracker? {
+        try await fetchAllTrackers().first { $0.id == id }
     }
 }

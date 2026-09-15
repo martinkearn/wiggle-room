@@ -23,14 +23,14 @@ struct TrackerEntity: AppEntity {
 struct TrackerEntityQuery: EntityQuery {
     @MainActor
     func entities(for identifiers: [TrackerEntity.ID]) async throws -> [TrackerEntity] {
-        try WidgetDataStore.fetchAllTrackers()
+        try await WidgetDataStore.fetchAllTrackers()
             .filter { identifiers.contains($0.id) }
             .map { TrackerEntity(id: $0.id, name: $0.name) }
     }
 
     @MainActor
     func suggestedEntities() async throws -> [TrackerEntity] {
-        try WidgetDataStore.fetchAllTrackers().map { TrackerEntity(id: $0.id, name: $0.name) }
+        try await WidgetDataStore.fetchAllTrackers().map { TrackerEntity(id: $0.id, name: $0.name) }
     }
 }
 
