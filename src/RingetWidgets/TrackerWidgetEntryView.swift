@@ -97,16 +97,66 @@ struct TrackerWidgetEntryView: View {
         .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
+    /// The large widget has real room to work with, but `RingsView`'s
+    /// default center content/legend are sized for the ~260pt phone
+    /// dashboard — reused verbatim here they overflowed and overlapped at
+    /// this size. Instead: a bare ring (`showsCenterContent: false`) stays
+    /// the primary visual, with the status/difference and the Current
+    /// Balance/Target figures laid out as their own rows below/beside it,
+    /// mirroring the phone dashboard's own card layout rather than trying
+    /// to squeeze everything inside the ring itself.
     private func largeHomeScreen(_ tracker: Tracker) -> some View {
-        VStack(spacing: 12) {
+        let p = pace(for: tracker)
+        return VStack(alignment: .leading, spacing: 16) {
             Text(tracker.name)
                 .font(.headline)
                 .lineLimit(1)
-            RingsView(tracker: tracker, now: entry.date)
-                .frame(width: 160, height: 160)
+
+            HStack(spacing: 20) {
+                RingsView(tracker: tracker, now: entry.date, lineWidth: 14, showsCenterContent: false)
+                    .frame(width: 130, height: 130)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(p.status.label(for: tracker).uppercased())
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
+                        .foregroundStyle(p.status.color)
+                    Text(p.displayDifference(for: tracker))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundStyle(p.status.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text("difference from target")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+
+            Divider()
+
+            HStack(spacing: 12) {
+                widgetFigure(title: tracker.currentValueLabel, value: tracker.formattedValue(p.currentValue), color: p.status.color)
+                widgetFigure(title: "Target Right Now", value: tracker.formattedValue(p.targetValueToday), color: .primary)
+            }
         }
         .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .containerBackground(for: .widget) { Color.widgetBackground }
+    }
+
+    private func widgetFigure(title: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     #if !os(macOS)
