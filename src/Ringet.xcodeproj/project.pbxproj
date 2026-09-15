@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		293C1E388C1A2543A9D0ADC2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0BCFAD5620138EFA3C3DD43 /* Foundation.framework */; };
-		4B9BEC6E86E3038255B3C542 /* RingetWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AC013DBE5CBD724972D4B331 /* RingetWatch.app */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		4B9BEC6E86E3038255B3C542 /* RingetWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AC013DBE5CBD724972D4B331 /* RingetWatch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9391A7D9A0377A729C701CD2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DA585E7618392675CF6D760 /* Foundation.framework */; };
 		951FF7F25912393137B09B3B /* RingetWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0390A05B6F76AA646812AE87 /* RingetWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -106,8 +106,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0028FDCFB48782B4201280F1 /* RingetShared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RingetShared;
 			sourceTree = "<group>";
 		};
@@ -137,15 +135,11 @@
 		};
 		EF63B1263056875F0092FD24 /* RingetTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RingetTests;
 			sourceTree = "<group>";
 		};
 		EF63B1303056875F0092FD24 /* RingetUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RingetUITests;
 			sourceTree = "<group>";
 		};
@@ -481,9 +475,7 @@
 		C6DBCE2B792836BDD7628365 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = RingetWatch;
-			platformFilters = (
-				ios,
-			);
+			platformFilter = ios;
 			target = 2E72304D8C979446738D729C /* RingetWatch */;
 			targetProxy = 5B6172D4BC984B4F7D80D757 /* PBXContainerItemProxy */;
 		};

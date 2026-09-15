@@ -6,6 +6,7 @@
 import Foundation
 import Observation
 import SwiftData
+import WidgetKit
 
 /// App-wide actions and the fixed manual-entry source, backed by SwiftData
 /// (§6) rather than in-memory storage. Tracker/source lists themselves are
@@ -37,11 +38,13 @@ final class TrackerStore {
     func addTracker(_ tracker: Tracker) {
         modelContext.insert(tracker)
         try? modelContext.save()
+        reloadWidgets()
     }
 
     func deleteTracker(_ tracker: Tracker) {
         modelContext.delete(tracker)
         try? modelContext.save()
+        reloadWidgets()
     }
 
     /// Persists in-place edits to an existing `@Model` object (e.g. from
@@ -49,6 +52,7 @@ final class TrackerStore {
     /// just flushes it.
     func saveChanges() {
         try? modelContext.save()
+        reloadWidgets()
     }
 
     /// Appends a manually-logged reading directly — the dashboard and log
@@ -59,6 +63,7 @@ final class TrackerStore {
         reading.tracker = tracker
         modelContext.insert(reading)
         try? modelContext.save()
+        reloadWidgets()
     }
 
     /// Removes a single previously-logged reading (manual trackers only —
@@ -66,6 +71,21 @@ final class TrackerStore {
     func deleteReading(_ reading: ValueSnapshot) {
         modelContext.delete(reading)
         try? modelContext.save()
+        reloadWidgets()
+    }
+
+    /// Every mutation flows through this store (the app, and Shortcuts/Siri
+    /// via `IntentDataStore.store()`), so this is the one place that needs
+    /// to tell WidgetKit a tracker's figures may have changed — without it,
+    /// a Home Screen/Lock Screen widget only picks up new data on its own
+    /// refresh schedule (up to an hour away, see `TrackerTimelineProvider`),
+    /// showing stale numbers even though the app itself is current.
+    /// watchOS complications reuse the same mechanism once one exists; the
+    /// widget extension itself also links WidgetKit (compiled from this
+    /// same shared file) but never calls this — reloading its own timeline
+    /// from inside itself would be pointless.
+    private func reloadWidgets() {
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     private static func fetchOrCreateManualEntrySource(in context: ModelContext) -> ConnectedSource {

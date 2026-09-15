@@ -30,6 +30,7 @@ struct RingetWatchApp: App {
             modelContainer = localContainer
         }
         _store = State(initialValue: TrackerStore(modelContext: modelContainer.mainContext))
+        CloudSyncWidgetRefresher.start()
     }
 
     var body: some Scene {

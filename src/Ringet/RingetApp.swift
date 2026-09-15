@@ -34,6 +34,7 @@ struct RingetApp: App {
         }
 
         _store = State(initialValue: TrackerStore(modelContext: modelContainer.mainContext))
+        CloudSyncWidgetRefresher.start()
     }
 
     var body: some Scene {
