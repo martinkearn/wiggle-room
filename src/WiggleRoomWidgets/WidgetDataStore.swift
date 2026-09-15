@@ -3,6 +3,7 @@
 //  WiggleRoomWidgets
 //
 
+import CoreData
 import Foundation
 import SwiftData
 import os
@@ -88,23 +89,45 @@ enum WidgetDataStore {
 
     /// Used only by the interactive "choose a tracker" widget configuration
     /// picker (`TrackerEntityQuery.suggestedEntities()`), which already
-    /// shows its own "Loading" state, so a short wait here is expected
+    /// shows its own "Loading" state, so a longer wait here is expected
     /// rather than surprising. Unlike `fetchAllTrackers()` above, this keeps
-    /// re-fetching for a few seconds even when the *first* result already
-    /// has trackers in it — a tracker created moments ago in the main app
-    /// still has to make a round trip through CloudKit and back down into
-    /// this extension's own separate local store, which doesn't finish just
-    /// because this container already had other trackers cached from
-    /// before. Returns whichever fetch found the most trackers, on the
-    /// assumption the local store only gains rows during this short window,
-    /// never loses ones it already had.
+    /// re-fetching even when the *first* result already has trackers in it —
+    /// a tracker created moments ago in the main app still has to make a
+    /// round trip through CloudKit and back down into this extension's own
+    /// separate local store, which doesn't finish just because this
+    /// container already had other trackers cached from before.
+    ///
+    /// A short fixed poll (originally ~3-6s) turned out to be nowhere near
+    /// enough: a brand new tracker's very first CloudKit sync — especially
+    /// right after this app switched CloudKit containers — can legitimately
+    /// take considerably longer than that, and the picker was timing out
+    /// and showing "no tracker" well before the sync had actually finished
+    /// (confirmed by it succeeding on retry once enough wall-clock time had
+    /// passed, with no code change). Rather than guess a longer fixed delay,
+    /// this waits on CloudKit's own "import finished" signal
+    /// (`NSPersistentCloudKitContainer.eventChangedNotification`, which
+    /// SwiftData's CloudKit-backed store posts under the hood) so it moves
+    /// on the moment a sync actually completes, re-fetching after each one —
+    /// with a generous overall deadline as a backstop in case that
+    /// notification never arrives (e.g. no network). Returns whichever
+    /// fetch found the most trackers, on the assumption the local store
+    /// only gains rows during this window, never loses ones it already had.
     @MainActor
     static func fetchAllTrackersForConfiguration() async throws -> [Tracker] {
         do {
             var best = try fetchAllTrackersImmediately()
-            let attempts = best.isEmpty ? 12 : 6
-            for _ in 0..<attempts {
-                try await Task.sleep(nanoseconds: 500_000_000)
+            // Nothing synced yet at all (e.g. this extension process's very
+            // first launch, or right after switching CloudKit containers) is
+            // the slow case that needs the full generous window; once at
+            // least one tracker is already visible, a newly-added one only
+            // needs a shorter grace period to catch up, so editing an
+            // already-configured widget doesn't sit on "Loading" for 25s
+            // when there's nothing new to find.
+            let deadline = Date().addingTimeInterval(best.isEmpty ? 25 : 10)
+            while Date() < deadline {
+                let timeRemaining = deadline.timeIntervalSinceNow
+                guard timeRemaining > 0 else { break }
+                await waitForNextCloudKitImport(timeout: min(timeRemaining, 3))
                 let latest = try fetchAllTrackersImmediately()
                 if latest.count > best.count {
                     best = latest
@@ -114,6 +137,29 @@ enum WidgetDataStore {
         } catch {
             logger.error("Failed to fetch trackers for configuration: \(error, privacy: .public)")
             throw error
+        }
+    }
+
+    /// Suspends until CloudKit reports an import has finished (successful or
+    /// not — either way it's a good moment to re-check the local store), or
+    /// `timeout` elapses, whichever comes first. Never throws; a missed or
+    /// absent notification just falls through to the caller's next poll.
+    private static func waitForNextCloudKitImport(timeout: TimeInterval) async {
+        let importFinished = NotificationCenter.default.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification)
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                for await note in importFinished {
+                    guard let event = note.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+                        as? NSPersistentCloudKitContainer.Event,
+                        event.type == .import, event.endDate != nil else { continue }
+                    return
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(max(timeout, 0) * 1_000_000_000))
+            }
+            await group.next()
+            group.cancelAll()
         }
     }
 }
