@@ -30,7 +30,7 @@ struct TrackerEntityQuery: EntityQuery {
 
     @MainActor
     func suggestedEntities() async throws -> [TrackerEntity] {
-        try await WidgetDataStore.fetchAllTrackers().map { TrackerEntity(id: $0.id, name: $0.name) }
+        try await WidgetDataStore.fetchAllTrackersForConfiguration().map { TrackerEntity(id: $0.id, name: $0.name) }
     }
 }
 

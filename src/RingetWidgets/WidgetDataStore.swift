@@ -85,4 +85,35 @@ enum WidgetDataStore {
     static func fetchTracker(id: UUID) async throws -> Tracker? {
         try await fetchAllTrackers().first { $0.id == id }
     }
+
+    /// Used only by the interactive "choose a tracker" widget configuration
+    /// picker (`TrackerEntityQuery.suggestedEntities()`), which already
+    /// shows its own "Loading" state, so a short wait here is expected
+    /// rather than surprising. Unlike `fetchAllTrackers()` above, this keeps
+    /// re-fetching for a few seconds even when the *first* result already
+    /// has trackers in it — a tracker created moments ago in the main app
+    /// still has to make a round trip through CloudKit and back down into
+    /// this extension's own separate local store, which doesn't finish just
+    /// because this container already had other trackers cached from
+    /// before. Returns whichever fetch found the most trackers, on the
+    /// assumption the local store only gains rows during this short window,
+    /// never loses ones it already had.
+    @MainActor
+    static func fetchAllTrackersForConfiguration() async throws -> [Tracker] {
+        do {
+            var best = try fetchAllTrackersImmediately()
+            let attempts = best.isEmpty ? 12 : 6
+            for _ in 0..<attempts {
+                try await Task.sleep(nanoseconds: 500_000_000)
+                let latest = try fetchAllTrackersImmediately()
+                if latest.count > best.count {
+                    best = latest
+                }
+            }
+            return best
+        } catch {
+            logger.error("Failed to fetch trackers for configuration: \(error, privacy: .public)")
+            throw error
+        }
+    }
 }
