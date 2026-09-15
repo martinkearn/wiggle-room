@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# One-off script used to add the RingetWidgets extension target to the
+# One-off script used to add the WiggleRoomWidgets extension target to the
 # Xcode project via the `xcodeproj` gem, since this project uses the newer
 # folder-synchronized group format (PBXFileSystemSynchronizedRootGroup) that
 # Xcode's own "New Target" wizard would otherwise be needed for. Not part of
@@ -8,34 +8,34 @@
 
 require 'xcodeproj'
 
-project_path = File.expand_path('../src/Ringet.xcodeproj', __dir__)
+project_path = File.expand_path('../src/WiggleRoom.xcodeproj', __dir__)
 project = Xcodeproj::Project.open(project_path)
 
-main_target = project.targets.find { |t| t.name == 'Ringet' }
-raise 'Ringet target not found' unless main_target
+main_target = project.targets.find { |t| t.name == 'WiggleRoom' }
+raise 'WiggleRoom target not found' unless main_target
 
 # --- Shared code group, visible to both the app and the widget extension ---
 shared_group = project.new(Xcodeproj::Project::Object::PBXFileSystemSynchronizedRootGroup)
-shared_group.path = 'RingetShared'
+shared_group.path = 'WiggleRoomShared'
 shared_group.source_tree = '<group>'
 project.main_group.children << shared_group
 main_target.file_system_synchronized_groups << shared_group
 
 # --- Widget extension's own source group ---
 widget_group = project.new(Xcodeproj::Project::Object::PBXFileSystemSynchronizedRootGroup)
-widget_group.path = 'RingetWidgets'
+widget_group.path = 'WiggleRoomWidgets'
 widget_group.source_tree = '<group>'
 project.main_group.children << widget_group
 # Info.plist and the entitlements file are referenced directly by build
 # settings, not compiled as sources — exclude them from the synced group's
 # membership the same way the main app's Info.plist is excluded.
 widget_exceptions = project.new(Xcodeproj::Project::Object::PBXFileSystemSynchronizedBuildFileExceptionSet)
-widget_exceptions.membership_exceptions = ['Info.plist', 'RingetWidgets.entitlements']
+widget_exceptions.membership_exceptions = ['Info.plist', 'WiggleRoomWidgets.entitlements']
 
 # --- The extension target itself ---
 widget_target = project.new_target(
   :app_extension,
-  'RingetWidgets',
+  'WiggleRoomWidgets',
   :ios,
   '26.5',
   nil,
@@ -56,17 +56,17 @@ widget_target.file_system_synchronized_groups << shared_group
 # since all sources come from the synchronized groups above.
 
 common_settings = {
-  'CODE_SIGN_ENTITLEMENTS' => 'RingetWidgets/RingetWidgets.entitlements',
+  'CODE_SIGN_ENTITLEMENTS' => 'WiggleRoomWidgets/WiggleRoomWidgets.entitlements',
   'CODE_SIGN_STYLE' => 'Automatic',
   'CURRENT_PROJECT_VERSION' => '1',
   'DEVELOPMENT_TEAM' => 'KP8NBNSB5M',
   'GENERATE_INFOPLIST_FILE' => 'YES',
-  'INFOPLIST_FILE' => 'RingetWidgets/Info.plist',
-  'INFOPLIST_KEY_CFBundleDisplayName' => 'Ringet Widgets',
+  'INFOPLIST_FILE' => 'WiggleRoomWidgets/Info.plist',
+  'INFOPLIST_KEY_CFBundleDisplayName' => 'Wiggle Room Widgets',
   'IPHONEOS_DEPLOYMENT_TARGET' => '26.5',
   'MACOSX_DEPLOYMENT_TARGET' => '26.5',
   'MARKETING_VERSION' => '1.0',
-  'PRODUCT_BUNDLE_IDENTIFIER' => 'martinkearn.Ringet.RingetWidgets',
+  'PRODUCT_BUNDLE_IDENTIFIER' => 'martinkearn.WiggleRoom.WiggleRoomWidgets',
   'PRODUCT_NAME' => '$(TARGET_NAME)',
   'SDKROOT' => 'auto',
   'SKIP_INSTALL' => 'YES',

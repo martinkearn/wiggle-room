@@ -1,15 +1,15 @@
 #!/usr/bin/env ruby
 # The watch app embed (dependency + copy-files build file) must not apply
-# when the Ringet app target is built for macOS — a macOS app can't embed a
+# when the WiggleRoom app target is built for macOS — a macOS app can't embed a
 # watchOS binary. Scope both to iOS only via Xcode's platform filter.
 
 require 'xcodeproj'
 
-project_path = File.expand_path('../src/Ringet.xcodeproj', __dir__)
+project_path = File.expand_path('../src/WiggleRoom.xcodeproj', __dir__)
 project = Xcodeproj::Project.open(project_path)
 
-main_target = project.targets.find { |t| t.name == 'Ringet' }
-watch_target = project.targets.find { |t| t.name == 'RingetWatch' }
+main_target = project.targets.find { |t| t.name == 'WiggleRoom' }
+watch_target = project.targets.find { |t| t.name == 'WiggleRoomWatch' }
 raise 'targets not found' unless main_target && watch_target
 
 dependency = main_target.dependencies.find { |d| d.target == watch_target }
@@ -23,4 +23,4 @@ raise 'watch build file not found' unless build_file
 build_file.platform_filters = ['ios']
 
 project.save
-puts 'Scoped RingetWatch embedding to iOS only.'
+puts 'Scoped WiggleRoomWatch embedding to iOS only.'

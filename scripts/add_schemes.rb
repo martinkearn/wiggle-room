@@ -6,10 +6,10 @@
 
 require 'xcodeproj'
 
-project_path = File.expand_path('../src/Ringet.xcodeproj', __dir__)
+project_path = File.expand_path('../src/WiggleRoom.xcodeproj', __dir__)
 project = Xcodeproj::Project.open(project_path)
 
-%w[RingetWidgets RingetWatch].each do |name|
+%w[WiggleRoomWidgets WiggleRoomWatch].each do |name|
   target = project.targets.find { |t| t.name == name }
   raise "#{name} target not found" unless target
 

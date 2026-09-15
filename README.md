@@ -1,4 +1,4 @@
-# Ringet
+# Wiggle Room
 
 A personal iOS/iPadOS/macOS/watchOS app that tracks any allowance —
 a bank balance against a monthly budget, a car's mileage against a
@@ -14,7 +14,7 @@ scoped to personal use, not a public multi-user product).
 ## Documentation
 
 The full build specification lives at
-[`docs/ringet-build-spec.md`](docs/ringet-build-spec.md). It's the
+[`docs/wiggleroom-build-spec.md`](docs/wiggleroom-build-spec.md). It's the
 source of truth for how the app should work — data model, the source
 provider architecture, visual/UX direction, platform-specific UI, and
 what's explicitly out of scope for v1. Read it before making any
@@ -53,10 +53,10 @@ Rough shape of what's implemented vs. still to come:
 
 ## Getting started
 
-1. Open `src/Ringet.xcodeproj` (or `.xcworkspace`, if present) in Xcode.
+1. Open `src/WiggleRoom.xcodeproj` (or `.xcworkspace`, if present) in Xcode.
 2. Build and run on the iOS, macOS, or watchOS simulator — pick the
-   `Ringet` scheme for the iPhone/Mac app (the watch app and widgets embed
-   automatically), or `RingetWatch`/`RingetWidgets` directly to iterate on
+   `WiggleRoom` scheme for the iPhone/Mac app (the watch app and widgets embed
+   automatically), or `WiggleRoomWatch`/`WiggleRoomWidgets` directly to iterate on
    just one of them.
 3. Provider credentials are entered in-app under Settings → Connected
    Sources — never hardcode tokens in source or commit them to this
@@ -67,19 +67,19 @@ Rough shape of what's implemented vs. still to come:
 ```
 ringet/
 ├── docs/
-│   ├── ringet-build-spec.md   — the build spec (source of truth)
+│   ├── wiggleroom-build-spec.md — the build spec (source of truth)
 │   └── progress-notes.md      — what's actually been built, decisions, gaps
 ├── scripts/                   — one-off Xcode-project-surgery scripts (see
 │                                 progress-notes.md; not part of the app)
 ├── src/                       — Xcode project & app source
-│   ├── Ringet.xcodeproj
-│   ├── Ringet/                — the iOS/iPadOS/macOS app + Shortcuts intents
-│   ├── RingetShared/          — model/pace layer + RingsView, shared by
+│   ├── WiggleRoom.xcodeproj
+│   ├── WiggleRoom/                — the iOS/iPadOS/macOS app + Shortcuts intents
+│   ├── WiggleRoomShared/          — model/pace layer + RingsView, shared by
 │   │                             every target below (no App Group — each
 │   │                             target syncs independently via CloudKit)
-│   ├── RingetWidgets/         — WidgetKit extension (Home Screen, Lock Screen)
-│   ├── RingetWatch/           — watchOS companion app
-│   ├── RingetTests/
-│   └── RingetUITests/
+│   ├── WiggleRoomWidgets/         — WidgetKit extension (Home Screen, Lock Screen)
+│   ├── WiggleRoomWatch/           — watchOS companion app
+│   ├── WiggleRoomTests/
+│   └── WiggleRoomUITests/
 └── README.md
 ```
