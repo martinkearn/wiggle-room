@@ -28,11 +28,12 @@ Everything in the UI should read as **holding (or drifting from) a steady pace t
 
 ### 3.2 Color language
 
-- **Ahead of pace**: a calm, confident green — avoid neon/alert greens.
-- **Behind pace**: an amber-leaning red rather than a harsh stop-sign red, to keep the tone corrective rather than alarming. Reserve pure red for genuinely urgent states (e.g. a money tracker's balance near zero, or a mileage tracker with the full allowance already used) — not just "behind pace" on its own.
+- **Ahead of / on pace**: a calm, confident green — avoid neon/alert greens.
+- **Behind pace**: an amber-leaning red rather than a harsh stop-sign red, to keep the tone corrective rather than alarming. Reserve pure red for genuinely urgent states (e.g. a money tracker's balance near zero, or a mileage tracker with the full allowance already used) — not just "behind pace" on its own. In practice this urgency distinction is what the amber early-warning band below is for, ahead of the harder red.
 - **Neutral/refreshing**: cool grey-blue.
 - **Error**: amber/warning tone, distinct from both the ahead-of-pace green and behind-pace red, so a stale-data state is never confused with a genuinely-behind-pace state (see §8.4).
-- The **outer (pace) ring** stays a neutral gray/graphite in all states — it's a clock, not a status indicator. Only the **inner (actual) ring** carries the green/red status color.
+- The **outer (pace) ring** stays a neutral gray/graphite in all states — it's a clock, not a status indicator. Only the **inner (actual) ring** carries the status color.
+- **Implementation note**: the inner ring's status is a **three-state traffic light** (`PaceStatus`: good/warning/bad → green/amber/red), not a plain green/red binary. Amber is a genuine early-warning band — behind pace by between 1% and 5% of the tracker's `totalAllowance` — rather than an exact "landed on the target" match; green covers on-pace-or-ahead plus behind-by-less-than-1%, red covers behind-by-more-than-5%. Comparing an absolute amount wouldn't mean the same thing for a £50 tracker as a £5,000 one, hence the percentage basis. The two threshold numbers (1% and 5%) are a tuning decision, not a fixed requirement — adjust if real usage suggests otherwise.
 
 ### 3.3 Typography & iconography
 
@@ -45,7 +46,7 @@ Everything in the UI should read as **holding (or drifting from) a steady pace t
 The primary visualization is two concentric rings, functionally accurate (not decorative) — numbers remain the source of truth throughout the app, but the rings should encode real values precisely:
 
 - **Outer ring ("pace")** — fills according to elapsed time within the period: `fraction = hoursElapsed / periodHours`, clamped to `[0, 1]`. Colored neutral gray per §3.2.
-- **Inner ring ("actual")** — fills according to how much of the total allowance has actually been consumed so far (§4.3 `consumedSoFar`): `fraction = clamp(consumedSoFar / totalAllowance, 0, 1)`. Colored green if ahead of pace, amber-red if behind (§3.2).
+- **Inner ring ("actual")** — fills according to how much of the total allowance has actually been consumed so far (§4.3 `consumedSoFar`): `fraction = clamp(consumedSoFar / totalAllowance, 0, 1)`. Colored per the three-state traffic light in §3.2 (green/amber/red).
 - **Reading it**: if the inner ring is *less* filled than the outer ring, less of the allowance has been consumed than the elapsed time implies — ahead of pace. If the inner ring is *more* filled than the outer, behind pace.
 - This is the primary at-a-glance visual on the main dashboard, Home Screen widgets, Lock Screen widgets, and watch complication. A trend-line chart (actual vs. pace over time) may still be included as a secondary/detail view, styled per §3.5, for users who want to see the historical shape rather than a single current snapshot.
 - Numeric readouts (current value, target value, difference, in the tracker's own unit) must always be shown alongside the rings, never replaced by them.
@@ -57,9 +58,13 @@ The primary visualization is two concentric rings, functionally accurate (not de
 
 ### 3.6 Copy/tone
 
-- Use calm, plain status language: "On pace", "Ahead of pace", "Behind pace" — avoid "danger", "warning", "over budget" phrasing except in genuinely urgent cases.
+- Use calm, plain status language, adapted per tracker shape rather than one fixed phrase set:
+  - A **decreasing, currency-denominated** tracker (the common money case) reads naturally as a budget, so it uses budget-specific wording: "Under Budget" / "Close to Over Budget" / "Over Budget", with the over/under amount phrased as "Over Budget by £8.00" (sign dropped — the color and word already say the direction, so a sign on top is redundant).
+  - Every other tracker shape (increasing, or a non-currency unit like mileage) uses neutral, non-race wording instead: "On Track" / "Slightly Behind" / "Needs Attention", with the difference figure keeping its +/- sign (there's no natural "by" phrasing without reintroducing race language).
+  - Avoid "danger", "over budget" phrasing on non-budget trackers, and avoid "ahead of pace"/"behind pace" as literal UI copy — internally useful as calculation terms (§4.3), but it reads as a race and doesn't distinguish "good" from "bad" clearly enough for a user-facing label; the `PaceStatus` wording above is what ships.
 - Widget/menu bar copy should stay terse and numeric (e.g. "+£42" or "+120 mi") with fuller pace framing reserved for slightly more spacious surfaces (main dashboard, notifications).
-- UI labels adapt to the tracker's `unit` and `direction` (§4.1): a money tracker shows "Current balance" / "Target balance today"; a mileage tracker shows "Current mileage" / "Target mileage today".
+- UI labels adapt to the tracker's `unit` and `direction` (§4.1): a currency tracker shows "Current Balance" / "Target Right Now"; any other unit shows "Current" / "Target Right Now".
+- The button that records a new manual reading is labeled "Update Current Value" (not "Log a Reading") — keep this word ("Update") consistent everywhere that action or its history is referenced (e.g. "Update History", "Edit Update"), rather than mixing in "Log"/"Reading" terminology for the same feature.
 
 ## 4. Core Concept: Trackers
 
@@ -71,15 +76,15 @@ The fundamental unit of the app is a **Tracker**: any quantity that should move 
 |---|---|---|
 | `id` | UUID | |
 | `name` | String | User-facing label, e.g. "Joint account — September", "Car lease mileage" |
-| `unit` | String | Display unit, e.g. "£", "mi" — drives number formatting and UI copy (§3.6) |
-| `direction` | Enum: `decreasing` \| `increasing` | `decreasing`: starts high and depletes (bank balance). `increasing`: starts at a baseline and accumulates upward (odometer mileage, or a savings goal) |
+| `unit` | String | Display unit — drives number formatting and UI copy (§3.6). Picked from a fixed set of pills (£, $, €, mi, km, kg, L, hrs), not free text, so downstream currency/formatting checks (e.g. which units get budget language, §3.6) can rely on an exact string match rather than parsing arbitrary text |
+| `direction` | Enum: `decreasing` \| `increasing` | `decreasing`: starts high and depletes (bank balance). `increasing`: starts at a baseline and accumulates upward toward a **cap/allowance** (odometer mileage against a lease limit) — implemented as "less than the pace target is good," the same good/bad sense as an under-spent budget. This does **not** support an open-ended "goal to exceed" framing (e.g. a savings goal, where going *over* the target is the good outcome) — that would need a distinct mode, not just `direction = increasing`, and isn't built |
 | `connectedSourceId` | UUID | References a `ConnectedSource` (§5.2) — the account/connection this tracker reads from |
 | `sourceTargetId` | String? | Which specific target within that source, e.g. a Starling `accountUid` or `spaceUid`. Nil for sources with only one implicit target (most manual trackers) |
 | `startDate` | Date | Start of the period (inclusive) |
 | `endDate` | Date | Start of the *next* period (exclusive) — i.e. the period runs `startDate` through 23:59:59 the day before `endDate` |
 | `startingValue` | Decimal | The value at period start. Defaults to **0** for money trackers (user-editable); for mileage this is the odometer reading at period start |
 | `totalAllowance` | Decimal | Total amount/distance available for the whole period |
-| `recurrence` | `RecurrenceRule`? | Optional — see §4.4. Nil for a genuine one-off tracker |
+| `recurrence` | `RecurrenceRule`? | Optional — see §4.4. Nil for a genuine one-off tracker. **Not implemented yet**: an earlier placeholder field was removed from the model rather than left as unused scaffolding; re-add with real semantics when §4.4 is actually built |
 
 ### 4.2 Resolving `actualValue`
 
@@ -154,7 +159,8 @@ A `ConnectedSource` is a configured instance of a provider — e.g. "My Starling
 | `credentialKeychainKey` | String? | Reference to the auth token in Keychain, if any |
 
 - A **Settings → Connected Sources** screen lists all configured sources, independent of the Tracker list, with add/remove actions.
-- Adding a new tracker involves: pick an existing Connected Source (or add a new one inline), then pick a target within it (§5.1).
+- Adding a new tracker involves: pick an existing Connected Source (or add a new one inline, via the same screen Settings uses), then pick a target within it (§5.1).
+- **Implementation note**: manual entry is *not* a `ConnectedSource` the user creates or multiplies — it's a single fixed, implicit source (auto-created once), kept out of the Settings → Connected Sources list entirely. That list only shows real external connections (`providerId != "manual"`), which in practice is empty until a real provider (§5.3/§5.4) ships. A manual tracker's `sourceTargetId` is simply its own tracker id — there's no "which manual log" picker, since each manual tracker owns its own dedicated reading history (§5.5) directly.
 
 ### 5.3 Provider: Starling
 
@@ -189,9 +195,11 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 
 - **Requirement: full sync of all trackers, connected sources, and reading history across the user's own iPhone, iPad, Mac, and Apple Watch.** This is a hard requirement, not optional.
 - Every value obtained from a provider is stored as a **timestamped snapshot** (§4.6) rather than a single overwritten "current value" field — this history is required for zoom levels (§4.6) and the optional trend chart (§3.5), and must sync in full, not just the latest reading.
-- Implementation: **SwiftData with CloudKit sync** (`ModelContainer` configured with a CloudKit container). Apple handles propagation and basic conflict resolution across devices signed into the same Apple ID.
-  - Alternative if SwiftData proves unsuitable: Core Data + `NSPersistentCloudKitContainer`, same underlying mechanism.
-- Requires the app's iCloud capability (CloudKit) enabled in Xcode, and the Apple Developer Program membership (see §10).
+- Implementation: **SwiftData with CloudKit sync** (`ModelContainer` configured with a CloudKit container, `cloudKitDatabase: .automatic`), confirmed working end-to-end (real cross-device sync verified between a physical device and the Simulator). A local-only `ModelConfiguration` is kept as a defensive fallback, used only if CloudKit container creation throws (e.g. no iCloud account signed in). Apple handles propagation and basic conflict resolution across devices signed into the same Apple ID.
+  - This resolves the open question in §12 about SwiftData vs. Core Data — SwiftData proved sufficient; no need to fall back to `NSPersistentCloudKitContainer`.
+  - **CloudKit requires every relationship on a `@Model` type to declare an inverse on both sides**, or the app crashes on launch (SwiftData does not enforce this locally, only once CloudKit is active) — a real requirement to design for, not just a debugging note, since it means every new relationship between model types needs its inverse added on both sides in the same change.
+- Requires the app's iCloud capability (CloudKit) enabled in Xcode, and the Apple Developer Program membership (see §10) — **now active**; TestFlight and CloudKit sync are both usable.
+- Widgets, the watch app, and Shortcuts intents each open their **own** `ModelContainer` against the same CloudKit container rather than sharing an App Group with the phone app — CloudKit sync itself is what keeps them consistent. A freshly-created container's very first fetch can race CloudKit's own initial history import and come back empty with no error; callers that need data immediately (e.g. a widget's configuration picker) should retry a few times rather than trusting the first empty result.
 - **No sync between different users' data at any point** — each person's CloudKit container is scoped to their own private database under their own Apple ID.
 
 ## 7. Platform-Specific UI
@@ -208,14 +216,14 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 
 - **Main window**: `NavigationSplitView` — sidebar lists trackers (including past, completed instances of recurring trackers as history), detail pane shows the same dashboard content as iOS.
 - **Settings**: native `Settings` scene (Cmd+,) for Connected Sources management and add/edit tracker.
-- **Menu bar item** (`MenuBarExtra`): compact ahead/behind figure, color-coded per §3.2, with states for refreshing (spinner) and error (`--` with warning color) — see §8.4. Dropdown shows current value, target, difference, and a refresh/log-reading button. Supports multiple trackers via a default/pinned tracker or a submenu (decide during build).
-- **Dock icon badge**: indicates when any tracker is behind pace.
-- **Notifications**: banner when a tracker crosses from ahead to behind pace (or vice versa), worded per §3.6.
+- **Menu bar item** (`MenuBarExtra`): compact ahead/behind figure, color-coded per §3.2, with states for refreshing (spinner) and error (`--` with warning color) — see §8.4. Dropdown shows current value, target, difference, and a refresh/log-reading button. **Decision made**: shows a single tracker — the most-recently-started one — rather than a submenu; simpler of the two options the spec left open, revisit with a submenu if a single pinned tracker proves insufficient once there are enough concurrent trackers for it to matter.
+- **Dock icon badge**: indicates when any tracker is behind pace. **Not implemented yet.**
+- **Notifications**: banner when a tracker crosses from ahead to behind pace (or vice versa), worded per §3.6. **Not implemented yet.**
 
 ### 7.3 watchOS
 
-- Companion app: simple list/detail view mirroring the dashboard (current value, target, ahead/behind) — read-only for auto-fetch sources; manual trackers may support quick reading entry directly from the Watch as a stretch goal.
-- Complication: shows the ahead/behind figure for a chosen/default tracker directly on the watch face.
+- Companion app: simple list/detail view mirroring the dashboard (current value, target, ahead/behind) — read-only for auto-fetch sources; manual trackers support quick reading entry directly from the Watch (implemented as a real v1 feature, not left as a stretch goal, since manual entry is the only provider in scope so far). Talks to its own CloudKit-backed `ModelContainer` independently of the phone being nearby.
+- Complication: shows the ahead/behind figure for a chosen/default tracker directly on the watch face. **Not implemented yet** — the companion app exists, but its complication (a second WidgetKit extension embedded inside the watch app target) hasn't been built.
 
 ## 8. Widgets
 
@@ -224,7 +232,8 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 - **Small**: mini two-ring visual (§3.4) with the ahead/behind figure below it.
 - **Medium**: current value + target + the rings (compact) + ahead/behind line.
 - **Large**: rings at a larger size, optionally with a secondary trend chart (styled per §3.5).
-- Each widget instance is configurable to a specific tracker and, for long-running trackers, a specific zoom level (§4.6) — e.g. a widget pinned to "3-year lease — This month" rather than always showing the full 3-year pace (WidgetKit configuration intent).
+- Each widget instance is configurable to a specific tracker (via an `AppIntentConfiguration` + `WidgetConfigurationIntent`, so two widgets can show two different trackers side by side) and, for long-running trackers, a specific zoom level (§4.6) — e.g. a widget pinned to "3-year lease — This month" rather than always showing the full 3-year pace. **Zoom-level configuration isn't built yet**, since §4.6 itself isn't implemented; per-tracker configuration is.
+- Reuses the same `RingsView` used by the main app dashboard rather than a bespoke widget-only visual.
 
 ### 8.2 iOS Lock Screen widgets
 
@@ -240,6 +249,8 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 
 All glanceable surfaces (widgets, menu bar item) should support four states, colored per §3.2: ahead of pace (green), behind pace (amber-red), refreshing (neutral grey-blue), and error (amber/warning — token invalid, no network, stale manual entry, etc., visually distinct from the behind-pace state). Never silently show a stale figure as if it were current.
 
+- **Implementation note**: nothing tells WidgetKit a tracker's figures changed for free — an explicit reload trigger is required on every mutation path. In-app changes (any edit that goes through `TrackerStore`) call `WidgetCenter.shared.reloadAllTimelines()` directly; changes that arrive via CloudKit sync from another device while the app is simply open (never touching `TrackerStore`) need a separate observer on the store's remote-change notification to trigger the same reload. Both paths are needed — one alone leaves a real staleness gap.
+
 ## 9. Out of Scope for v1 (possible future additions)
 
 - Additional source providers beyond Starling, Tesla, and manual entry (another bank, an aggregator-backed provider, HealthKit, etc.) — the provider interface (§5.1) is designed to make these additive later without reworking the core app.
@@ -248,7 +259,7 @@ All glanceable surfaces (widgets, menu bar item) should support four states, col
 - Siri Shortcuts / voice status queries.
 - Spotlight surfacing via App Intents.
 - Handoff between the user's own devices.
-- Live Activities / Dynamic Island.
+- Live Activities / Dynamic Island — evaluated explicitly and skipped by design, not just left aside: the API is built for short, bounded events (a ride, a delivery) with a clear start/end held open on the Lock Screen for that duration, which doesn't fit a tracker running for weeks or months. A narrower version — surfacing one only in a tracker's final 24 hours — could be worth it later, but that's a distinct, smaller feature.
 - Any cross-user sharing or syncing of tracker data.
 - Transaction-level detail or spending categorization for money trackers.
 - Payment initiation (Starling access is read-only; no `payment:create` or similar scopes needed).
@@ -268,12 +279,19 @@ All glanceable surfaces (widgets, menu bar item) should support four states, col
 
 ## 12. Assumptions / Open Items for the Build Agent to Confirm
 
-- Exact current Starling API endpoint(s) and scope name(s) for Spaces / savings goals (confirm against developer.starlingbank.com/docs, as this may have changed).
-- Whether SwiftData + CloudKit or Core Data + NSPersistentCloudKitContainer is the better fit given current tooling maturity at build time.
-- Menu bar behavior when multiple trackers exist (single pinned tracker vs. submenu) — pick a sensible default and note it as a decision made.
-- Rate limit handling for Starling API calls (back off gracefully on 429s), especially given §4.5's shared-fetch requirement across trackers on the same source.
+Still open:
+
+- Exact current Starling API endpoint(s) and scope name(s) for Spaces / savings goals (confirm against developer.starlingbank.com/docs, as this may have changed) — no Starling work has started yet.
+- Rate limit handling for Starling API calls (back off gracefully on 429s), especially given §4.5's shared-fetch requirement across trackers on the same source — moot until the Starling provider exists.
 - Final app icon design exploring the two-ring motif from §3.3 — treat the direction given as a brief, not a locked-in final design.
-- Exact `RecurrenceRule` representation (§4.4) — e.g. an RRULE-like structure vs. a simpler custom enum — left to the build agent's judgment, as long as it supports "monthly anchored to a day-of-month" and "weekly anchored to a weekday" at minimum.
-- Whether manual-entry reminder notifications (§5.5) are worth including in v1 or deferred.
-- Exact Tesla Fleet API endpoint/scope names and current free-credit amount for the user's region (confirm against developer.tesla.com at build time, as pricing and endpoint names have changed before and may again).
+- Exact `RecurrenceRule` representation (§4.4) — e.g. an RRULE-like structure vs. a simpler custom enum — left to the build agent's judgment, as long as it supports "monthly anchored to a day-of-month" and "weekly anchored to a weekday" at minimum. (An earlier unused placeholder field was removed from `Tracker` rather than left half-built — see §4.1 — so this still needs a real decision when §4.4 is picked up.)
+- Whether manual-entry reminder notifications (§5.5) are worth including in v1 or deferred — still undecided; not built yet either way.
+- Exact Tesla Fleet API endpoint/scope names and current free-credit amount for the user's region (confirm against developer.tesla.com at build time, as pricing and endpoint names have changed before and may again) — no Tesla work has started yet.
+
+Resolved (kept here for the record):
+
+- **SwiftData + CloudKit vs. Core Data**: SwiftData with CloudKit sync proved sufficient — see §6. No need to fall back to `NSPersistentCloudKitContainer`.
+- **Menu bar behavior with multiple trackers**: a single pinned tracker (the most-recently-started one), not a submenu — see §7.2. Revisit if real usage shows it's insufficient.
+- **Amber ring threshold**: not an exact "landed exactly on target" match — a percentage-of-total-allowance early-warning band (1–5% behind pace) — see §3.2.
+- **Increasing-direction trackers model a cap/allowance, not an open-ended goal** — see §4.1. A savings-goal-style "exceeding is good" framing would need a distinct mode, not built.
 
