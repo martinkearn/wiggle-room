@@ -2,33 +2,27 @@
 
 ## 1. Overview
 
-**Wiggle Room** tracks any allowance that depletes or accumulates over a fixed period against the pace needed to land exactly on target — a bank balance against a monthly budget, or a car's mileage against a lease's annual allowance are the two concrete domains for v1. The core engine — a **Tracker** comparing an expected pace against an actual reading over a date range (§4) — is deliberately generic, and the data that feeds a tracker comes from a **modular source provider** (§5), so new domains (a different bank, a different kind of reading entirely) can be added as self-contained units of code without touching the tracker/calculation engine itself.
-
-Three source providers ship in v1: **Starling** (money), **Tesla** (car mileage, via its Fleet API), and **manual entry** (anything without an API). Three is a deliberate minimum, not two — building only Starling and manual entry risks the "provider interface" quietly becoming shaped around just those two cases without anyone noticing. Starling (personal access token, no OAuth), Tesla (OAuth2, a different auth shape entirely), and manual (no network access at all) are usefully different from each other, so if all three fit through the same interface cleanly, the abstraction is real rather than accidental. Additional providers beyond these three — another bank, another kind of connected data — are expected to require genuinely new code each time (this is not a no-code plugin system), but the architecture in §5 keeps that new code isolated behind one interface so it never touches tracker logic, calculations, or UI beyond a picker entry.
-
+**Wiggle Room** tracks any allowance that depletes or accumulates over a fixed period against the pace needed to land exactly on target. Examples include a bank balance against a monthly budget, or a car's mileage against a lease's annual allowance. The core engine is a **Tracker** comparing an expected pace against an actual reading over a date range (§4). Trackers are deliberately generic, and the data that feeds a tracker comes from a **modular source provider** (§5), so new domains (a different bank, a different kind of reading entirely) can be added as self-contained units of code without touching the tracker/calculation engine itself.
+Three source providers will ship initially: **Starling** (money), **Tesla** (car mileage, via its Fleet API), and **manual entry** (anything without an API). Three is a deliberate minimum, not two; building only Starling and manual entry risks the "provider interface" quietly becoming shaped around just those two cases without anyone noticing. Starling (personal access token, no OAuth), Tesla (OAuth2, a different auth shape entirely), and manual (no network access at all) are usefully different from each other, so if all three fit through the same interface cleanly, the abstraction is real rather than accidental. Additional providers beyond these three — another bank, another kind of connected data — are expected to require genuinely new code each time (this is not a no-code plugin system), but the architecture in §5 keeps that new code isolated behind one interface so it never touches tracker logic, calculations, or UI beyond a picker entry.
 The name **Wiggle Room** captures the everyday idiom for having a bit of slack left before a limit — the two-ring visualization (like Apple Fitness's Activity rings) shows exactly how much of that slack remains, tracking pace vs. actual consumption against a target, detailed in §3.
-
 The app is built for a single user's own use across their own devices. Two people (e.g. a couple) may each run their own independent installation against overlapping accounts (e.g. a shared joint account), but **the two installations never share or sync data with each other**. All sync is within one person's own Apple ID and devices only.
-
 ## 2. Platforms
-
+In all cases, we target the latest geneally avaliable OS versions, including MacOS and IOS 27.
 - iOS (iPhone)
 - iPadOS
 - macOS
 - watchOS (companion app + complication)
-- Shared codebase via a single Xcode multiplatform SwiftUI project; platform-specific UI where noted below.
-
+- Shared codebase via a single Xcode multiplatform SwiftUI project; platform-specific UI where noted below. 
 ## 3. Name & Visual Direction
-
 This section gives the build agent a consistent design language, rather than defaulting to generic finance-app styling (heavy greens/reds, bar charts, alert-style banners). It's written with money as the example throughout for clarity, but every rule applies equally to a mileage tracker — swap "balance" for "reading" and "£" for "mi" as the tracker's `unit` dictates (§4.1).
 
 ### 3.1 Core metaphor
-
 Everything in the UI should read as **holding (or drifting from) a steady pace toward a known endpoint**, not a countdown or a warning system. The emotional tone should be calm and steady, not alarming. Reaching a "full" ring at period end is an expected, neutral outcome (you were meant to use the whole allowance) — never framed as an achievement to celebrate the way Apple's own Activity rings frame closing a ring, since here "full" just means "period over," not "goal smashed."
 
 ### 3.2 Color language
 
 - **Ahead of / on pace**: a calm, confident green — avoid neon/alert greens.
+- **Slightly behind pace**: amber - just an indicator before it goes red
 - **Behind pace**: an amber-leaning red rather than a harsh stop-sign red, to keep the tone corrective rather than alarming. Reserve pure red for genuinely urgent states (e.g. a money tracker's balance near zero, or a mileage tracker with the full allowance already used) — not just "behind pace" on its own. In practice this urgency distinction is what the amber early-warning band below is for, ahead of the harder red.
 - **Neutral/refreshing**: cool grey-blue.
 - **Error**: amber/warning tone, distinct from both the ahead-of-pace green and behind-pace red, so a stale-data state is never confused with a genuinely-behind-pace state (see §8.4).
