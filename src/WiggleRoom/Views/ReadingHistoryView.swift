@@ -44,6 +44,19 @@ struct ReadingHistoryView: View {
                                     .font(.wiggleNumber(.body))
                             }
                         }
+                        #if os(macOS)
+                        // macOS `List` has no swipe-to-delete gesture and no
+                        // `selection:` binding here to drive `EditButton`'s
+                        // usual Delete-key path, so a per-row context menu is
+                        // the affordance instead.
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                store.deleteReading(reading)
+                            } label: {
+                                Label("Delete Update", systemImage: "trash")
+                            }
+                        }
+                        #endif
                     }
                     .onDelete(perform: deleteReadings)
                 }

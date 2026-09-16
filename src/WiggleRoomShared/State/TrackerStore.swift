@@ -38,10 +38,12 @@ final class TrackerStore {
     func addTracker(_ tracker: Tracker) {
         modelContext.insert(tracker)
         try? modelContext.save()
+        ReminderScheduler.sync(tracker)
         reloadWidgets()
     }
 
     func deleteTracker(_ tracker: Tracker) {
+        ReminderScheduler.cancel(tracker)
         modelContext.delete(tracker)
         try? modelContext.save()
         reloadWidgets()
@@ -49,9 +51,13 @@ final class TrackerStore {
 
     /// Persists in-place edits to an existing `@Model` object (e.g. from
     /// editing a tracker's details) — SwiftData tracks the mutation, this
-    /// just flushes it.
-    func saveChanges() {
+    /// just flushes it. `reminderCadenceDays` may have changed as part of
+    /// that edit, so the scheduled reminder (§5.5) is re-synced too.
+    func saveChanges(reminderTracker: Tracker? = nil) {
         try? modelContext.save()
+        if let reminderTracker {
+            ReminderScheduler.sync(reminderTracker)
+        }
         reloadWidgets()
     }
 

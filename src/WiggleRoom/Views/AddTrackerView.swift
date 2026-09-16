@@ -55,6 +55,12 @@ struct AddTrackerView: View {
     @State private var sourceSelection: SourceOption?
     @State private var isShowingAddSource = false
 
+    /// §5.5 — a lightweight local-notification reminder to log a new
+    /// reading, on a user-set cadence. `nil` means no reminder. Only offered
+    /// for a manual-entry tracker (see `isManualEntrySelected`) — a real
+    /// provider's readings arrive on their own.
+    @State private var reminderCadenceDays: Int?
+
     @State private var errorMessage: String?
 
     private enum NumberField {
@@ -159,6 +165,22 @@ struct AddTrackerView: View {
                     }
                 }
 
+                if isManualEntrySelected {
+                    Section {
+                        Picker("Reminder", selection: $reminderCadenceDays) {
+                            Text("None").tag(nil as Int?)
+                            Text("Daily").tag(1 as Int?)
+                            Text("Weekly").tag(7 as Int?)
+                            Text("Every 2 Weeks").tag(14 as Int?)
+                            Text("Monthly").tag(30 as Int?)
+                        }
+                    } header: {
+                        Text("Reminder")
+                    } footer: {
+                        Text("Get a local notification reminding you to log a new reading on this cadence.")
+                    }
+                }
+
                 if let errorMessage {
                     Section {
                         Text(errorMessage)
@@ -192,6 +214,7 @@ struct AddTrackerView: View {
                     startingValueText = existingTracker.startingValue.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                     totalAllowanceText = existingTracker.totalAllowance.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                     sourceSelection = .source(existingTracker.connectedSource?.id ?? store.manualEntrySource.id)
+                    reminderCadenceDays = existingTracker.reminderCadenceDays
                 } else if sourceSelection == nil {
                     sourceSelection = .source(store.manualEntrySource.id)
                 }
@@ -267,6 +290,16 @@ struct AddTrackerView: View {
         return id
     }
 
+    /// Whether the reminder section (§5.5) should be offered — either an
+    /// existing manual tracker being edited, or Manual Entry currently
+    /// selected while creating a new one.
+    private var isManualEntrySelected: Bool {
+        if let existingTracker {
+            return existingTracker.isManualEntry
+        }
+        return selectedSourceId == store.manualEntrySource.id
+    }
+
     private var startingValueHint: String {
         switch direction {
         case .decreasing:
@@ -286,11 +319,18 @@ struct AddTrackerView: View {
     }
 
     private var budgetFooter: String {
+        let displayUnit = unit.isEmpty ? "units" : unit
         switch direction {
         case .decreasing:
-            return "Example: for a simple £3000 budget, set both starting value and total budget to 3000. You'll then log your remaining balance over time (e.g. 3000 → 0), not your bank account's own balance unless this tracker follows that account exactly."
+            if Tracker.isCurrencyUnit(unit) {
+                return "Example: for a simple \(unit)3000 budget, set both starting value and total budget to 3000. You'll then log your remaining balance over time (e.g. 3000 → 0), not your bank account's own balance unless this tracker follows that account exactly."
+            }
+            return "Example: for a simple 3000 \(displayUnit) budget, set both starting value and total budget to 3000. You'll then log your remaining amount over time (e.g. 3000 → 0)."
         case .increasing:
-            return "Example: for a 3000-mile lease allowance, set starting value to your odometer reading and total budget to 3000. You'll then log your current odometer reading over time as it rises."
+            if Tracker.isCurrencyUnit(unit) {
+                return "Example: for a \(unit)3000 allowance, set starting value to what you've already used and total budget to 3000. You'll then log your running total over time as it rises."
+            }
+            return "Example: for a 3000 \(displayUnit) allowance (e.g. a mileage lease), set starting value to your reading at the start and total budget to 3000. You'll then log your current reading over time as it rises."
         }
     }
 
@@ -382,7 +422,8 @@ struct AddTrackerView: View {
             existingTracker.endDate = endDate
             existingTracker.startingValue = startingValue
             existingTracker.totalAllowance = totalAllowance
-            store.saveChanges()
+            existingTracker.reminderCadenceDays = reminderCadenceDays
+            store.saveChanges(reminderTracker: existingTracker)
             dismiss()
             return
         }
@@ -412,7 +453,8 @@ struct AddTrackerView: View {
             startDate: startDate,
             endDate: endDate,
             startingValue: startingValue,
-            totalAllowance: totalAllowance
+            totalAllowance: totalAllowance,
+            reminderCadenceDays: reminderCadenceDays
         )
         store.addTracker(tracker)
         // Seed the reading history with the starting value itself, dated at

@@ -33,6 +33,13 @@ final class Tracker {
     var startingValue: Decimal = 0
     var totalAllowance: Decimal = 0
 
+    /// A lightweight local-notification reminder to log a new reading, on a
+    /// user-set cadence in days (§5.5 — a nice-to-have, only meaningful for
+    /// a manual-entry tracker). `nil` means no reminder. See
+    /// `ReminderScheduler`, which schedules/cancels the actual notification
+    /// whenever this changes.
+    var reminderCadenceDays: Int?
+
     /// Every reading ever logged for this tracker (§4.6 — timestamped
     /// history, not a single overwritten current value). Optional array for
     /// CloudKit compatibility; use `sortedReadings`/`latestReading` rather
@@ -50,7 +57,8 @@ final class Tracker {
         startDate: Date,
         endDate: Date,
         startingValue: Decimal,
-        totalAllowance: Decimal
+        totalAllowance: Decimal,
+        reminderCadenceDays: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -62,6 +70,7 @@ final class Tracker {
         self.endDate = endDate
         self.startingValue = startingValue
         self.totalAllowance = totalAllowance
+        self.reminderCadenceDays = reminderCadenceDays
         self.readings = []
     }
 }
@@ -75,6 +84,18 @@ extension Tracker {
     /// The most recently logged reading, if any.
     var latestReading: ValueSnapshot? {
         sortedReadings.last
+    }
+
+    /// The value this tracker's history implies as of a given instant — the
+    /// most recent reading at or before `date`, or `startingValue` if `date`
+    /// is at/before the period start or there's no reading that early yet.
+    /// Used by zoom levels (§4.5) to find "what the value was at the start
+    /// of this month" without a separately-maintained snapshot.
+    func actualValue(atOrBefore date: Date) -> Decimal {
+        guard date > startDate, let reading = sortedReadings.last(where: { $0.date <= date }) else {
+            return startingValue
+        }
+        return reading.value
     }
 }
 
@@ -183,17 +204,68 @@ extension Tracker {
 
     /// "3 days remaining" / "6 hours remaining" / "Period ended", as of a
     /// given instant — the days-remaining line under the dashboard's rings,
-    /// also reused by the extra-large widget.
-    func periodRemainingText(asOf now: Date) -> String {
+    /// also reused by the extra-large widget. `until` defaults to the
+    /// tracker's own `endDate`, but a zoom level (§4.5) passes its
+    /// sub-period's end instead, so the caption reads correctly when zoomed
+    /// (e.g. "12 days remaining" in the current month, not the whole lease).
+    func periodRemainingText(asOf now: Date, until: Date? = nil) -> String {
         let calendar = Calendar.current
-        if now >= endDate {
+        let until = until ?? endDate
+        if now >= until {
             return "Period ended"
         }
-        let days = calendar.dateComponents([.day], from: now, to: endDate).day ?? 0
+        let days = calendar.dateComponents([.day], from: now, to: until).day ?? 0
         if days >= 1 {
             return "\(days) day\(days == 1 ? "" : "s") remaining"
         }
-        let hours = max(calendar.dateComponents([.hour], from: now, to: endDate).hour ?? 0, 0)
+        let hours = max(calendar.dateComponents([.hour], from: now, to: until).hour ?? 0, 0)
         return "\(hours) hour\(hours == 1 ? "" : "s") remaining"
+    }
+}
+
+extension Tracker {
+    /// Which zoom levels (§4.5) make sense to offer for this tracker, based
+    /// on its own period length — a week-long tracker has no need for a
+    /// "This year" tab. `.overall` is always available. A shorter level is
+    /// offered once the tracker's period meaningfully exceeds it, so the
+    /// zoomed sub-period is a real narrowing rather than ~the whole thing.
+    var availableZoomLevels: [ZoomLevel] {
+        let totalDays = endDate.timeIntervalSince(startDate) / 86400
+        var levels: [ZoomLevel] = [.overall]
+        if totalDays > 366 { levels.append(.thisYear) }
+        if totalDays > 31 { levels.append(.thisMonth) }
+        if totalDays > 7 { levels.append(.thisWeek) }
+        return levels
+    }
+
+    /// The calendar-aligned sub-period (§4.5) for a zoom level, clamped to
+    /// this tracker's own overall period — so the zoomed window never
+    /// extends before `startDate` or after `endDate` even when the calendar
+    /// month/year/week it falls in does. `nil` for `.overall` (no
+    /// sub-period — use the tracker's own bounds directly) or when the
+    /// clamped window is empty (e.g. `asOf` is exactly at `endDate`, or the
+    /// tracker's own period doesn't overlap the calendar unit at all).
+    func subPeriod(for zoomLevel: ZoomLevel, asOf: Date) -> DateInterval? {
+        guard zoomLevel != .overall else { return nil }
+        let calendar = Calendar.current
+        let clampedNow = min(max(asOf, startDate), endDate)
+
+        let interval: DateInterval?
+        switch zoomLevel {
+        case .overall:
+            interval = nil
+        case .thisYear:
+            interval = calendar.dateInterval(of: .year, for: clampedNow)
+        case .thisMonth:
+            interval = calendar.dateInterval(of: .month, for: clampedNow)
+        case .thisWeek:
+            interval = calendar.dateInterval(of: .weekOfYear, for: clampedNow)
+        }
+        guard let interval else { return nil }
+
+        let start = max(interval.start, startDate)
+        let end = min(interval.end, endDate)
+        guard end > start else { return nil }
+        return DateInterval(start: start, end: end)
     }
 }

@@ -18,10 +18,45 @@ import Charts
 struct TrendChartView: View {
     let tracker: Tracker
 
+    /// Re-scopes the chart to a zoom level's calendar-aligned sub-period
+    /// (§4.5) — the reference line runs the sub-period's own local starting
+    /// value to its own target-end, and only readings actually logged
+    /// within the sub-period are plotted. Defaults to `.overall`, the
+    /// existing full-period behavior.
+    var zoomLevel: ZoomLevel = .overall
+    var now: Date = .now
+
+    private var window: DateInterval {
+        if let subPeriod = tracker.subPeriod(for: zoomLevel, asOf: now) {
+            return subPeriod
+        }
+        return DateInterval(start: tracker.startDate, end: tracker.endDate)
+    }
+
+    private var windowStartingValue: Decimal {
+        zoomLevel == .overall ? tracker.startingValue : tracker.actualValue(atOrBefore: window.start)
+    }
+
+    private var windowAllowance: Decimal {
+        guard zoomLevel != .overall else { return tracker.totalAllowance }
+        let totalPeriodDays = tracker.endDate.timeIntervalSince(tracker.startDate) / 86400
+        guard totalPeriodDays > 0 else { return tracker.totalAllowance }
+        let subPeriodDays = window.end.timeIntervalSince(window.start) / 86400
+        return tracker.totalAllowance * Decimal(subPeriodDays / totalPeriodDays)
+    }
+
+    /// Readings that actually fall within the zoomed window — the reading
+    /// history as a whole still holds everything ever logged, but a zoomed
+    /// chart should only plot what happened inside the sub-period it's
+    /// showing.
+    private var windowedReadings: [ValueSnapshot] {
+        tracker.sortedReadings.filter { $0.date >= window.start && $0.date <= window.end }
+    }
+
     private var targetEndValue: Decimal {
         switch tracker.direction {
-        case .decreasing: tracker.startingValue - tracker.totalAllowance
-        case .increasing: tracker.startingValue + tracker.totalAllowance
+        case .decreasing: windowStartingValue - windowAllowance
+        case .increasing: windowStartingValue + windowAllowance
         }
     }
 
@@ -36,8 +71,8 @@ struct TrendChartView: View {
     /// directly — see that property for why leaving the raw, un-clamped
     /// values for Charts' own axis-driven clipping to handle isn't enough.
     private var yDomain: ClosedRange<Double> {
-        var values = [tracker.startingValue, targetEndValue].map { ($0 as NSDecimalNumber).doubleValue }
-        values += tracker.sortedReadings.map { ($0.value as NSDecimalNumber).doubleValue }
+        var values = [windowStartingValue, targetEndValue].map { ($0 as NSDecimalNumber).doubleValue }
+        values += windowedReadings.map { ($0.value as NSDecimalNumber).doubleValue }
         let low = values.min() ?? 0
         let high = values.max() ?? 0
         let padding = max((high - low) * 0.1, 1)
@@ -65,7 +100,7 @@ struct TrendChartView: View {
     /// still visibly runs to the domain's top/bottom edge, which reads as
     /// "steep" just as well as the true extrapolated value would.
     private var trendLine: (start: (date: Date, value: Decimal), end: (date: Date, value: Decimal))? {
-        let readings = tracker.sortedReadings
+        let readings = windowedReadings
         guard readings.count > 1 else { return nil }
 
         let referenceDate = readings[0].date
@@ -83,14 +118,14 @@ struct TrendChartView: View {
         let slope = (n * sumXY - sumX * sumY) / denominator
         let intercept = (sumY - slope * sumX) / n
 
-        let startX = tracker.startDate.timeIntervalSince(referenceDate)
-        let endX = tracker.endDate.timeIntervalSince(referenceDate)
+        let startX = window.start.timeIntervalSince(referenceDate)
+        let endX = window.end.timeIntervalSince(referenceDate)
         let domain = yDomain
         let clampedStartY = min(max(intercept + slope * startX, domain.lowerBound), domain.upperBound)
         let clampedEndY = min(max(intercept + slope * endX, domain.lowerBound), domain.upperBound)
         return (
-            start: (tracker.startDate, Decimal(clampedStartY)),
-            end: (tracker.endDate, Decimal(clampedEndY))
+            start: (window.start, Decimal(clampedStartY)),
+            end: (window.end, Decimal(clampedEndY))
         )
     }
 
@@ -99,14 +134,14 @@ struct TrendChartView: View {
     /// of the app (`TrackerPace.isAheadOfPace`) rather than re-deriving
     /// "above/below the line" separately for each direction.
     private func isAheadOfPace(value: Decimal, at date: Date) -> Bool {
-        tracker.pace(actualValue: value, asOf: date).isAheadOfPace
+        tracker.pace(actualValue: value, asOf: date, zoomLevel: zoomLevel).isAheadOfPace
     }
 
     /// Consecutive reading pairs, each tagged with whether the *later*
     /// point was ahead of pace — a segment is colored by where it ends up,
     /// same convention as coloring a stock chart's rising/falling days.
     private var segments: [(id: String, start: ValueSnapshot, end: ValueSnapshot, isAhead: Bool)] {
-        let readings = tracker.sortedReadings
+        let readings = windowedReadings
         guard readings.count > 1 else { return [] }
         return zip(readings, readings.dropFirst()).map { start, end in
             (id: "\(start.id)-\(end.id)", start: start, end: end, isAhead: isAheadOfPace(value: end.value, at: end.date))
@@ -144,13 +179,13 @@ struct TrendChartView: View {
     private var chart: some View {
         Chart {
             LineMark(
-                x: .value("Date", tracker.startDate),
-                y: .value("Pace", tracker.startingValue)
+                x: .value("Date", window.start),
+                y: .value("Pace", windowStartingValue)
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
             .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 5]))
             LineMark(
-                x: .value("Date", tracker.endDate),
+                x: .value("Date", window.end),
                 y: .value("Pace", targetEndValue)
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
@@ -173,7 +208,7 @@ struct TrendChartView: View {
                 .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
             }
 
-            ForEach(tracker.sortedReadings) { reading in
+            ForEach(windowedReadings) { reading in
                 PointMark(
                     x: .value("Date", reading.date),
                     y: .value("Actual", reading.value)
@@ -199,7 +234,7 @@ struct TrendChartView: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: [tracker.startDate, tracker.endDate]) { value in
+            AxisMarks(values: [window.start, window.end]) { value in
                 AxisValueLabel(format: .dateTime.month(.abbreviated).day())
             }
         }

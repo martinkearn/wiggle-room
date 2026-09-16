@@ -103,6 +103,8 @@ Trackers and sources are many-to-one: several trackers can point at the same `Co
 
 ### 4.5 Zoom levels (for long-running trackers)
 
+**Implemented** on the main dashboard (§7.1) — see progress-notes.md. Not yet implemented for widgets/the watch complication (a widget still always shows `.overall`); see §8.1 and §12.
+
 A tracker spanning months or years (e.g. a 3-year/30,000-mile lease) has an outer pace ring that barely moves day to day — each day is a tiny fraction of the whole period — so the primary ring visual would feel inert at that scale. Rather than solving this with a second Tracker record, a long-running tracker exposes **zoom levels**: read-only computed views of the *same* tracker at a shorter, calendar-aligned grain, so the ahead/behind question can be asked at whatever scale is actually useful ("how am I doing this month?") without redefining the tracker itself.
 
 - Available zoom levels: **Overall**, **This year**, **This month**, **This week** — offered as tabs/segmented control on the dashboard. Which levels are offered depends on the tracker's own length (a week-long money tracker has no need for a "This year" tab).
@@ -168,7 +170,7 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 - Used for anything without an API — mileage is the concrete v1 case, but this covers any quantity tracked by hand.
 - The tracker's Add/Edit screen includes a "Log a reading" action: user enters a value and a timestamp (defaulting to now).
 - `actualValue` is the most recent logged reading; no automatic refresh.
-- Consider a lightweight local-notification reminder to log a new reading on a user-set cadence (e.g. weekly) — a nice-to-have, not a hard requirement for v1.
+- **Implemented**: a lightweight local-notification reminder to log a new reading, on a per-tracker user-set cadence (None/Daily/Weekly/Every 2 Weeks/Monthly) — see progress-notes.md.
 - Manual readings are stored as part of the synced data (§6) — no separate storage mechanism needed.
 
 ## 6. Data Storage & Cross-Device Sync
@@ -213,7 +215,7 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 - **Small**: mini two-ring visual (§3.4) with the ahead/behind figure below it.
 - **Medium**: current value + target + the rings (compact) + ahead/behind line.
 - **Large**: rings at a larger size, optionally with a secondary trend chart (styled per §3.5).
-- Each widget instance is configurable to a specific tracker (via an `AppIntentConfiguration` + `WidgetConfigurationIntent`, so two widgets can show two different trackers side by side) and, for long-running trackers, a specific zoom level (§4.5) — e.g. a widget pinned to "3-year lease — This month" rather than always showing the full 3-year pace. **Zoom-level configuration isn't built yet**, since §4.5 itself isn't implemented; per-tracker configuration is.
+- Each widget instance is configurable to a specific tracker (via an `AppIntentConfiguration` + `WidgetConfigurationIntent`, so two widgets can show two different trackers side by side) and, for long-running trackers, a specific zoom level (§4.5) — e.g. a widget pinned to "3-year lease — This month" rather than always showing the full 3-year pace. **Zoom-level configuration still isn't built**, even now that §4.5 itself is implemented on the main dashboard — see §12's open item for why (a tooling constraint in this environment, not a design decision); per-tracker configuration is.
 - Reuses the same `RingsView` used by the main app dashboard rather than a bespoke widget-only visual.
 - Each widget instance sets a `.widgetURL` (`wiggleroom://tracker/<uuid>`) so tapping it opens the app directly to that tracker's dashboard, rather than just to the tracker list.
 
@@ -264,8 +266,8 @@ Still open:
 
 - Exact current Starling API endpoint(s) and scope name(s) for Spaces / savings goals (confirm against developer.starlingbank.com/docs, as this may have changed) — no Starling work has started yet.
 - Rate limit handling for Starling API calls (back off gracefully on 429s), especially given §4.4's shared-fetch requirement across trackers on the same source — moot until the Starling provider exists.
-- Whether manual-entry reminder notifications (§5.5) are worth including in v1 or deferred — still undecided; not built yet either way.
 - Exact Tesla Fleet API endpoint/scope names and current free-credit amount for the user's region (confirm against developer.tesla.com at build time, as pricing and endpoint names have changed before and may again) — no Tesla work has started yet.
+- Per-widget/complication zoom-level configuration (§8.1's "Zoom-level configuration isn't built yet" line) — §4.5 zoom levels are now implemented on the main dashboard, but a widget/complication instance still always shows a tracker's `.overall` pace, not a pinned zoom level. Deferred specifically because it needs a new `AppEnum` parameter threaded through two separate extension targets (`WiggleRoomWidgets`, `WiggleRoomComplication`), each with its own build settings this environment can't safely edit without Xcode's GUI (see progress-notes.md's tooling-gotchas section) — not a design decision, a tooling constraint.
 
 Resolved (kept here for the record):
 
@@ -274,4 +276,5 @@ Resolved (kept here for the record):
 - **Amber ring threshold**: not an exact "landed exactly on target" match — a percentage-of-total-allowance early-warning band (1–5% behind pace) — see §3.2.
 - **Increasing-direction trackers model a cap/allowance, not an open-ended goal** — see §4.1. A savings-goal-style "exceeding is good" framing would need a distinct mode, not built.
 - **App icon final design**: settled on a single hand-drawn wiggle/sine-wave line in brand violet, with a lower-opacity descending second line, rather than the two-ring motif originally proposed in §3.3 — see §3.3 and progress-notes.md for the decision history. A matching watchOS icon was added at the same time.
+- **Whether manual-entry reminder notifications (§5.5) were worth building for v1**: built — a per-tracker `reminderCadenceDays` (None/Daily/Weekly/Every 2 Weeks/Monthly), scheduled as a repeating local notification. See progress-notes.md's 2026-09-16 zoom-levels/reminders follow-up.
 

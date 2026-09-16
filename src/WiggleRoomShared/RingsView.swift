@@ -32,6 +32,13 @@ struct RingsView: View {
     var lineWidth: CGFloat = 20
     var showsCenterContent: Bool = true
 
+    /// Re-scopes the whole ring — both fractions and the center figure — to
+    /// a calendar-aligned sub-period (§4.5) instead of the tracker's own
+    /// full period. Defaults to `.overall`, i.e. the existing full-period
+    /// behavior, so every pre-existing caller (list rows, widgets) is
+    /// unaffected.
+    var zoomLevel: ZoomLevel = .overall
+
     /// Widgets render from a static `TimelineEntry` snapshot rather than a
     /// live SwiftUI runloop — WidgetKit captures the view's appearance
     /// essentially immediately, well before a deferred `onAppear` animation
@@ -71,7 +78,7 @@ struct RingsView: View {
     }
 
     private var pace: TrackerPace {
-        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
+        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now, zoomLevel: zoomLevel)
     }
 
     private var status: PaceStatus {

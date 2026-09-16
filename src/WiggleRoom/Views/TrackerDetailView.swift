@@ -23,6 +23,11 @@ struct TrackerDetailView: View {
     @State private var isPresentingDeleteConfirmation = false
     @State private var isPresentingReadingHistory = false
     @State private var now = Date.now
+    /// The zoom-level lens (§4.5) the dashboard is currently scoped to —
+    /// re-scopes the rings, figures, and trend chart together. Only shown
+    /// as a picker when `tracker.availableZoomLevels` offers more than just
+    /// `.overall`.
+    @State private var zoomLevel: ZoomLevel = .overall
     // Set from `.onAppear`, not here: a default value initializes whenever
     // SwiftUI happens to construct this struct, which can be well before
     // the screen actually becomes visible (e.g. NavigationLink destinations
@@ -43,7 +48,25 @@ struct TrackerDetailView: View {
     private let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var pace: TrackerPace {
-        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
+        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now, zoomLevel: zoomLevel)
+    }
+
+    private var availableZoomLevels: [ZoomLevel] {
+        tracker.availableZoomLevels
+    }
+
+    /// The zoomed window's own end — the days-remaining caption and the
+    /// trend chart's readings should both scope to the sub-period, not the
+    /// tracker's full period, once zoomed in.
+    private var zoomWindowEnd: Date {
+        tracker.subPeriod(for: zoomLevel, asOf: now)?.end ?? tracker.endDate
+    }
+
+    private var windowedReadingCount: Int {
+        guard let subPeriod = tracker.subPeriod(for: zoomLevel, asOf: now) else {
+            return tracker.sortedReadings.count
+        }
+        return tracker.sortedReadings.filter { $0.date >= subPeriod.start && $0.date <= subPeriod.end }.count
     }
 
     var body: some View {
@@ -60,7 +83,11 @@ struct TrackerDetailView: View {
                         .padding(.top, 4)
                 }
 
-                RingsView(tracker: tracker, now: now)
+                if availableZoomLevels.count > 1 {
+                    zoomLevelPicker
+                }
+
+                RingsView(tracker: tracker, now: now, zoomLevel: zoomLevel)
                     .frame(width: 260, height: 260)
 
                 figuresRow
@@ -75,8 +102,8 @@ struct TrackerDetailView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
-                } else if tracker.sortedReadings.count > 1 {
-                    TrendChartView(tracker: tracker)
+                } else if windowedReadingCount > 1 {
+                    TrendChartView(tracker: tracker, zoomLevel: zoomLevel, now: now)
                         .frame(height: 240)
                         .padding(.horizontal)
                 }
@@ -250,7 +277,21 @@ struct TrackerDetailView: View {
     }
 
     private var periodRemainingText: String {
-        tracker.periodRemainingText(asOf: now)
+        tracker.periodRemainingText(asOf: now, until: zoomWindowEnd)
+    }
+
+    /// Segmented zoom-level control (§4.5, §7.1) sitting above the rings —
+    /// re-scopes the whole dashboard (rings, figures, chart) to the selected
+    /// sub-period. Only shown when the tracker's own length actually offers
+    /// more than `.overall` (see `Tracker.availableZoomLevels`).
+    private var zoomLevelPicker: some View {
+        Picker("Zoom", selection: $zoomLevel) {
+            ForEach(availableZoomLevels) { level in
+                Text(level.label).tag(level)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
     }
 }
 

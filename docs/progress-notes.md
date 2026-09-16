@@ -1,8 +1,12 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. Last updated 2026-09-16, after
-a further pass (see **2026-09-16 follow-up** near the end) that added the
-watch complication, widget-to-tracker deep linking, macOS Dock badge +
+a second follow-up pass the same day (see **2026-09-16 zoom levels &
+reminders follow-up** near the end) that implemented §4.5 zoom levels on the
+main dashboard, §5.5 manual-entry reminder notifications, and two small
+known-gap fixes (macOS Update History delete, the budget-footer copy). Before
+that: an earlier follow-up the same day (see **2026-09-16 follow-up**) added
+the watch complication, widget-to-tracker deep linking, macOS Dock badge +
 pace-crossing notifications, a custom app font system, an app icon redesign,
 and various widget/countdown bug fixes. Before that: an overnight session on
 2026-09-14 added the widget extension, watch app, macOS parity, and
@@ -104,28 +108,36 @@ sessions). Still, prefer the iOS Simulator destination for routine test runs
 
 ## Known gaps / things to verify by hand
 
-- §4.5 zoom levels (This year/This month/This week sub-period views) are not implemented — the dashboard always shows the tracker's full period.
-- A `WiggleRoomUITests` target exists (`WiggleRoomUITests.swift`, `WiggleRoomUITestsLaunchTests.swift`), added in the 2026-09-16 follow-up, but hasn't grown beyond Xcode's generated scaffold yet — no view has real automated UI-interaction coverage. Verification is still mostly manual (simulator screenshots + interaction) plus unit tests on the non-UI layers (`TrackerPace`, `Tracker`, `ManualEntryProvider`, `TrackerStore` — 62 tests as of the 2026-09-16 follow-up, up from 23; `TrackerTests.swift` is new and covers `Tracker` model behavior — `isCurrencyUnit`, `usesBudgetLanguage`, `currentValueLabel`, `formattedValue`, `projectedRemainder`, `remainingAtEndCaption`, `periodRemainingText` — directly, distinct from `TrackerPaceTests`). Consider `ViewInspector`-style tests or fleshing out the UI test target if this grows much further.
+- §4.5 zoom levels are implemented on the main dashboard (see **2026-09-16 zoom levels & reminders follow-up**) but **not** for widgets/the watch complication — a widget instance always shows a tracker's `.overall` pace. See that section for why (a tooling constraint, not a design decision).
+- A `WiggleRoomUITests` target exists (`WiggleRoomUITests.swift`, `WiggleRoomUITestsLaunchTests.swift`), added in the 2026-09-16 follow-up, but hasn't grown beyond Xcode's generated scaffold yet — no view has real automated UI-interaction coverage. Verification is still mostly manual (simulator screenshots + interaction) plus unit tests on the non-UI layers (`TrackerPace`, `Tracker`, `ManualEntryProvider`, `TrackerStore`, `ZoomLevel`/zoom-scoped `Tracker`/`TrackerPace` behavior — see **2026-09-16 zoom levels & reminders follow-up** for the current count). Consider `ViewInspector`-style tests or fleshing out the UI test target if this grows much further.
 - ~~This Mac isn't yet registered as a device on the paid developer account~~ — resolved during the overnight session: `-allowProvisioningUpdates` now generates a working Mac profile from the command line with no Xcode GUI step needed (see **Overnight platform expansion**).
 - An increasing tracker can't model an open-ended "goal to exceed" (e.g. a savings goal) — see decision #14. Only tested as a cap/allowance (mileage-lease-style), which is what the current pace math supports.
-- The Budget section's example/footer text in `AddTrackerView` is written for the mileage-lease example on increasing trackers regardless of the unit actually chosen (it doesn't adapt to a currency unit) — minor, cosmetic, not fixed this session.
 
 ## Explicitly out of scope so far (per spec, deferred on purpose)
 
-- §4.4 multi-tracker source-sharing/dedup (only matters once a second provider exists), §4.5 zoom levels
+- §4.4 multi-tracker source-sharing/dedup (only matters once a second provider exists)
+- Widget/watch-complication zoom-level configuration (§8.1) — §4.5 zoom levels themselves are now implemented on the main dashboard; see **2026-09-16 zoom levels & reminders follow-up**
 - §5.3 Starling, §5.4 Tesla providers (only the manual provider exists) — explicitly kept out of scope for the overnight session too, by direct instruction
 - Live Activities / Dynamic Island — considered during the overnight session and deliberately skipped; see **Overnight platform expansion** for why
 
 ## Suggested next steps (not a commitment, just a sane order)
 
-1. §4.5 zoom levels, once a long-running tracker makes the full-period ring feel too static to be useful day-to-day.
+1. Widget/watch-complication zoom-level configuration, once the two-extension-target plumbing can safely be done (needs Xcode's GUI or a scripted `.pbxproj` change in this environment — see **2026-09-16 zoom levels & reminders follow-up**).
 2. A real source provider (Starling is the simplest per spec's own note in §5.3) — this is what actually exercises the multi-source parts of the Settings screen and the "Add New Source" flow for real, and is also what would make the widget/watch/Shortcuts refresh cadence choices (hourly, once-a-day, on-demand) actually matter.
 3. If a goal-type tracker (exceed-the-target framing, e.g. savings) turns out to matter, it needs new semantics distinct from "increasing" — see decision #14.
 4. See **Overnight platform expansion**'s own "Suggested next steps" for widget/watch/macOS-specific follow-ups.
 
 ## Verifying the app still builds and passes tests
 
-Use the iOS Simulator destination:
+Use the iOS Simulator destination. **Note**: since the deployment target was
+raised to 27.0, the destination needs an actual iOS 27.0 simulator — a
+generic `name=iPhone 17 Pro` destination may resolve to an older-OS instance
+of that device model and fail with a deployment-target mismatch error; if
+so, create one (`xcrun simctl create "iPhone 17 Pro (iOS 27)"
+com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro
+com.apple.CoreSimulator.SimRuntime.iOS-27-0`, if the iOS 27.0 runtime is
+installed) and pass `-destination 'platform=iOS Simulator,id=<its udid>'`
+instead:
 
 ```bash
 cd src
@@ -135,10 +147,13 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
   -only-testing:WiggleRoomTests test
 ```
 
-62 tests should pass (`TrackerPaceTests`, `TrackerTests`,
+75 tests should pass (`TrackerPaceTests`, `TrackerTests`, `ZoomLevelTests`,
 `ManualEntryProviderTests`, `TrackerStoreTests`, plus the two scaffold tests
 in `WiggleRoomTests`) — up from 23 as of the 2026-09-16 follow-up, which
-added `TrackerTests.swift`.
+added `TrackerTests.swift`. **As of this session, `ManualEntryProviderTests`
+and `TrackerStoreTests` cannot actually be confirmed passing** on at least
+one iOS 27.0 Simulator — see gotcha #28 above before assuming a failure
+there is a real regression.
 
 ## Verifying on a real device
 
@@ -486,3 +501,172 @@ bespoke pass.
   item #4 above) is still open — not addressed this session.
 - No Starling/Tesla provider work was done this session either — still just
   manual entry, per every prior session's scope note.
+
+## 2026-09-16 zoom levels & reminders follow-up
+
+A second pass the same day, asked to implement everything remaining in the
+spec except Starling/Tesla. Reviewed both this file and
+`wiggleroom-build-spec.md` end to end first — the only substantial gap left
+was §4.5 zoom levels; everything else was either already built, explicitly
+out of scope (Starling/Tesla, per every prior session), or a small
+known-gap item already flagged above.
+
+### §4.5 Zoom levels — the main gap, now closed on the dashboard
+
+- **`ZoomLevel.swift`** (`WiggleRoomShared/Models/`) — a small
+  `.overall`/`.thisYear`/`.thisMonth`/`.thisWeek` enum with a display label.
+- **`Tracker.swift`** gained three pieces: `actualValue(atOrBefore:)` (the
+  latest reading at or before a date, or `startingValue` if there isn't
+  one — this is what makes "the value at the start of this month" answerable
+  without a separate snapshot mechanism, exactly as §4.5 anticipated);
+  `availableZoomLevels` (which levels are worth offering, based on the
+  tracker's own length — `> 366/31/7` days respectively); and
+  `subPeriod(for:asOf:)`, which returns the calendar-aligned `DateInterval`
+  for a level via `Calendar.current.dateInterval(of:for:)`, clamped to the
+  tracker's own `startDate`/`endDate` so a zoomed window never extends past
+  the tracker's real period even when the calendar month/year/week does.
+- **`TrackerPace.swift`**: the existing `pace(actualValue:asOf:)` body was
+  extracted into a private `Tracker.computePace(startDate:endDate:
+  startingValue:totalAllowance:direction:actualValue:asOf:)` so a new
+  `pace(actualValue:asOf:zoomLevel:)` overload could reuse the exact same
+  math against a sub-period's bounds/allowance/local-starting-value instead
+  of duplicating it. `.overall` (or a level with no valid sub-period for the
+  given `asOf`) falls back to the plain full-period `pace`. The original
+  `pace(actualValue:asOf:)` signature/behavior is untouched, so every
+  existing caller (widgets, watch, Shortcuts, `PaceCrossingNotifier`,
+  `MenuBarStatusView`, etc.) needed no changes.
+- **`RingsView`** gained a `zoomLevel: ZoomLevel = .overall` parameter,
+  threaded into its internal `pace` computation — the default keeps every
+  pre-existing caller (list rows, widgets) unaffected.
+- **`TrendChartView`** gained `zoomLevel`/`now` parameters and a `window`
+  computed property; every place it used to read `tracker.startDate`/
+  `endDate`/`startingValue`/`sortedReadings` directly now reads the
+  zoom-scoped equivalents (`window.start`/`.end`, `windowStartingValue`,
+  `windowedReadings`) instead — the reference line, trend line, and plotted
+  points are all scoped to the sub-period when zoomed, not just the ring.
+- **`TrackerDetailView`** gained a segmented zoom-level picker (`Picker` +
+  `.pickerStyle(.segmented)`) above the rings, shown only when
+  `tracker.availableZoomLevels.count > 1` (per §7.1: "a week-long money
+  tracker has no need for a 'This year' tab"). Selecting a level re-scopes
+  the rings, both figure cards (via the zoomed `pace`), the days-remaining
+  caption (now takes an `until:` parameter, defaulting to the tracker's own
+  `endDate` but passed the zoomed sub-period's end when zoomed), and the
+  trend chart together — exactly the "whole dashboard" re-scoping §7.1 asks
+  for, not just the ring.
+- **Tests**: `ZoomLevelTests.swift` (13 tests) covers `availableZoomLevels`,
+  `subPeriod` (calendar alignment and clamping at both ends of the
+  tracker's period), `actualValue(atOrBefore:)`, and the zoomed `pace`
+  overload (allowance scaling, local starting value from history, period
+  bounds, and the `.overall`/not-offered-level fallback paths).
+
+**Not built**: per-widget/complication zoom-level configuration (§8.1's own
+note that this "isn't built yet"). Threading a zoom-level `AppEnum`
+parameter through `SelectTrackerIntent` would need changes to two separate
+extension targets' (`WiggleRoomWidgets`, `WiggleRoomComplication`) own build
+settings — this environment has no Xcode GUI and past sessions only touch
+`.pbxproj` targets/schemes via the scripted `xcodeproj`-gem route (decision
+#17), which is a heavier, riskier change than justified for this pass. A
+widget/complication instance always shows a tracker's `.overall` pace for
+now — see **Suggested next steps**.
+
+### §5.5 Manual-entry reminder notifications — built
+
+- **`Tracker.reminderCadenceDays: Int?`** — `nil` means no reminder;
+  otherwise the number of days between reminders. Only meaningful for a
+  manual-entry tracker.
+- **`ReminderScheduler.swift`** (new, `WiggleRoomShared/`) — `sync(_:)`
+  schedules (after requesting notification authorization) or cancels a
+  single repeating `UNNotificationRequest` per tracker, keyed by
+  `"reminder-<tracker.id>"` so re-syncing replaces rather than duplicates a
+  prior request. Uses `UNTimeIntervalNotificationTrigger(timeInterval:
+  repeats: true)` rather than a calendar trigger — a calendar trigger can
+  only repeat on regular calendar components (daily, weekly, ...), not an
+  arbitrary "every N days" cadence, but a time-interval trigger can.
+- **`TrackerStore`** calls `ReminderScheduler.sync`/`.cancel` from
+  `addTracker`/`deleteTracker`, and `saveChanges(reminderTracker:)` gained
+  an optional parameter so an edit can re-sync the reminder only when a
+  tracker (as opposed to, say, a reading edit via `LogReadingView`) was
+  what changed.
+- **`AddTrackerView`** gained a "Reminder" section (None/Daily/Weekly/Every
+  2 Weeks/Monthly picker), shown only when the tracker being created/edited
+  is manual-entry (`isManualEntrySelected`).
+
+### Two known-gap fixes
+
+- **macOS `ReadingHistoryView` had no delete affordance** (flagged as an
+  open gap in two prior sessions) — macOS `List` has no swipe gesture and
+  this view has no `selection:` binding to drive `EditButton`'s usual
+  Delete-key path, so a per-row `.contextMenu` with a destructive "Delete
+  Update" button was added, macOS-only (`#if os(macOS)`).
+- **`AddTrackerView`'s budget footer text** always described a mileage-lease
+  example for increasing trackers regardless of the unit actually chosen
+  (flagged as a cosmetic gap previously). Now branches on
+  `Tracker.isCurrencyUnit(unit)` for both directions and interpolates the
+  chosen unit into the non-currency wording, instead of a hardcoded "mile".
+
+### A real environment issue hit while testing this session (unresolved)
+
+28. **Every test that calls `ModelContext.fetch(_:)` against an in-memory
+    `ModelContainer` reliably crashes on this machine's new "iPhone 17 Pro
+    (iOS 27)" Simulator** (created fresh this session via `xcrun simctl
+    create`, since no iOS 27.0 device existed yet — the deployment target
+    was raised to 27.0 in the previous session, but no matching simulator had
+    been made). The crash is `NSInternalInconsistencyException: "No eligible
+    connection available"`, thrown from inside CoreData's
+    `-[NSSQLCore executeRequest:withContext:error:]`, every time, directly
+    preceded by a `[CloudKit] ... CKAccountStatusNoAccount` recovery-attempt
+    log line even though the container involved is a plain local
+    `isStoredInMemoryOnly: true` one with no CloudKit configuration at all —
+    this looks like the *app's own* real CloudKit-backed container (built at
+    launch by `WiggleRoomApp.swift`, since the test host launches the real
+    app) failing its account-status check and somehow leaving the process's
+    shared CoreData/SQLite connection pool in a bad state for *every*
+    context, not just its own. **This hits every test that constructs a
+    `TrackerStore` or `ManualEntryProvider` and calls `context.fetch`**
+    (`TrackerStoreTests`, `ManualEntryProviderTests` — both go through
+    `TrackerStore.init` → `fetchOrCreateManualEntrySource` →
+    `context.fetch(FetchDescriptor<ConnectedSource>())`), reproducing
+    consistently across three separate full test-suite runs this session.
+    **It does not hit any test that only constructs model objects directly
+    without going through a `ModelContext` fetch** — `TrackerPaceTests`,
+    `TrackerTests`, and the new `ZoomLevelTests` all build `Tracker`/
+    `ConnectedSource`/`ValueSnapshot` as plain unmanaged objects and never
+    call `.fetch`, and all passed cleanly, every run. This strongly points
+    at a genuine SwiftData/CoreData bug or mis-signed-in-iCloud interaction
+    specific to this early iOS 27.0 Simulator runtime, **not** a regression
+    in any of this session's code changes (none of the affected tests
+    exercise anything touched this session — zoom levels or reminders). Not
+    root-caused or fixed this session; flagging for whoever picks this back
+    up rather than guessing further. Worth trying: a different/non-fresh
+    simulator, an older iOS 27.0 runtime point release if one becomes
+    available, or running with no iCloud account signed into the Simulator's
+    Settings app at all (vs. whatever ambient state this one has).
+
+### Verifying this session's changes
+
+`xcodebuild ... -only-testing:WiggleRoomTests test` on the "iPhone 17 Pro
+(iOS 27)" simulator described above, run three times this session. Every
+run: `TrackerPaceTests` (25), `TrackerTests` (22), `WiggleRoomTests` (2), and
+the new `ZoomLevelTests` (13) passed with 0 failures — the zoom-level model
+logic (`ZoomLevel`, `Tracker.availableZoomLevels`/`subPeriod`/
+`actualValue(atOrBefore:)`, the zoomed `TrackerPace` overload) is confirmed
+correct by these. `ManualEntryProviderTests` and `TrackerStoreTests` could
+not be verified in this environment at all, blocked by the environment issue
+in gotcha #28 above — this predates and is unrelated to this session's
+changes (neither suite touches zoom levels or reminders), but it does mean
+`TrackerStore.addTracker`/`.deleteTracker`'s new `ReminderScheduler.sync`/
+`.cancel` calls specifically were not exercised by an automated test this
+session; they were verified by code review only (the calls mirror the
+existing `WidgetCenter.shared.reloadAllTimelines()` pattern in the same
+methods). Not verified live in a simulator UI either: the zoom-level
+picker's actual on-screen appearance/interaction, or a reminder notification
+actually arriving — this environment has no interactive way to watch a
+notification fire or tap through a running app's UI.
+
+**Full builds confirmed clean** (0 errors) for both platforms with this
+session's changes, including the embedded extensions that compile
+`WiggleRoomShared` (where most of the zoom-level/reminder code lives):
+`xcodebuild -scheme WiggleRoom -destination 'platform=iOS Simulator,...'
+build` (`WiggleRoomWidgets`, `WiggleRoomWatch`, `WiggleRoomComplication` all
+embedded and signed) and `xcodebuild -scheme WiggleRoom -destination
+'platform=macOS' -allowProvisioningUpdates build`.
