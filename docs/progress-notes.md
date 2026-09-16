@@ -1,10 +1,13 @@
 # Wiggle Room — Progress Notes
 
-Status snapshot for picking this work back up. Last updated 2026-09-14
-(overnight session), after an autonomous pass that added the widget
-extension, watch app, macOS parity, and Shortcuts/Siri integration — see
-**Overnight platform expansion** below for that work; everything above it
-predates that session. Read alongside
+Status snapshot for picking this work back up. Last updated 2026-09-16, after
+a further pass (see **2026-09-16 follow-up** near the end) that added the
+watch complication, widget-to-tracker deep linking, macOS Dock badge +
+pace-crossing notifications, a custom app font system, an app icon redesign,
+and various widget/countdown bug fixes. Before that: an overnight session on
+2026-09-14 added the widget extension, watch app, macOS parity, and
+Shortcuts/Siri integration — see **Overnight platform expansion** below for
+that work; everything above it predates that session. Read alongside
 [wiggleroom-build-spec.md](wiggleroom-build-spec.md) — this file tracks *what's
 actually been built*, not the spec itself.
 
@@ -20,7 +23,7 @@ resolves to.
 
 ### §4.1 / §4.3 — Tracker model & pace calculations
 - [`Tracker.swift`](../src/WiggleRoomShared/Models/Tracker.swift) — `Tracker`, a SwiftData `@Model` class (see **Persistence** below), and the `TrackerDirection` enum. Also holds `isCurrencyUnit` and `formattedValue(_:signed:)` — a currency symbol (£, $, €, …) is prefixed with no space ("£1,234.56"); any other unit is suffixed with a space ("1,234 miles"). The `recurrence` field (an unused placeholder) was removed — see decision #7; recurring trackers were later cut from the spec entirely.
-- [`TrackerPace.swift`](../src/WiggleRoomShared/Models/TrackerPace.swift) — `Tracker.pace(actualValue:asOf:)` computing periodHours/hoursElapsed/consumedSoFar/expectedConsumedByNow/difference/target-right-now in one call, so a single snapshot of "now" stays consistent. `hoursElapsed` uses `timeIntervalSince` (wall-clock seconds), which is DST-safe by construction. Also defines `PaceStatus` (`.good`/`.warning`/`.bad`) — the traffic-light read of a tracker's pace — with `.color` (green/amber/red) and `.label(for tracker:)`, which switches to budget language ("Under Budget"/"At Budget"/"Over Budget") specifically for decreasing trackers denominated in currency, and stays neutral ("On Track"/"At Target"/"Needs Attention") otherwise. `.status` is `.warning` ("at") only on an **exact whole-number match** between current and target (pennies/cents don't count) — not a percentage tolerance band, per explicit feedback that a fuzzy "near" reading was confusing. `TrackerPace.displayDifference(for:)` is the one place that decides whether to show a signed value or drop the sign — see decision #4.
+- [`TrackerPace.swift`](../src/WiggleRoomShared/Models/TrackerPace.swift) — `Tracker.pace(actualValue:asOf:)` computing periodHours/hoursElapsed/consumedSoFar/expectedConsumedByNow/difference/target-right-now in one call, so a single snapshot of "now" stays consistent. `hoursElapsed` uses `timeIntervalSince` (wall-clock seconds), which is DST-safe by construction. Also defines `PaceStatus` (`.good`/`.warning`/`.bad`) — the traffic-light read of a tracker's pace — with `.color` (green/amber/red) and `.label(for tracker:)`, which switches to budget language ("Under Budget"/"At Budget"/"Over Budget") specifically for decreasing trackers denominated in currency, and stays neutral ("On Track"/"At Target"/"Needs Attention") otherwise. `.status`'s amber band is a percentage-of-total-allowance early warning (1–5% behind pace, see decision #26), not an exact match. `.label(for tracker:)` switches to budget language ("Under Budget"/"Slightly Over Budget"/"Over Budget") specifically for decreasing trackers denominated in currency, and stays neutral ("On Track"/"Slightly Behind"/"Needs Attention") otherwise — the warning-band wording was reworded from an earlier "At Budget" to "Slightly Over Budget" per follow-up feedback, to read as an early warning rather than a neutral midpoint. `TrackerPace.displayDifference(for:)` is the one place that decides whether to show a signed value or drop the sign — see decision #4.
 - Tests: [`TrackerPaceTests.swift`](../src/WiggleRoomTests/TrackerPaceTests.swift) — both directions, ahead/behind pace, period-start/end edges, one DST-transition regression test.
 
 ### §5.1 / §5.2 / §5.5 — Source provider abstraction & manual entry
@@ -45,7 +48,7 @@ resolves to.
   - An hourly pace estimate, joined by a **daily** one once the period runs longer than 24 hours (`dailyPaceDescription`).
   - A **remaining-at-end** projection (`Tracker.projectedRemainder`) shown whenever starting value and total budget differ — e.g. "£600 will remain at the end of the tracker" for a decreasing tracker, or a warning if the budget exceeds the starting value. Decreasing trackers only — see decision #14 on why increasing trackers don't have an equivalent "remaining" concept.
   - Verified a 1-minute-long tracker (Start/End 1 minute apart via the times toggle) doesn't crash — the hourly-rate math degrades to a very large but finite number, and the daily line correctly stays hidden.
-- [`TrackerDetailView.swift`](../src/WiggleRoom/Views/TrackerDetailView.swift) — the tracker dashboard. Two-ring visual with the **difference-from-target as its centerpiece** (large, bold, colored, inside the rings), a `PaceStatus`-driven status word above it (e.g. "OVER BUDGET BY £8.00" for budget trackers — no sign, see decision #4), a trend chart once ≥2 readings exist, and a "…" menu with **Edit Tracker**, **Update History** (manual trackers only — see `ReadingHistoryView` below), and Delete (confirmation first). Below the rings, **Current Balance/Current and Target Right Now are two visually separate cards**, not a shared row — they're different things updated in different ways, and the "Update" button (a capsule, `.controlSize(.large)`, plus-icon — reads as a proper button per Apple HIG, not the cramped two-line label it was before) lives inside the Current Balance card specifically, since that's the only figure it changes. The "Current Balance" vs. "Current" title comes from `Tracker.currentValueLabel` (currency vs. not). Pace figures refresh once a minute (`minuteTimer`); a `secondTimer`-driven "Updates in Xs" caption sits at the **top of the screen**, under the nav title — it reflects the whole screen's live figures (the ring, the difference, Target Right Now), not just one card, so it doesn't belong tucked under a single figure. That countdown's baseline is set in `.onAppear`, not a default `@State` value — see decision #12. A subtle remaining-at-end caption sits under the days-remaining text (same projection as the add/edit form, see above).
+- [`TrackerDetailView.swift`](../src/WiggleRoom/Views/TrackerDetailView.swift) — the tracker dashboard. Two-ring visual with the **difference-from-target as its centerpiece** (large, bold, colored, inside the rings), a `PaceStatus`-driven status word above it (e.g. "OVER BUDGET BY £8.00" for budget trackers — no sign, see decision #4), a trend chart once ≥2 readings exist, and a "…" menu with **Edit Tracker**, **Update History** (manual trackers only — see `ReadingHistoryView` below), and Delete (confirmation first). Below the rings, **Current Balance/Current and Target Right Now are two visually separate cards**, not a shared row — they're different things updated in different ways, and the "Update" button (a capsule, `.controlSize(.large)`, plus-icon — reads as a proper button per Apple HIG, not the cramped two-line label it was before) lives inside the Current Balance card specifically, since that's the only figure it changes. The "Current Balance" vs. "Current" title comes from `Tracker.currentValueLabel` (currency vs. not). Pace figures refresh once a minute; a `secondTimer`-driven "Updates in Xs" caption sits at the **top of the screen**, under the nav title — it reflects the whole screen's live figures (the ring, the difference, Target Right Now), not just one card, so it doesn't belong tucked under a single figure. That countdown's baseline is set in `.onAppear`, not a default `@State` value — see decision #12. The minute rollover itself was originally a separately `let`-stored `Timer.publish(every: 60...)`, which turned out to never fire in practice (see decision #28) — it's now folded into the same 1-second timer that drives the visible countdown. The remaining-at-end caption sits under the **Target Right Now** figure card specifically (moved from under the days-remaining text — it's a projection about the tracker's target, not about time remaining), and that card does a full 360° flip animation whenever a new reading lands.
 - [`ReadingHistoryView.swift`](../src/WiggleRoom/Views/ReadingHistoryView.swift) — **new**: lists every logged update for a manual tracker, newest first, tap to edit (via `LogReadingView`'s edit mode) or swipe/Edit-mode to delete. Reachable only for `tracker.isManualEntry` trackers — a real provider's history should reflect what it actually reported, not something hand-edited.
 - [`RingsView.swift`](../src/WiggleRoomShared/RingsView.swift) — the two-ring visual itself (§3.4) — outer neutral-gray pace ring (elapsed-time fraction), inner ring colored per `PaceStatus` (green/amber/red — true traffic-light semantics, not just a green/red binary). Bigger by default (used at 260pt in the dashboard) with the difference figure and a legend as center content; `showsCenterContent: false` gives the bare rings for small uses like the list-row indicator. The legend uses the exact same wording as the figure cards below it ("Current Balance"/"Target Right Now"), in the same left-to-right order — not a separately-worded "Progress"/"Time elapsed" pair the reader had to map onto the figures themselves. Uses a `GeometryReader` to constrain the center text's width so long values shrink to fit rather than overflowing past the ring.
 - [`TrendChartView.swift`](../src/WiggleRoom/Views/TrendChartView.swift) — Swift Charts line (§3.5) — a straight gray pace-reference line from start to end, actual logged readings plotted in blue on top.
@@ -102,7 +105,7 @@ sessions). Still, prefer the iOS Simulator destination for routine test runs
 ## Known gaps / things to verify by hand
 
 - §4.5 zoom levels (This year/This month/This week sub-period views) are not implemented — the dashboard always shows the tracker's full period.
-- No SwiftUI view has automated UI tests — verification has been manual (simulator screenshots + interaction) plus unit tests on the non-UI layers (`TrackerPace`, `ManualEntryProvider`, `TrackerStore` — 23 tests, all passing). Consider `ViewInspector`-style tests or UI tests if this grows much further.
+- A `WiggleRoomUITests` target exists (`WiggleRoomUITests.swift`, `WiggleRoomUITestsLaunchTests.swift`), added in the 2026-09-16 follow-up, but hasn't grown beyond Xcode's generated scaffold yet — no view has real automated UI-interaction coverage. Verification is still mostly manual (simulator screenshots + interaction) plus unit tests on the non-UI layers (`TrackerPace`, `Tracker`, `ManualEntryProvider`, `TrackerStore` — 62 tests as of the 2026-09-16 follow-up, up from 23; `TrackerTests.swift` is new and covers `Tracker` model behavior — `isCurrencyUnit`, `usesBudgetLanguage`, `currentValueLabel`, `formattedValue`, `projectedRemainder`, `remainingAtEndCaption`, `periodRemainingText` — directly, distinct from `TrackerPaceTests`). Consider `ViewInspector`-style tests or fleshing out the UI test target if this grows much further.
 - ~~This Mac isn't yet registered as a device on the paid developer account~~ — resolved during the overnight session: `-allowProvisioningUpdates` now generates a working Mac profile from the command line with no Xcode GUI step needed (see **Overnight platform expansion**).
 - An increasing tracker can't model an open-ended "goal to exceed" (e.g. a savings goal) — see decision #14. Only tested as a cap/allowance (mileage-lease-style), which is what the current pace math supports.
 - The Budget section's example/footer text in `AddTrackerView` is written for the mileage-lease example on increasing trackers regardless of the unit actually chosen (it doesn't adapt to a currency unit) — minor, cosmetic, not fixed this session.
@@ -132,8 +135,10 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
   -only-testing:WiggleRoomTests test
 ```
 
-23 tests should pass (`TrackerPaceTests`, `ManualEntryProviderTests`,
-`TrackerStoreTests`, plus the two scaffold tests in `WiggleRoomTests`).
+62 tests should pass (`TrackerPaceTests`, `TrackerTests`,
+`ManualEntryProviderTests`, `TrackerStoreTests`, plus the two scaffold tests
+in `WiggleRoomTests`) — up from 23 as of the 2026-09-16 follow-up, which
+added `TrackerTests.swift`.
 
 ## Verifying on a real device
 
@@ -154,7 +159,7 @@ a design pass.
 
 - **WiggleRoomWidgets** (`src/WiggleRoomWidgets/`) — a WidgetKit extension, embedded
   in the iOS app's `PlugIns/`. One `AppIntentConfiguration`-based `Widget`
-  covers Home Screen small/medium/large and Lock Screen
+  covers Home Screen small/medium/large/extra-large and Lock Screen
   circular/rectangular/inline (iOS only — WidgetKit's accessory families
   don't exist on macOS, see below). Each widget instance is independently
   configurable to a tracker via a `WidgetConfigurationIntent` +
@@ -163,6 +168,11 @@ a design pass.
   `ModelContainer` against the same CloudKit container on every timeline
   refresh (no App Group needed — see **Architecture** below) and refreshes
   hourly. Reuses `RingsView` directly rather than a bespoke widget visual.
+  Each widget instance also sets a `.widgetURL` (`wiggleroom://tracker/<uuid>`)
+  so tapping it deep-links straight to that tracker's dashboard (see
+  **2026-09-16 follow-up** below for `DeepLinkRouter`). The extra-large
+  family, widget typography, and a tracker-name truncation fix were also
+  added in that later pass.
 - **WiggleRoomWatch** (`src/WiggleRoomWatch/`) — a single-target watchOS companion
   app, embedded in the iOS app via the classic "Embed Watch Content" phase.
   A tracker list, a detail screen (`RingsView` again, at watch size), and a
@@ -170,11 +180,12 @@ a design pass.
   goal" to a real feature, since manual entry is the only provider in scope.
   Talks to its own `ModelContainer`/CloudKit container independently of the
   phone being nearby.
-- No separate widget/complication target for the watch was attempted —
-  watchOS complications are WidgetKit widgets too (since watchOS 9), but
-  they'd need their own extension embedded *inside* `WiggleRoomWatch`, which is
-  a second round of the same target-surgery done for `WiggleRoomWidgets` above.
-  Deferred — see "Suggested next steps" below.
+- At the time of this overnight session, no separate widget/complication
+  target for the watch had been attempted — watchOS complications are
+  WidgetKit widgets too (since watchOS 9), but need their own extension
+  embedded *inside* `WiggleRoomWatch`. **This was built in the 2026-09-16
+  follow-up** — see below (`WiggleRoomComplication`) — this bullet is kept
+  for history.
 
 ### Architecture: WiggleRoomShared
 
@@ -231,10 +242,9 @@ boundaries, each target needs its own.
 - **`-allowProvisioningUpdates` now succeeds for macOS from the command
   line** — see the updated CloudKit section above; this had previously
   looked like an Xcode-GUI-only fix.
-- Not attempted: a macOS Dock icon badge for "any tracker behind pace", and
-  a cross-app-crossing-pace notification (§7.2's last two bullets) — both
-  small, but neither is load-bearing and both can be added later without
-  touching anything else.
+- Not attempted at the time: a macOS Dock icon badge for "any tracker behind
+  pace", and a cross-app-crossing-pace notification (§7.2's last two
+  bullets). **Both were built in the 2026-09-16 follow-up** — see below.
 
 ### Live Activities — deliberately not built
 
@@ -272,9 +282,9 @@ silently skipping it or building something that doesn't fit the API.
 
 ### Suggested next steps (widget/watch/macOS-specific)
 
-1. A real watch complication (a second WidgetKit extension embedded inside `WiggleRoomWatch`, using the same accessory families as the Lock Screen widgets) — the natural next step now the plumbing for #17–21 above is understood.
-2. A macOS Dock badge + cross-pace notification (§7.2's last two bullets) — small, deferred, not started.
-3. A first real design pass — this was explicitly functionality-first tonight, and the "not verified live" gaps above (actual widget rendering on a Home Screen, the macOS window) are exactly where a design pass would want to start looking.
+1. ~~A real watch complication~~ — **done**, see **2026-09-16 follow-up** below (`WiggleRoomComplication` target).
+2. ~~A macOS Dock badge + cross-pace notification~~ — **done**, see **2026-09-16 follow-up** below (`MacRootView`'s dock badge, `PaceCrossingNotifier`).
+3. A first real design pass — this was explicitly functionality-first tonight, and the "not verified live" gaps above (actual widget rendering on a Home Screen, the macOS window) are exactly where a design pass would want to start looking. Partially addressed since (app icon, typography, wiggle-line trend accent — see **2026-09-16 follow-up**), but a full pass hasn't happened.
 4. `EditButton()`-equivalent delete-by-swipe on macOS's `ReadingHistoryView` list currently has no visible affordance (macOS `List` supports `.onDelete` via a selected row + Delete key, but the list has no `selection:` binding yet) — small follow-up.
 
 ## Follow-up feedback round (2026-09-15)
@@ -313,3 +323,166 @@ A batch of feedback after trying the widget/watch/macOS work above:
 
 26. **Amber is now a percentage-of-total-allowance band (1-5% behind pace), not an exact match** — reverses part of an earlier explicit decision (§ decision #4/#16's "below, at, or above — only true if the pounds match") based on new feedback that a genuine early-warning zone is more useful than a zero-tolerance snap. `TrackerPace` gained a `totalAllowance` field so `status` can express "behind" relative to the whole rather than an absolute amount (meaningless to compare a £50 tracker's absolute pounds-behind to a £5,000 one's). If this needs tuning again, the two boundary numbers (currently 1 and 5) are the only things to change, in one place (`TrackerPace.status`).
 27. **A ring's inner/outer gap must scale with the size it's drawn at, not a flat constant** — `RingsView` is reused from a 36pt list-row indicator up to a 260pt dashboard hero and everything in between (widgets, watch); any spacing constant in it needs to be proportional (here, tied to `lineWidth`, which callers already scale per context) or it silently breaks at whichever end of that size range wasn't visually checked.
+
+## 2026-09-16 follow-up
+
+A further pass building out the gaps the previous two sessions had flagged
+as deferred, plus a first real design pass and a batch of small bug fixes.
+
+### Watch complication (§7.3, resolves a known gap)
+
+- **`WiggleRoomComplication`** (`src/WiggleRoomComplication/`) — a second
+  WidgetKit extension, embedded inside `WiggleRoomWatch` (not the phone app),
+  showing a chosen/default tracker's ahead/behind figure across
+  `.accessoryCircular`/`.accessoryRectangular`/`.accessoryInline` families —
+  the same families already proven out on the iOS Lock Screen, styled to
+  match. `TrackerComplicationProvider` (`AppIntentTimelineProvider`) refreshes
+  hourly; `SelectTrackerIntent` has its own `TrackerEntity`/`TrackerEntityQuery`
+  rather than reusing the phone widget extension's — App Intents entities
+  aren't shared across extension/module boundaries, each target needs its own
+  (same lesson as the Shortcuts intents in the overnight session).
+- `WidgetDataStore` (the CloudKit cold-start/import-wait retry logic, see
+  decision #25) moved into `WiggleRoomShared` so the phone widgets, macOS
+  widgets, and this new watch complication share one implementation instead
+  of a third copy.
+- Target/scheme creation scripted via the `xcodeproj` gem
+  (`scripts/add_complication_target.rb`, `scripts/add_complication_scheme.rb`),
+  same approach as the existing `scripts/add_*_target.rb` files — this
+  project's file-system-synchronized group format still needs that instead of
+  Xcode's "New Target" wizard (see decision #17). A new shared scheme was
+  required too, per decision #24 (adding one explicit scheme disables
+  autocreation project-wide).
+- One SDK quirk: this watchOS SDK's `AppIntentTimelineProvider` has no
+  default `recommendations()` implementation the way the iOS one does, so
+  the complication needed an explicit empty stub to conform.
+
+### macOS Dock badge + pace-crossing notifications (§7.2, resolves a known gap)
+
+- **Dock badge**: `MacRootView` sets `NSApplication.shared.dockTile.badgeLabel`
+  to `"!"` whenever any tracker's `PaceStatus` isn't `.good`, `nil` otherwise —
+  re-evaluated once a minute via `paceRefreshTimer`, the same cadence
+  `TrackerDetailView` recomputes its own figures at.
+- **`PaceCrossingNotifier.swift`** — posts a local notification when a
+  tracker crosses from ahead-of/on-pace to behind, or back again. Tracks each
+  tracker's last-known side of the ahead/behind line purely in memory (not
+  persisted across relaunches) — the point is a timely heads-up while the app
+  happens to be running, not an audit trail; readings themselves remain the
+  durable record. macOS only for now, since iOS/watchOS already have an
+  always-visible widget/complication covering this at a glance.
+
+### Widget-to-tracker deep linking
+
+- **`DeepLinkRouter.swift`** (main app) + **`WiggleRoomDeepLink.swift`**
+  (shared) — each widget instance sets a `.widgetURL`
+  (`wiggleroom://tracker/<uuid>`), parsed via `.onOpenURL` and picked up by
+  `TrackerListView` to push straight to that tracker's dashboard, rather than
+  just opening the app to the tracker list.
+
+### Widget fixes and additions
+
+- **Tracker names truncating despite unused space**: in the medium/large
+  layouts, a trailing `Spacer(minLength: 0)` was soaking up the row's
+  leftover width instead of the name `Text`, leaving visible whitespace after
+  the ellipsis (e.g. "Dublin Trip" showing as "Dublin T..."). Every
+  tracker-name `Text` (small/medium/large/extra-large + the rectangular Lock
+  Screen widget) now gets `.frame(maxWidth: .infinity, ...)` plus
+  `.minimumScaleFactor()`; the now-redundant trailing Spacers were removed.
+- **Extra-large widget family**: added `.systemExtraLarge` (iOS/iPadOS/macOS
+  27+ only — this is why the deployment target was raised, see below). Its
+  layout mirrors `TrackerDetailView` closely (full rings, both figure cards
+  with captions, days-remaining line) rather than the more compact `large`
+  layout.
+- Widgets now adopt `WiggleRoomFont` (see design pass below) instead of
+  system fonts, matching the main app's typography.
+
+### Dashboard fixes
+
+- **Countdown stalling at 0s**: `TrackerDetailView`'s minute rollover was a
+  `let`-stored `Timer.publish(every: 60...)` on the view struct. Since the
+  view's body re-evaluates every second (driven by the visible 1-second
+  countdown), that 60-second timer got torn down and recreated roughly once a
+  second — never surviving long enough to actually fire, so the countdown
+  never rolled forward once it reached 0. Fixed by folding the minute
+  rollover into the existing 1-second timer's own handler instead (compares
+  the current date against `nextUpdateAt`), which only ever needs to survive
+  ~1s between recreations — something it already did reliably, since the
+  visible countdown itself was ticking fine. A related but distinct bug from
+  decision #12's `.onAppear` baseline fix, same view.
+- **Remaining-at-end caption moved**: now sits under the **Target Right Now**
+  figure card specifically (was under the days-remaining text) — it's a
+  projection about the tracker's target, not about time remaining. That card
+  also gained a full 360° flip animation whenever a new reading lands (a full
+  turn rather than a toggle, so back-to-back updates never fight over
+  direction).
+- **"Slightly Over Budget" wording**: the warning-band budget label was
+  reworded from an earlier "At Budget" to "Slightly Over Budget", to read as
+  an early warning rather than a neutral midpoint — matches the neutral
+  side's existing "Slightly Behind". The amber *threshold* itself
+  (decision #26, 1-5%) is unchanged; only the label text moved.
+- **Add/Edit Tracker number fields**: a follow-up beyond the earlier
+  full-row-tappable fix (see the 2026-09-15 section above) wasn't needed here
+  — noted only because it's easy to confuse with this session's other small
+  interaction fixes.
+
+### A first real design pass
+
+iOS-focused; macOS/watchOS/widgets picked up the new fonts but not a full
+bespoke pass.
+
+- **App icon redesigned twice**: first replaced the original two-ring motif
+  with a bold single sine-wave line in the brand violet/coral/green palette
+  (`21afa89`), then further refined to a violet background with the wiggle
+  line plus a lower-opacity descending second line echoing the trend chart
+  (`baceacd`). A matching watchOS app icon was added at the same time. The
+  two-ring motif remains the in-app data-visualization language (dashboard
+  rings, list-row indicators, `WiggleEmptyState`'s ring stroke) even though
+  the app icon itself moved away from it.
+- **`WiggleRoomFonts.swift`** (`WiggleRoomShared`) — Fraunces (a variable
+  serif, WONK axis) for headlines/status words via
+  `WiggleRoomFont.headline`/`.statusWord`/`.aside`, registered per-process via
+  Core Text (`registerIfNeeded()` — safe to call from every target since
+  app/widget/watch/complication don't share a process); SF Rounded with
+  tabular figures (`Font.wiggleNumber`) for every numeric readout, kept
+  deliberately separate from Fraunces so digit alignment (§3.3) is never put
+  at risk. An iOS-only `installNavigationBarAppearance()` applies Fraunces to
+  `UINavigationBar` titles, since SwiftUI's `.navigationTitle` has no native
+  font hook.
+- **`WiggleEmptyState.swift`** — a shared empty-state view (ring stroke + SF
+  Symbol tinted brand violet, title/message/optional action button) used
+  across every empty list, so even a blank screen reads as Wiggle Room.
+- **Ring recycle animation fix**: dropped a desyncing "cap dot" that drifted
+  out of sync with the ring fill during recycled (0%→100%→0%) animations, and
+  synced the list-row ring's motion to match.
+- **`WiggleRoomColors.swift`** gained the brand violet/warm palette backing
+  the new icon and fonts (`.brand`, `.brandWarm`).
+
+### Other additions
+
+- **`AppCommands.swift`** — backs macOS's File > New Tracker (⌘N) menu
+  command. Uses an ever-incrementing counter (same pattern as
+  `TrackerDetailView`'s flip-animation counter above) rather than a plain
+  `Bool`, so a second ⌘N pressed before the first sheet finishes dismissing
+  still registers instead of silently no-oping on an already-true flag.
+  Observed by `MacRootView`.
+- **`TrackerTests.swift`** — 22 new tests covering `Tracker` model behavior
+  directly (`isCurrencyUnit`, `usesBudgetLanguage`, `currentValueLabel`,
+  `formattedValue`, `projectedRemainder`, `remainingAtEndCaption`,
+  `periodRemainingText`), distinct from `TrackerPaceTests`. A
+  `WiggleRoomUITests` target was also added but is still Xcode's generated
+  scaffold — no real UI-interaction coverage yet.
+- **Deployment targets raised to 27.0** (iOS/macOS) to support the
+  extra-large widget family; watchOS/`WiggleRoomWatch`/`WiggleRoomComplication`
+  deliberately left at 26.0 for real-device compatibility. Test target
+  deployment settings were also cleaned up (recommended iOS/visionOS
+  targets, macOS test target to 27.0, redundant Xcode project exceptions
+  removed).
+- Recurring trackers (spec's old §4.4) were removed from the spec entirely —
+  see decision #17, unchanged by this session, listed here only because the
+  commit landed in the same run.
+
+### Known gaps, updated
+
+- The macOS `ReadingHistoryView` swipe-to-delete gap (Suggested next steps
+  item #4 above) is still open — not addressed this session.
+- No Starling/Tesla provider work was done this session either — still just
+  manual entry, per every prior session's scope note.

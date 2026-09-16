@@ -7,7 +7,7 @@ Three source providers will ship initially: **Starling** (money), **Tesla** (car
 The name **Wiggle Room** captures the everyday idiom for having a bit of slack left before a limit — the two-ring visualization (like Apple Fitness's Activity rings) shows exactly how much of that slack remains, tracking pace vs. actual consumption against a target, detailed in §3.
 The app is built for a single user's own use across their own devices. Two people (e.g. a couple) may each run their own independent installation against overlapping accounts (e.g. a shared joint account), but **the two installations never share or sync data with each other**. All sync is within one person's own Apple ID and devices only.
 ## 2. Platforms
-In all cases, we target the latest geneally avaliable OS versions, including MacOS and IOS 27.
+In all cases, we target the latest geneally avaliable OS versions, including MacOS and IOS 27 (watchOS remains on 26.0 deliberately, for real-device compatibility — see progress-notes.md).
 - iOS (iPhone)
 - iPadOS
 - macOS
@@ -31,9 +31,8 @@ Everything in the UI should read as **holding (or drifting from) a steady pace t
 
 ### 3.3 Typography & iconography
 
-- Numerals (current value, target value, difference) should be the visual anchor of every screen — large, tabular/monospaced figures so digits align as they change.
-- App icon and in-app iconography center on two concentric rings. Avoid literal piggy-bank/coin imagery so the icon reads sensibly for non-money trackers too.
-- SF Symbols candidates to consider: `circle.circle`, `smallcircle.circle`, or a custom two-ring glyph if none fit well enough.
+- Numerals (current value, target value, difference) should be the visual anchor of every screen — large, tabular/monospaced figures so digits align as they change. **Implemented**: a custom typography system (`WiggleRoomFont`) uses Fraunces (a variable serif) for headlines/status words and SF Rounded with tabular figures for every numeric readout, kept as a separate font specifically so digit alignment is never put at risk by the display typeface.
+- **App icon**: after exploring several concepts (including the two-ring motif originally proposed here), the shipped design is a single hand-drawn wiggle/sine-wave line in brand violet, with a lower-opacity second line descending behind it echoing the trend chart — not literal piggy-bank/coin imagery, and reads sensibly for non-money trackers. A matching watchOS app icon was added alongside it. The two-ring motif survives as the **in-app** data-visualization language (the dashboard rings, list-row indicators, empty-state ring stroke) even though the app icon itself moved away from it — avoid literal piggy-bank/coin imagery there too.
 
 ### 3.4 Ring encoding (primary visualization)
 
@@ -192,19 +191,20 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 - **Add/Edit tracker screen** — name, unit, direction, Connected Source picker (§5.2) then target picker within it, start date, end date, starting value (defaults to 0 for money), and total allowance. Shows computed hourly pace rate as a confirmation line.
 - **Settings → Connected Sources** — add/remove connected sources (Starling token entry, or name a new manual source).
 - iPad: same views, laid out with more breathing room / split view where natural; no bespoke iPad-only screens required for v1.
+- **Shortcuts/Siri**: implemented via `AppShortcutsProvider` — a "Log a reading" intent (manual trackers only) and a read-only "view tracker status" intent, each with their own App Intents entity so Shortcuts/Siri can invoke them without the app running.
 
 ### 7.2 macOS
 
 - **Main window**: `NavigationSplitView` — sidebar lists trackers, detail pane shows the same dashboard content as iOS.
 - **Settings**: native `Settings` scene (Cmd+,) for Connected Sources management and add/edit tracker.
 - **Menu bar item** (`MenuBarExtra`): compact ahead/behind figure, color-coded per §3.2, with states for refreshing (spinner) and error (`--` with warning color) — see §8.4. Dropdown shows current value, target, difference, and a refresh/log-reading button. **Decision made**: shows a single tracker — the most-recently-started one — rather than a submenu; simpler of the two options the spec left open, revisit with a submenu if a single pinned tracker proves insufficient once there are enough concurrent trackers for it to matter.
-- **Dock icon badge**: indicates when any tracker is behind pace. **Not implemented yet.**
-- **Notifications**: banner when a tracker crosses from ahead to behind pace (or vice versa), worded per §3.6. **Not implemented yet.**
+- **Dock icon badge**: indicates when any tracker is behind pace. **Implemented** — `MacRootView` sets `NSApplication.shared.dockTile.badgeLabel` to `"!"` whenever any tracker's `PaceStatus` isn't `.good`, re-evaluated once a minute alongside the notification check below.
+- **Notifications**: banner when a tracker crosses from ahead to behind pace (or vice versa), worded per §3.6. **Implemented** via `PaceCrossingNotifier` — tracks each tracker's last-known ahead/behind side in memory (not persisted; a timely heads-up, not an audit trail) and posts a local notification on any crossing, worded via the same `PaceStatus` labels as §3.6. macOS only for now, since iOS/watchOS already have an always-visible widget/complication covering this at a glance.
 
 ### 7.3 watchOS
 
 - Companion app: simple list/detail view mirroring the dashboard (current value, target, ahead/behind) — read-only for auto-fetch sources; manual trackers support quick reading entry directly from the Watch (implemented as a real v1 feature, not left as a stretch goal, since manual entry is the only provider in scope so far). Talks to its own CloudKit-backed `ModelContainer` independently of the phone being nearby.
-- Complication: shows the ahead/behind figure for a chosen/default tracker directly on the watch face. **Not implemented yet** — the companion app exists, but its complication (a second WidgetKit extension embedded inside the watch app target) hasn't been built.
+- Complication: shows the ahead/behind figure for a chosen/default tracker directly on the watch face. **Implemented** as a separate WidgetKit extension (`WiggleRoomComplication` target, embedded inside `WiggleRoomWatch`), covering `.accessoryCircular`/`.accessoryRectangular`/`.accessoryInline` families with its own tracker-picker configuration (App Intents entities aren't shared across extension targets), refreshed hourly with an immediate reload on data changes.
 
 ## 8. Widgets
 
@@ -215,6 +215,7 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 - **Large**: rings at a larger size, optionally with a secondary trend chart (styled per §3.5).
 - Each widget instance is configurable to a specific tracker (via an `AppIntentConfiguration` + `WidgetConfigurationIntent`, so two widgets can show two different trackers side by side) and, for long-running trackers, a specific zoom level (§4.5) — e.g. a widget pinned to "3-year lease — This month" rather than always showing the full 3-year pace. **Zoom-level configuration isn't built yet**, since §4.5 itself isn't implemented; per-tracker configuration is.
 - Reuses the same `RingsView` used by the main app dashboard rather than a bespoke widget-only visual.
+- Each widget instance sets a `.widgetURL` (`wiggleroom://tracker/<uuid>`) so tapping it opens the app directly to that tracker's dashboard, rather than just to the tracker list.
 
 ### 8.2 iOS Lock Screen widgets
 
@@ -237,7 +238,6 @@ All glanceable surfaces (widgets, menu bar item) should support four states, col
 - Additional source providers beyond Starling, Tesla, and manual entry (another bank, an aggregator-backed provider, HealthKit, etc.) — the provider interface (§5.1) is designed to make these additive later without reworking the core app.
 - Tesla Fleet Telemetry (real-time streaming) — v1 uses only the cached, free vehicle-data read (§5.4); streaming could be added later if a use case actually needs near-real-time mileage, which seems unlikely.
 - Domains beyond money and mileage (e.g. weight/health tracking) — parked for now; would likely need extra consideration around data smoothing (raw readings are noisier than a bank balance or an odometer) if revisited later.
-- Siri Shortcuts / voice status queries.
 - Spotlight surfacing via App Intents.
 - Handoff between the user's own devices.
 - Live Activities / Dynamic Island — evaluated explicitly and skipped by design, not just left aside: the API is built for short, bounded events (a ride, a delivery) with a clear start/end held open on the Lock Screen for that duration, which doesn't fit a tracker running for weeks or months. A narrower version — surfacing one only in a tracker's final 24 hours — could be worth it later, but that's a distinct, smaller feature.
@@ -264,7 +264,6 @@ Still open:
 
 - Exact current Starling API endpoint(s) and scope name(s) for Spaces / savings goals (confirm against developer.starlingbank.com/docs, as this may have changed) — no Starling work has started yet.
 - Rate limit handling for Starling API calls (back off gracefully on 429s), especially given §4.4's shared-fetch requirement across trackers on the same source — moot until the Starling provider exists.
-- Final app icon design exploring the two-ring motif from §3.3 — treat the direction given as a brief, not a locked-in final design.
 - Whether manual-entry reminder notifications (§5.5) are worth including in v1 or deferred — still undecided; not built yet either way.
 - Exact Tesla Fleet API endpoint/scope names and current free-credit amount for the user's region (confirm against developer.tesla.com at build time, as pricing and endpoint names have changed before and may again) — no Tesla work has started yet.
 
@@ -274,4 +273,5 @@ Resolved (kept here for the record):
 - **Menu bar behavior with multiple trackers**: a single pinned tracker (the most-recently-started one), not a submenu — see §7.2. Revisit if real usage shows it's insufficient.
 - **Amber ring threshold**: not an exact "landed exactly on target" match — a percentage-of-total-allowance early-warning band (1–5% behind pace) — see §3.2.
 - **Increasing-direction trackers model a cap/allowance, not an open-ended goal** — see §4.1. A savings-goal-style "exceeding is good" framing would need a distinct mode, not built.
+- **App icon final design**: settled on a single hand-drawn wiggle/sine-wave line in brand violet, with a lower-opacity descending second line, rather than the two-ring motif originally proposed in §3.3 — see §3.3 and progress-notes.md for the decision history. A matching watchOS icon was added at the same time.
 
