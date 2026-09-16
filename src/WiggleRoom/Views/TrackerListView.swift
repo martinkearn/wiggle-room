@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 /// Root screen listing all trackers. See spec §7.1.
 struct TrackerListView: View {
@@ -14,6 +15,13 @@ struct TrackerListView: View {
 
     @State private var isPresentingAddTracker = false
     @State private var isPresentingSources = false
+
+    // Mirrors TrackerDetailView's own minute timer (§7.1) — without this,
+    // a row's ring only ever redraws when its underlying data changes, so
+    // it would never show the same live-refresh re-cycle the dashboard
+    // does; every ring in the app should visibly tick on the same cadence.
+    @State private var now = Date.now
+    private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack {
@@ -26,7 +34,7 @@ struct TrackerListView: View {
                             NavigationLink {
                                 TrackerDetailView(tracker: tracker)
                             } label: {
-                                TrackerRow(tracker: tracker)
+                                TrackerRow(tracker: tracker, now: now)
                             }
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
@@ -60,6 +68,9 @@ struct TrackerListView: View {
             .sheet(isPresented: $isPresentingSources) {
                 ConnectedSourcesView()
             }
+            .onReceive(minuteTimer) { date in
+                now = date
+            }
         }
     }
 
@@ -76,9 +87,10 @@ struct TrackerListView: View {
 /// the list reads as a stack of little dashboards rather than a plain table.
 private struct TrackerRow: View {
     let tracker: Tracker
+    let now: Date
 
     private var pace: TrackerPace {
-        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: .now)
+        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
     }
 
     private var status: PaceStatus {
@@ -87,7 +99,7 @@ private struct TrackerRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            RingsView(tracker: tracker, now: .now, lineWidth: 6, showsCenterContent: false)
+            RingsView(tracker: tracker, now: now, lineWidth: 6, showsCenterContent: false)
                 .frame(width: 46, height: 46)
 
             VStack(alignment: .leading, spacing: 3) {

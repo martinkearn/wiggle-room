@@ -95,8 +95,8 @@ struct RingsView: View {
             GeometryReader { geometry in
                 let side = min(geometry.size.width, geometry.size.height)
                 ZStack {
-                    ring(fraction: displayedPaceFraction, color: WiggleRoomColors.paceRing, showsCap: false)
-                    ring(fraction: displayedActualFraction, color: statusColor, showsCap: lineWidth >= 12)
+                    ring(fraction: displayedPaceFraction, color: WiggleRoomColors.paceRing)
+                    ring(fraction: displayedActualFraction, color: statusColor)
                         .padding(ringGap)
 
                     if showsCenterContent {
@@ -169,10 +169,9 @@ struct RingsView: View {
     /// Below this fraction, a round-capped trimmed stroke's two end-caps
     /// overlap enough to render as a solid dot rather than a recognizable
     /// sliver of arc — exactly the range the recycle animation sweeps
-    /// through on every drain and every refill. Fading the stroke (and the
-    /// leading-edge cap) out across this range means the ring visibly
-    /// empties and refills rather than shrinking to a stray dot and
-    /// reappearing as one.
+    /// through on every drain and every refill. Fading the stroke out across
+    /// this range means the ring visibly empties and refills rather than
+    /// shrinking to a stray dot and reappearing as one.
     private let dotFadeThreshold = 0.035
 
     private func progressOpacity(for fraction: Double) -> Double {
@@ -237,10 +236,17 @@ struct RingsView: View {
     }
 
     /// Builds one ring: a full faint track plus a trimmed, colored progress
-    /// stroke. `showsCap` adds a small solid dot at the progress stroke's
-    /// leading edge (as Apple's own Activity rings do) — only at sizes where
-    /// it reads as a deliberate detail rather than clutter.
-    private func ring(fraction: Double, color: Color, showsCap: Bool) -> some View {
+    /// stroke, round-capped for a soft leading edge (as Apple's own Activity
+    /// rings have). Deliberately *not* a separate dot layered on top at the
+    /// stroke's tip — a plain view positioned via trigonometry off of
+    /// `fraction` doesn't interpolate in lockstep with the trimmed shape's
+    /// own animation (`Shape.trim` is animated natively by SwiftUI; a
+    /// `.position()` computed in a `GeometryReader` is not, in practice, kept
+    /// perfectly in sync with it), so during the recycle animation the two
+    /// visibly drifted apart — a floating dot detached from the arc's actual
+    /// tip. The round line cap alone gives the same soft-tip look with no
+    /// second, separately-animated element that can desync.
+    private func ring(fraction: Double, color: Color) -> some View {
         let opacity = progressOpacity(for: fraction)
         return ZStack {
             Circle()
@@ -249,22 +255,6 @@ struct RingsView: View {
                 .trim(from: 0, to: fraction)
                 .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .opacity(opacity)
-            if showsCap, fraction > dotFadeThreshold {
-                GeometryReader { geo in
-                    let radius = min(geo.size.width, geo.size.height) / 2
-                    let angle = fraction * 2 * .pi
-                    let point = CGPoint(
-                        x: geo.size.width / 2 + radius * CGFloat(cos(angle)),
-                        y: geo.size.height / 2 + radius * CGFloat(sin(angle))
-                    )
-                    Circle()
-                        .fill(color)
-                        .frame(width: lineWidth * 0.86, height: lineWidth * 0.86)
-                        .shadow(color: color.opacity(0.4), radius: 2, y: 1)
-                        .position(point)
-                        .opacity(opacity)
-                }
-            }
         }
         .rotationEffect(.degrees(-90))
     }
