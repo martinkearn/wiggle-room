@@ -31,6 +31,12 @@ struct TrackerDetailView: View {
     @State private var nextUpdateAt = Date.now
     @State private var secondsUntilUpdate = 60
 
+    /// Ever-incrementing rather than a toggled `Bool` — each increment
+    /// always spins a fresh full turn forward from wherever the last one
+    /// left off, so back-to-back updates never fight over rotation
+    /// direction the way flipping true/false/true would.
+    @State private var targetFlipCount = 0
+
     /// Recomputes the live pace/target figures once a minute — the period
     /// is fixed, so each minute has one exact target value, no finer-grained
     /// updates are needed. `secondTimer` only drives the visible countdown
@@ -61,16 +67,9 @@ struct TrackerDetailView: View {
 
                 figuresRow
 
-                VStack(spacing: 2) {
-                    Text(periodRemainingText)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    if let remainingAtEndCaption {
-                        Text(remainingAtEndCaption)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
+                Text(periodRemainingText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
                 if tracker.latestReading == nil {
                     Text("No readings logged yet — log one to see your pace.")
@@ -149,6 +148,14 @@ struct TrackerDetailView: View {
         .onReceive(secondTimer) { date in
             secondsUntilUpdate = max(0, Int(nextUpdateAt.timeIntervalSince(date).rounded()))
         }
+        // Keyed on the reading's own id, not its value — logging a reading
+        // that happens to match the previous one is still a genuine update
+        // and should still visibly register, not silently no-op.
+        .onChange(of: tracker.latestReading?.id) { _, _ in
+            withAnimation(.easeInOut(duration: 0.7)) {
+                targetFlipCount += 1
+            }
+        }
     }
 
     /// Two visually separate cards, not one shared row — Current Balance
@@ -175,8 +182,17 @@ struct TrackerDetailView: View {
             }
 
             card(tint: WiggleRoomColors.paceRing) {
-                figureContent(title: "Target Right Now", value: pace.targetValueToday)
+                figureContent(title: "Target Right Now", value: pace.targetValueToday, caption: tracker.remainingAtEndCaption)
             }
+            // A little "just updated" flourish when a new reading lands —
+            // a full turn rather than a half-flip so the card never rests
+            // mirror-reversed mid-animation if interrupted by a second
+            // rapid update.
+            .rotation3DEffect(
+                .degrees(Double(targetFlipCount) * 360),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.35
+            )
         }
         .padding(.horizontal)
     }
@@ -206,18 +222,6 @@ struct TrackerDetailView: View {
         pace.remainingInAllowanceCaption(for: tracker)
     }
 
-    /// How much would be left over at the end of the tracker's period, shown
-    /// only when the starting value and total budget actually differ (the
-    /// "spend it all" case needs no extra explanation).
-    private var remainingAtEndCaption: String? {
-        guard let remainder = tracker.projectedRemainder else { return nil }
-        if remainder > 0 {
-            return "\(tracker.formattedValue(remainder)) will remain at the end"
-        } else {
-            return "Budget exceeds starting value by \(tracker.formattedValue(abs(remainder)))"
-        }
-    }
-
     private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {
         VStack(spacing: 4) {
             Text(title)
@@ -237,16 +241,7 @@ struct TrackerDetailView: View {
     }
 
     private var periodRemainingText: String {
-        let calendar = Calendar.current
-        if now >= tracker.endDate {
-            return "Period ended"
-        }
-        let days = calendar.dateComponents([.day], from: now, to: tracker.endDate).day ?? 0
-        if days >= 1 {
-            return "\(days) day\(days == 1 ? "" : "s") remaining"
-        }
-        let hours = max(calendar.dateComponents([.hour], from: now, to: tracker.endDate).hour ?? 0, 0)
-        return "\(hours) hour\(hours == 1 ? "" : "s") remaining"
+        tracker.periodRemainingText(asOf: now)
     }
 }
 
