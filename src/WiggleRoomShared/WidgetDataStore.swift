@@ -1,6 +1,6 @@
 //
 //  WidgetDataStore.swift
-//  WiggleRoomWidgets
+//  WiggleRoomShared
 //
 
 import CoreData
@@ -8,14 +8,23 @@ import Foundation
 import SwiftData
 import os
 
-/// The widget extension's own read access to the same CloudKit-synced
-/// SwiftData store the main app uses (§6 of the build spec) — widgets run in
-/// a separate process, so they open their own `ModelContainer` against the
-/// same `iCloud.martinkearn.WiggleRoom` container rather than sharing the app's
-/// in-memory one. No App Group is needed for this: CloudKit sync (not a
-/// shared local file) is what keeps the two processes' data consistent.
+/// A glanceable extension's own read access to the same CloudKit-synced
+/// SwiftData store the main app uses (§6 of the build spec). Shared by every
+/// WidgetKit-based extension in this app — the iOS/macOS Home/Lock Screen
+/// widgets (`WiggleRoomWidgets`) and the watchOS complication
+/// (`WiggleRoomComplication`, §7.3) — since each runs in its own process and
+/// needs the identical CloudKit cold-start/import-wait handling below; living
+/// here instead of duplicated per-extension means a fix to that handling
+/// (like the CloudKit-import-notification wait) only has to happen once.
+/// Each process opens its own `ModelContainer` against the same
+/// `iCloud.martinkearn.WiggleRoom` container rather than sharing the main
+/// app's in-memory one — no App Group is needed for this: CloudKit sync (not
+/// a shared local file) is what keeps every process's data consistent.
 enum WidgetDataStore {
-    private static let logger = Logger(subsystem: "martinkearn.WiggleRoom.WiggleRoomWidgets", category: "WidgetDataStore")
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "martinkearn.WiggleRoom",
+        category: "WidgetDataStore"
+    )
 
     /// Created once and reused for the lifetime of the extension process —
     /// standing up a CloudKit-backed `ModelContainer` from scratch isn't
@@ -62,18 +71,37 @@ enum WidgetDataStore {
     /// briefly here (instead of accepting the first empty result) is a
     /// one-time cold-start cost per extension process — once
     /// `cachedContainer` above is warm, later calls return immediately.
+    ///
+    /// When trackers *are* already present, this still gives CloudKit one
+    /// short, bounded chance to deliver a fresher import before returning.
+    /// `TrackerStore` calls `WidgetCenter.reloadAllTimelines()` the instant
+    /// a reading is logged in the main app, which makes WidgetKit re-invoke
+    /// this immediately — almost always well before that change has
+    /// actually round-tripped through CloudKit into this extension's own
+    /// separate local store (see the type doc above: no App Group, CloudKit
+    /// sync is the only channel). Without this, a value *update* to a
+    /// tracker the widget already knows about was invisible until the
+    /// store's own hourly refresh or the next unrelated reload, since only
+    /// the true-empty case above ever waited at all. This wait is much
+    /// shorter than `fetchAllTrackersForConfiguration()`'s — this runs
+    /// inside WidgetKit's own timeline-generation budget, not behind an
+    /// interactive "Loading" sheet, so it can't afford to be generous.
     @MainActor
     static func fetchAllTrackers() async throws -> [Tracker] {
         do {
             var trackers = try fetchAllTrackersImmediately()
-            guard trackers.isEmpty else { return trackers }
-            for attempt in 1...8 {
-                try await Task.sleep(nanoseconds: 500_000_000)
-                trackers = try fetchAllTrackersImmediately()
-                if !trackers.isEmpty {
-                    logger.notice("Trackers appeared after waiting for initial CloudKit import (attempt \(attempt)).")
-                    break
+            if trackers.isEmpty {
+                for attempt in 1...8 {
+                    try await Task.sleep(nanoseconds: 500_000_000)
+                    trackers = try fetchAllTrackersImmediately()
+                    if !trackers.isEmpty {
+                        logger.notice("Trackers appeared after waiting for initial CloudKit import (attempt \(attempt)).")
+                        break
+                    }
                 }
+            } else {
+                await waitForNextCloudKitImport(timeout: 2)
+                trackers = try fetchAllTrackersImmediately()
             }
             return trackers
         } catch {
