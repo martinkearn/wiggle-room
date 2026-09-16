@@ -11,10 +11,10 @@ import SwiftUI
 /// point exists ahead of that work, rather than something to flesh out now.
 struct AddSourceView: View {
     var body: some View {
-        ContentUnavailableView(
-            "Coming Soon",
-            systemImage: "point.3.filled.connected.trianglepath.dotted",
-            description: Text("Adding a real connection like Starling or Tesla isn't available yet.")
+        WiggleEmptyState(
+            symbol: "point.3.filled.connected.trianglepath.dotted",
+            title: "Coming Soon",
+            message: "Adding a real connection like Starling or Tesla isn't available yet."
         )
         .navigationTitle("Add Source")
         .inlineNavigationBarIfAvailable()

@@ -23,20 +23,21 @@ struct ConnectedSourcesView: View {
         NavigationStack {
             Group {
                 if addedSources.isEmpty {
-                    ContentUnavailableView(
-                        "No Connected Sources",
-                        systemImage: "point.3.filled.connected.trianglepath.dotted",
-                        description: Text("Add a source like Starling or Tesla to fetch readings automatically.")
+                    WiggleEmptyState(
+                        symbol: "point.3.filled.connected.trianglepath.dotted",
+                        title: "No Connected Sources",
+                        message: "Add a source like Starling or Tesla to fetch readings automatically."
                     )
                 } else {
                     List(addedSources) { source in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(source.displayName)
-                                .font(.headline)
+                                .font(WiggleRoomFont.headline(17, weight: 600))
                             Text(source.providerId.capitalized)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
+                        .padding(.vertical, 4)
                     }
                 }
             }

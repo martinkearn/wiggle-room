@@ -35,12 +35,17 @@ struct WiggleRoomApp: App {
 
         _store = State(initialValue: TrackerStore(modelContext: modelContainer.mainContext))
         CloudSyncWidgetRefresher.start()
+
+        #if os(iOS)
+        WiggleRoomFont.installNavigationBarAppearance()
+        #endif
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(store)
+                .tint(WiggleRoomColors.brand)
         }
         .modelContainer(modelContainer)
 

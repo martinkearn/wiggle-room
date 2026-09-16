@@ -158,7 +158,7 @@ struct TrackerDetailView: View {
     /// not to the pair of them together.
     private var figuresRow: some View {
         HStack(alignment: .top, spacing: 12) {
-            card {
+            card(tint: pace.status.color) {
                 figureContent(title: tracker.currentValueLabel, value: pace.currentValue, caption: remainingInAllowanceCaption)
                 Button {
                     isPresentingLogReading = true
@@ -171,22 +171,27 @@ struct TrackerDetailView: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
+                .tint(WiggleRoomColors.brand)
             }
 
-            card {
+            card(tint: WiggleRoomColors.paceRing) {
                 figureContent(title: "Target Right Now", value: pace.targetValueToday)
             }
         }
         .padding(.horizontal)
     }
 
-    private func card(@ViewBuilder content: () -> some View) -> some View {
+    private func card(tint: Color, @ViewBuilder content: () -> some View) -> some View {
         VStack(spacing: 12) {
             content()
         }
         .frame(maxWidth: .infinity)
         .padding(16)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+        .background(tint.opacity(0.09), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(tint.opacity(0.18), lineWidth: 1)
+        )
     }
 
     /// The whole screen's live figures (the ring, the difference, Target
@@ -216,10 +221,12 @@ struct TrackerDetailView: View {
     private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {
         VStack(spacing: 4) {
             Text(title)
-                .font(.caption)
+                .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
             Text(tracker.formattedValue(value))
-                .font(.title2.monospacedDigit().weight(.semibold))
+                .font(.wiggleNumber(size: 24, weight: .bold))
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
             if let caption {
                 Text(caption)
                     .font(.caption2)

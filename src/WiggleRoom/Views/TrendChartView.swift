@@ -48,11 +48,13 @@ struct TrendChartView: View {
                 y: .value("Pace", tracker.startingValue)
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
+            .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 5]))
             LineMark(
                 x: .value("Date", tracker.endDate),
                 y: .value("Pace", targetEndValue)
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
+            .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 5]))
 
             ForEach(segments, id: \.id) { segment in
                 LineMark(
@@ -61,12 +63,14 @@ struct TrendChartView: View {
                     series: .value("Segment", segment.id)
                 )
                 .foregroundStyle(segment.isAhead ? WiggleRoomColors.good : WiggleRoomColors.bad)
+                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                 LineMark(
                     x: .value("Date", segment.end.date),
                     y: .value("Actual", segment.end.value),
                     series: .value("Segment", segment.id)
                 )
                 .foregroundStyle(segment.isAhead ? WiggleRoomColors.good : WiggleRoomColors.bad)
+                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
             }
 
             ForEach(tracker.sortedReadings) { reading in

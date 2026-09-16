@@ -24,10 +24,10 @@ struct ReadingHistoryView: View {
     var body: some View {
         Group {
             if readingsNewestFirst.isEmpty {
-                ContentUnavailableView(
-                    "No Updates Yet",
-                    systemImage: "clock",
-                    description: Text("Updates you log will appear here.")
+                WiggleEmptyState(
+                    symbol: "clock",
+                    title: "No Updates Yet",
+                    message: "Updates you log will appear here."
                 )
             } else {
                 List {
@@ -41,7 +41,7 @@ struct ReadingHistoryView: View {
                                 Spacer()
                                 Text(tracker.formattedValue(reading.value))
                                     .foregroundStyle(.secondary)
-                                    .monospacedDigit()
+                                    .font(.wiggleNumber(.body))
                             }
                         }
                     }

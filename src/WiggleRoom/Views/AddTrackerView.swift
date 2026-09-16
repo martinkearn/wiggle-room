@@ -221,7 +221,7 @@ struct AddTrackerView: View {
                             .font(.subheadline.weight(.medium))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 6)
-                            .background(unit == symbol ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())
+                            .background(unit == symbol ? WiggleRoomColors.brand : Color.secondary.opacity(0.15), in: Capsule())
                             .foregroundStyle(unit == symbol ? .white : .primary)
                     }
                     .buttonStyle(.plain)

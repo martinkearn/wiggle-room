@@ -85,18 +85,18 @@ struct LogReadingView: View {
         HStack(spacing: 6) {
             if tracker.isCurrencyUnit {
                 Text(tracker.unit)
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .font(.wiggleNumber(size: 34))
                     .foregroundStyle(.secondary)
             }
             TextField("0", text: $valueText)
                 .decimalKeyboardIfAvailable()
                 .focused($isValueFieldFocused)
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
+                .font(.wiggleNumber(size: 34))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: true, vertical: false)
             if !tracker.isCurrencyUnit {
                 Text(tracker.unit)
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .font(.wiggleNumber(size: 34))
                     .foregroundStyle(.secondary)
             }
         }
