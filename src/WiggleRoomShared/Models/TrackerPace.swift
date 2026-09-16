@@ -118,7 +118,7 @@ enum PaceStatus {
     func label(for tracker: Tracker) -> String {
         switch self {
         case .good: return tracker.usesBudgetLanguage ? "Under Budget" : "On Track"
-        case .warning: return tracker.usesBudgetLanguage ? "Slightly Over Budget" : "Slightly Behind"
+        case .warning: return tracker.usesBudgetLanguage ? "Just Over Budget" : "Slightly Behind"
         case .bad: return tracker.usesBudgetLanguage ? "Over Budget" : "Needs Attention"
         }
     }
@@ -242,5 +242,20 @@ extension Tracker {
             targetValueToday: targetValueToday,
             totalAllowance: totalAllowance
         )
+    }
+}
+
+extension Tracker {
+    /// The tracker's final, whole-period `PaceStatus` once its period has
+    /// actually ended — `nil` before `endDate`, or if there's no reading yet
+    /// to judge it by. Deliberately evaluated against the tracker's own full
+    /// period (never a zoom level's sub-period, §4.5) and pinned to
+    /// `endDate` itself rather than whatever "now" is well after
+    /// completion, so the answer stays stable no matter how long after
+    /// closing the tracker is actually looked at. Used to decide whether a
+    /// tracker's completion deserves the celebration in `TrackerDetailView`.
+    func finalPaceStatus(asOf now: Date) -> PaceStatus? {
+        guard now >= endDate, let latest = latestReading else { return nil }
+        return pace(actualValue: latest.value, asOf: endDate).status
     }
 }

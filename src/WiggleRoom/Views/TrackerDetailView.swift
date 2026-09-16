@@ -42,6 +42,11 @@ struct TrackerDetailView: View {
     /// direction the way flipping true/false/true would.
     @State private var targetFlipCount = 0
 
+    /// Shown once, the first time this dashboard is viewed after the
+    /// tracker's period has actually ended still under budget/on track — see
+    /// `checkForCompletionCelebration()`.
+    @State private var isShowingCelebration = false
+
     /// Ticks once a second, both for the visible countdown and to roll the
     /// live pace/target figures over once a minute (see the `onReceive`
     /// below for why that rollover isn't a separate, longer-period timer).
@@ -70,6 +75,20 @@ struct TrackerDetailView: View {
     }
 
     var body: some View {
+        ZStack {
+            dashboardScrollView
+
+            if isShowingCelebration, let finalStatus = tracker.finalPaceStatus(asOf: now) {
+                CelebrationView(tracker: tracker, status: finalStatus) {
+                    isShowingCelebration = false
+                }
+                .transition(.opacity)
+                .zIndex(1)
+            }
+        }
+    }
+
+    private var dashboardScrollView: some View {
         ScrollView {
             VStack(spacing: 28) {
                 // The whole screen's figures update on this cadence (Target
@@ -165,6 +184,7 @@ struct TrackerDetailView: View {
             now = appearedAt
             nextUpdateAt = appearedAt.addingTimeInterval(60)
             secondsUntilUpdate = 60
+            checkForCompletionCelebration(asOf: appearedAt)
         }
         .onReceive(secondTimer) { date in
             // Folded the minute rollover into this same 1-second tick rather
@@ -181,6 +201,18 @@ struct TrackerDetailView: View {
             if date >= nextUpdateAt {
                 now = date
                 nextUpdateAt = date.addingTimeInterval(60)
+                // The minute rollover is exactly when Target Right Now's
+                // value actually moves (it's a live function of `now`), so
+                // the card's flip should register here too — previously the
+                // flip only fired from a newly logged reading, so the "live"
+                // side of this card never visibly updated at all, only the
+                // "Update Current Value" side did.
+                withAnimation(.easeInOut(duration: 0.7)) {
+                    targetFlipCount += 1
+                }
+                // Catches a tracker whose period ends while its dashboard
+                // happens to already be open, not just on a fresh appear.
+                checkForCompletionCelebration(asOf: date)
             }
             secondsUntilUpdate = max(0, Int(nextUpdateAt.timeIntervalSince(date).rounded()))
         }
@@ -191,6 +223,29 @@ struct TrackerDetailView: View {
             withAnimation(.easeInOut(duration: 0.7)) {
                 targetFlipCount += 1
             }
+            // A final reading logged after the period's already ended (a
+            // late "closing out" update) can be what actually puts the
+            // tracker under budget — worth checking here too, not just on
+            // appear/minute-tick.
+            checkForCompletionCelebration(asOf: now)
+        }
+    }
+
+    /// The video-game-style completion celebration (see `CelebrationView`)
+    /// fires once, the first time this dashboard sees the tracker's period
+    /// has genuinely ended (`asOf >= tracker.endDate`) with a final status
+    /// of `.good` — under budget for a budget tracker, on/under pace
+    /// otherwise. `Tracker.hasCelebratedCompletion` makes this a one-shot:
+    /// re-opening a long-finished tracker never replays it.
+    private func checkForCompletionCelebration(asOf date: Date) {
+        guard !tracker.hasCelebratedCompletion,
+              let finalStatus = tracker.finalPaceStatus(asOf: date),
+              finalStatus == .good
+        else { return }
+        tracker.hasCelebratedCompletion = true
+        store.saveChanges()
+        withAnimation(.easeIn(duration: 0.2)) {
+            isShowingCelebration = true
         }
     }
 

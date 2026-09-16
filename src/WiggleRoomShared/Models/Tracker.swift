@@ -40,6 +40,13 @@ final class Tracker {
     /// whenever this changes.
     var reminderCadenceDays: Int?
 
+    /// Whether the "closed under budget/on track" celebration has already
+    /// been shown for this tracker's completion — a one-shot flag so
+    /// re-opening a long-finished tracker's dashboard doesn't replay the
+    /// celebration every time. Set the moment it's shown; see
+    /// `TrackerDetailView`.
+    var hasCelebratedCompletion: Bool = false
+
     /// Every reading ever logged for this tracker (§4.6 — timestamped
     /// history, not a single overwritten current value). Optional array for
     /// CloudKit compatibility; use `sortedReadings`/`latestReading` rather

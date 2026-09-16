@@ -105,11 +105,20 @@ struct TrackerListView: View {
     /// already running and the URL arrives while this screen is visible) —
     /// a widget tap can land either way depending on whether the app was
     /// already open.
+    ///
+    /// **Replaces** the whole navigation path rather than appending to it —
+    /// if the app was already open with some other screen pushed (e.g. a
+    /// different tracker's own detail view), appending on top left that
+    /// screen underneath the new one, so the back button had to be tapped
+    /// twice to actually reach the tracker list (once to pop the newly
+    /// pushed detail, a second time to pop whatever was already there). A
+    /// widget tap should always land exactly one level deep from the list,
+    /// discarding any pre-existing push stack.
     private func navigateToPendingDeepLinkIfAny() {
         guard let id = deepLinkRouter.pendingTrackerId else { return }
         deepLinkRouter.pendingTrackerId = nil
         guard trackers.contains(where: { $0.id == id }) else { return }
-        navigationPath.append(TrackerRoute(id: id))
+        navigationPath = NavigationPath([TrackerRoute(id: id)])
     }
 }
 
