@@ -17,6 +17,7 @@ struct TrackerWidgetEntryView: View {
     var body: some View {
         if let tracker = entry.tracker {
             content(for: tracker)
+                .widgetURL(WiggleRoomDeepLink.url(forTrackerId: tracker.id))
         } else {
             emptyState
         }
@@ -59,7 +60,7 @@ struct TrackerWidgetEntryView: View {
 
     private func smallHomeScreen(_ tracker: Tracker) -> some View {
         VStack(spacing: 6) {
-            RingsView(tracker: tracker, now: entry.date, lineWidth: 10, showsCenterContent: false)
+            RingsView(tracker: tracker, now: entry.date, lineWidth: 10, showsCenterContent: false, isAnimated: false)
                 .frame(width: 60, height: 60)
             Text(tracker.name)
                 .font(.caption2.weight(.semibold))
@@ -76,7 +77,7 @@ struct TrackerWidgetEntryView: View {
 
     private func mediumHomeScreen(_ tracker: Tracker) -> some View {
         HStack(spacing: 16) {
-            RingsView(tracker: tracker, now: entry.date, lineWidth: 10, showsCenterContent: false)
+            RingsView(tracker: tracker, now: entry.date, lineWidth: 10, showsCenterContent: false, isAnimated: false)
                 .frame(width: 70, height: 70)
             VStack(alignment: .leading, spacing: 4) {
                 Text(tracker.name)
@@ -113,7 +114,7 @@ struct TrackerWidgetEntryView: View {
                 .lineLimit(1)
 
             HStack(spacing: 20) {
-                RingsView(tracker: tracker, now: entry.date, lineWidth: 14, showsCenterContent: false)
+                RingsView(tracker: tracker, now: entry.date, lineWidth: 14, showsCenterContent: false, isAnimated: false)
                     .frame(width: 130, height: 130)
 
                 VStack(alignment: .leading, spacing: 4) {

@@ -8,5 +8,18 @@
 		<string>processing</string>
 		<string>fetch</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>martinkearn.WiggleRoom</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>wiggleroom</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

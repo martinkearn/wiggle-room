@@ -32,6 +32,16 @@ struct RingsView: View {
     var lineWidth: CGFloat = 20
     var showsCenterContent: Bool = true
 
+    /// Widgets render from a static `TimelineEntry` snapshot rather than a
+    /// live SwiftUI runloop — WidgetKit captures the view's appearance
+    /// essentially immediately, well before a deferred `onAppear` animation
+    /// would ever get a chance to run, so the rings would render frozen at
+    /// their starting fraction of 0 (empty) rather than the real value.
+    /// Pass `false` there to skip all of the appear/recycle machinery below
+    /// and just show the real fraction immediately, at full opacity, with no
+    /// animation — a plain, correct ring rather than a blank one.
+    var isAnimated: Bool = true
+
     /// The fractions actually drawn on screen — deliberately separate from
     /// `paceFraction`/`actualFraction` (the real, current values) so the
     /// re-cycle animation can drive them through 0 and back up rather than
@@ -95,8 +105,8 @@ struct RingsView: View {
             GeometryReader { geometry in
                 let side = min(geometry.size.width, geometry.size.height)
                 ZStack {
-                    ring(fraction: displayedPaceFraction, color: WiggleRoomColors.paceRing)
-                    ring(fraction: displayedActualFraction, color: statusColor)
+                    ring(fraction: isAnimated ? displayedPaceFraction : paceFraction, color: WiggleRoomColors.paceRing)
+                    ring(fraction: isAnimated ? displayedActualFraction : actualFraction, color: statusColor)
                         .padding(ringGap)
 
                     if showsCenterContent {
@@ -116,6 +126,7 @@ struct RingsView: View {
             }
         }
         .onAppear {
+            guard isAnimated else { return }
             // Deferred by a beat rather than animating immediately: a plain
             // `withAnimation` called from `onAppear` during a cold launch or
             // a programmatic push (e.g. opening straight into this screen
@@ -137,7 +148,7 @@ struct RingsView: View {
             }
         }
         .onChange(of: fractionKey) { _, newValue in
-            guard hasAppeared else { return }
+            guard isAnimated, hasAppeared else { return }
             recycle(paceTarget: newValue.pace, actualTarget: newValue.actual)
         }
     }
@@ -175,6 +186,10 @@ struct RingsView: View {
     private let dotFadeThreshold = 0.035
 
     private func progressOpacity(for fraction: Double) -> Double {
+        // The fade only exists to hide a transient rendering artifact during
+        // the animated drain/refill — a static (widget) rendering shows
+        // whatever the real fraction is, faithfully, even if that's small.
+        guard isAnimated else { return fraction > 0 ? 1 : 0 }
         guard fraction > 0 else { return 0 }
         return min(fraction / dotFadeThreshold, 1)
     }

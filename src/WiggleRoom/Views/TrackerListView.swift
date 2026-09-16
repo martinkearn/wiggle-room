@@ -7,14 +7,24 @@ import SwiftUI
 import SwiftData
 import Combine
 
+/// A tracker referenced by id in `TrackerListView`'s navigation path —
+/// distinct from pushing the `Tracker` model object itself, since a plain
+/// SwiftData model class isn't `Hashable`/`Codable` in a way `NavigationPath`
+/// can work with directly.
+private struct TrackerRoute: Hashable {
+    let id: UUID
+}
+
 /// Root screen listing all trackers. See spec §7.1.
 struct TrackerListView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.modelContext) private var modelContext
+    @Environment(DeepLinkRouter.self) private var deepLinkRouter
     @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
 
     @State private var isPresentingAddTracker = false
     @State private var isPresentingSources = false
+    @State private var navigationPath = NavigationPath()
 
     // Mirrors TrackerDetailView's own minute timer (§7.1) — without this,
     // a row's ring only ever redraws when its underlying data changes, so
@@ -24,7 +34,7 @@ struct TrackerListView: View {
     private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             Group {
                 if trackers.isEmpty {
                     EmptyTrackersView(isPresentingAddTracker: $isPresentingAddTracker)
@@ -46,6 +56,11 @@ struct TrackerListView: View {
                 }
             }
             .navigationTitle("Trackers")
+            .navigationDestination(for: TrackerRoute.self) { route in
+                if let tracker = trackers.first(where: { $0.id == route.id }) {
+                    TrackerDetailView(tracker: tracker)
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigation) {
                     Button {
@@ -71,6 +86,10 @@ struct TrackerListView: View {
             .onReceive(minuteTimer) { date in
                 now = date
             }
+            .onAppear { navigateToPendingDeepLinkIfAny() }
+            .onChange(of: deepLinkRouter.pendingTrackerId) { _, _ in
+                navigateToPendingDeepLinkIfAny()
+            }
         }
     }
 
@@ -78,6 +97,19 @@ struct TrackerListView: View {
         for index in offsets {
             store.deleteTracker(trackers[index])
         }
+    }
+
+    /// Consumes a pending widget-tap navigation request, if there is one.
+    /// Checked both on appear (the URL arrived before this view existed —
+    /// a cold launch straight from a widget tap) and on change (the app was
+    /// already running and the URL arrives while this screen is visible) —
+    /// a widget tap can land either way depending on whether the app was
+    /// already open.
+    private func navigateToPendingDeepLinkIfAny() {
+        guard let id = deepLinkRouter.pendingTrackerId else { return }
+        deepLinkRouter.pendingTrackerId = nil
+        guard trackers.contains(where: { $0.id == id }) else { return }
+        navigationPath.append(TrackerRoute(id: id))
     }
 }
 
@@ -188,4 +220,5 @@ private struct EmptyTrackersView: View {
     TrackerListView()
         .modelContainer(PreviewData.container)
         .environment(PreviewData.store)
+        .environment(DeepLinkRouter())
 }

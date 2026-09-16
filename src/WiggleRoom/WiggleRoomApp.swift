@@ -12,6 +12,7 @@ import SwiftData
 struct WiggleRoomApp: App {
     let modelContainer: ModelContainer
     @State private var store: TrackerStore
+    @State private var deepLinkRouter = DeepLinkRouter()
 
     init() {
         let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
@@ -45,7 +46,11 @@ struct WiggleRoomApp: App {
         WindowGroup {
             ContentView()
                 .environment(store)
+                .environment(deepLinkRouter)
                 .tint(WiggleRoomColors.brand)
+                .onOpenURL { url in
+                    deepLinkRouter.handle(url)
+                }
         }
         .modelContainer(modelContainer)
 
