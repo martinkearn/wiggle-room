@@ -80,7 +80,7 @@ struct TrackerDetailView: View {
                         .padding(.horizontal)
                 } else if tracker.sortedReadings.count > 1 {
                     TrendChartView(tracker: tracker)
-                        .frame(height: 220)
+                        .frame(height: 240)
                         .padding(.horizontal)
                 }
             }
