@@ -84,7 +84,6 @@ The fundamental unit of the app is a **Tracker**: any quantity that should move 
 | `endDate` | Date | Start of the *next* period (exclusive) — i.e. the period runs `startDate` through 23:59:59 the day before `endDate` |
 | `startingValue` | Decimal | The value at period start. Defaults to **0** for money trackers (user-editable); for mileage this is the odometer reading at period start |
 | `totalAllowance` | Decimal | Total amount/distance available for the whole period |
-| `recurrence` | `RecurrenceRule`? | Optional — see §4.4. Nil for a genuine one-off tracker. **Not implemented yet**: an earlier placeholder field was removed from the model rather than left as unused scaffolding; re-add with real semantics when §4.4 is actually built |
 
 ### 4.2 Resolving `actualValue`
 
@@ -105,23 +104,11 @@ Regardless of source, every tracker resolves to a single `actualValue` at any po
   - `decreasing`: "current balance" = `actualValue`; "target balance today" = `startingValue - expectedConsumedByNow`
   - `increasing`: "current value" = `actualValue`; "target value today" = `startingValue + expectedConsumedByNow`
 
-### 4.4 Recurring trackers
-
-Recurrence is implemented as **template-cloning**, not a live-resetting counter:
-
-- A tracker may carry a `RecurrenceRule` (e.g. "monthly, anchored to the 25th", or "weekly, anchored to Monday").
-- When a recurring tracker's `endDate` passes, the app automatically creates a **new** Tracker instance, cloning `name`, `unit`, `direction`, `connectedSourceId`, `sourceTargetId`, `totalAllowance`, and the same `recurrence` rule, with a freshly computed `startDate`/`endDate` for the next period.
-- `startingValue` for the new instance:
-  - For auto-fetch sources (Starling): capture the live `actualValue` at the rollover moment automatically, so periods chain together with no user input needed.
-  - For manual sources: prompt the user to log a fresh starting reading, since there's no live value to capture.
-- Completed tracker instances are kept (not deleted) so a history of past periods remains browsable (see the macOS sidebar in §7.2).
-- A one-off tracker (e.g. a single mileage-tracking period tied to a specific lease year) simply has `recurrence = nil` and is never auto-cloned.
-
-### 4.5 Multiple trackers per source
+### 4.4 Multiple trackers per source
 
 Trackers and sources are many-to-one: several trackers can point at the same `ConnectedSource` (and even the same `sourceTargetId`) at once. For example, a Starling connected source's main balance could feed both a week-long tracker and a month-long tracker running concurrently, each with its own pace/allowance math, reading the same underlying live balance. When multiple trackers share a source/target, the app should fetch the underlying value once per refresh cycle and let all of them reuse it, rather than issuing duplicate API calls (relevant for Starling rate limits in particular).
 
-### 4.6 Zoom levels (for long-running trackers)
+### 4.5 Zoom levels (for long-running trackers)
 
 A tracker spanning months or years (e.g. a 3-year/30,000-mile lease) has an outer pace ring that barely moves day to day — each day is a tiny fraction of the whole period — so the primary ring visual would feel inert at that scale. Rather than solving this with a second Tracker record, a long-running tracker exposes **zoom levels**: read-only computed views of the *same* tracker at a shorter, calendar-aligned grain, so the ahead/behind question can be asked at whatever scale is actually useful ("how am I doing this month?") without redefining the tracker itself.
 
@@ -130,7 +117,7 @@ A tracker spanning months or years (e.g. a 3-year/30,000-mile lease) has an oute
   - `subAllowance = totalAllowance × (daysInSubPeriod / totalPeriodDays)`
   - `subPeriod` is **calendar-aligned** (the current calendar month, not a trailing 30-day window) so the zoomed ring visibly resets at a natural boundary and "time elapsed" means something intuitive within it.
   - `consumedSoFar`, `expectedConsumedByNow`, and `difference` (§4.3) are then computed exactly as before, just scoped to the sub-period's `subAllowance` and elapsed-time-within-`subPeriod`, using the value at the *start* of that sub-period as the local starting value (see below).
-- This is a **separate concept from recurrence (§4.4)**: recurrence creates a genuinely new Tracker with a fresh, independently-set allowance each cycle; a zoom level is a read-only lens on one unchanging long-term tracker, purely for at-a-glance pacing, and never creates or modifies a Tracker record.
+- A zoom level is a **read-only lens** on one unchanging tracker, purely for at-a-glance pacing — it never creates or modifies a Tracker record.
 - **New storage requirement this introduces**: computing "the value at the start of this month" requires knowing what `actualValue` was at that point in time, not just its current value. Every value obtained from a provider (§5.1) — whether auto-fetched or manually logged — must be stored as a **timestamped snapshot**, appended to a history, rather than overwriting a single "current value" field. Auto-fetch providers (Starling, Tesla) append a snapshot on every refresh; manual entries are snapshots by nature already. This history is what both zoom levels and the existing optional trend chart (§3.5) read from.
 
 ## 5. Source Provider Architecture
@@ -149,7 +136,7 @@ New sources are expected to require real engineering work (auth flows differ a l
 
 ### 5.2 Connected Sources
 
-A `ConnectedSource` is a configured instance of a provider — e.g. "My Starling account" — kept separate from individual trackers so multiple trackers can share one connection (§4.5):
+A `ConnectedSource` is a configured instance of a provider — e.g. "My Starling account" — kept separate from individual trackers so multiple trackers can share one connection (§4.4):
 
 | Field | Type | Notes |
 |---|---|---|
@@ -194,7 +181,7 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 ## 6. Data Storage & Cross-Device Sync
 
 - **Requirement: full sync of all trackers, connected sources, and reading history across the user's own iPhone, iPad, Mac, and Apple Watch.** This is a hard requirement, not optional.
-- Every value obtained from a provider is stored as a **timestamped snapshot** (§4.6) rather than a single overwritten "current value" field — this history is required for zoom levels (§4.6) and the optional trend chart (§3.5), and must sync in full, not just the latest reading.
+- Every value obtained from a provider is stored as a **timestamped snapshot** (§4.5) rather than a single overwritten "current value" field — this history is required for zoom levels (§4.5) and the optional trend chart (§3.5), and must sync in full, not just the latest reading.
 - Implementation: **SwiftData with CloudKit sync** (`ModelContainer` configured with a CloudKit container, `cloudKitDatabase: .automatic`), confirmed working end-to-end (real cross-device sync verified between a physical device and the Simulator). A local-only `ModelConfiguration` is kept as a defensive fallback, used only if CloudKit container creation throws (e.g. no iCloud account signed in). Apple handles propagation and basic conflict resolution across devices signed into the same Apple ID.
   - This resolves the open question in §12 about SwiftData vs. Core Data — SwiftData proved sufficient; no need to fall back to `NSPersistentCloudKitContainer`.
   - **CloudKit requires every relationship on a `@Model` type to declare an inverse on both sides**, or the app crashes on launch (SwiftData does not enforce this locally, only once CloudKit is active) — a real requirement to design for, not just a debugging note, since it means every new relationship between model types needs its inverse added on both sides in the same change.
@@ -207,14 +194,14 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 ### 7.1 iOS / iPadOS
 
 - **Tracker list** — root screen listing all trackers (name, unit, quick ring-based status indicator per §3.4).
-- **Tracker detail / dashboard** — the two-ring visual (§3.4) as the primary visual, plus current value, target value today, ahead/behind figure (in the tracker's own unit), days/hours remaining, refresh button (auto-fetch sources) or "Log a reading" button (manual sources), and optionally a secondary trend chart (styled per §3.5). For long-running trackers, a zoom-level selector (Overall / This year / This month / This week, per §4.6) sits above the rings, re-scoping the whole dashboard — rings, figures, and chart — to the selected sub-period.
-- **Add/Edit tracker screen** — name, unit, direction, Connected Source picker (§5.2) then target picker within it, start date, end date, starting value (defaults to 0 for money), total allowance, and an optional recurrence rule (§4.4). Shows computed hourly pace rate as a confirmation line.
+- **Tracker detail / dashboard** — the two-ring visual (§3.4) as the primary visual, plus current value, target value today, ahead/behind figure (in the tracker's own unit), days/hours remaining, refresh button (auto-fetch sources) or "Log a reading" button (manual sources), and optionally a secondary trend chart (styled per §3.5). For long-running trackers, a zoom-level selector (Overall / This year / This month / This week, per §4.5) sits above the rings, re-scoping the whole dashboard — rings, figures, and chart — to the selected sub-period.
+- **Add/Edit tracker screen** — name, unit, direction, Connected Source picker (§5.2) then target picker within it, start date, end date, starting value (defaults to 0 for money), and total allowance. Shows computed hourly pace rate as a confirmation line.
 - **Settings → Connected Sources** — add/remove connected sources (Starling token entry, or name a new manual source).
 - iPad: same views, laid out with more breathing room / split view where natural; no bespoke iPad-only screens required for v1.
 
 ### 7.2 macOS
 
-- **Main window**: `NavigationSplitView` — sidebar lists trackers (including past, completed instances of recurring trackers as history), detail pane shows the same dashboard content as iOS.
+- **Main window**: `NavigationSplitView` — sidebar lists trackers, detail pane shows the same dashboard content as iOS.
 - **Settings**: native `Settings` scene (Cmd+,) for Connected Sources management and add/edit tracker.
 - **Menu bar item** (`MenuBarExtra`): compact ahead/behind figure, color-coded per §3.2, with states for refreshing (spinner) and error (`--` with warning color) — see §8.4. Dropdown shows current value, target, difference, and a refresh/log-reading button. **Decision made**: shows a single tracker — the most-recently-started one — rather than a submenu; simpler of the two options the spec left open, revisit with a submenu if a single pinned tracker proves insufficient once there are enough concurrent trackers for it to matter.
 - **Dock icon badge**: indicates when any tracker is behind pace. **Not implemented yet.**
@@ -232,7 +219,7 @@ Used for mileage trackers against a Tesla vehicle, as the "simplest available in
 - **Small**: mini two-ring visual (§3.4) with the ahead/behind figure below it.
 - **Medium**: current value + target + the rings (compact) + ahead/behind line.
 - **Large**: rings at a larger size, optionally with a secondary trend chart (styled per §3.5).
-- Each widget instance is configurable to a specific tracker (via an `AppIntentConfiguration` + `WidgetConfigurationIntent`, so two widgets can show two different trackers side by side) and, for long-running trackers, a specific zoom level (§4.6) — e.g. a widget pinned to "3-year lease — This month" rather than always showing the full 3-year pace. **Zoom-level configuration isn't built yet**, since §4.6 itself isn't implemented; per-tracker configuration is.
+- Each widget instance is configurable to a specific tracker (via an `AppIntentConfiguration` + `WidgetConfigurationIntent`, so two widgets can show two different trackers side by side) and, for long-running trackers, a specific zoom level (§4.5) — e.g. a widget pinned to "3-year lease — This month" rather than always showing the full 3-year pace. **Zoom-level configuration isn't built yet**, since §4.5 itself isn't implemented; per-tracker configuration is.
 - Reuses the same `RingsView` used by the main app dashboard rather than a bespoke widget-only visual.
 
 ### 8.2 iOS Lock Screen widgets
@@ -282,9 +269,8 @@ All glanceable surfaces (widgets, menu bar item) should support four states, col
 Still open:
 
 - Exact current Starling API endpoint(s) and scope name(s) for Spaces / savings goals (confirm against developer.starlingbank.com/docs, as this may have changed) — no Starling work has started yet.
-- Rate limit handling for Starling API calls (back off gracefully on 429s), especially given §4.5's shared-fetch requirement across trackers on the same source — moot until the Starling provider exists.
+- Rate limit handling for Starling API calls (back off gracefully on 429s), especially given §4.4's shared-fetch requirement across trackers on the same source — moot until the Starling provider exists.
 - Final app icon design exploring the two-ring motif from §3.3 — treat the direction given as a brief, not a locked-in final design.
-- Exact `RecurrenceRule` representation (§4.4) — e.g. an RRULE-like structure vs. a simpler custom enum — left to the build agent's judgment, as long as it supports "monthly anchored to a day-of-month" and "weekly anchored to a weekday" at minimum. (An earlier unused placeholder field was removed from `Tracker` rather than left half-built — see §4.1 — so this still needs a real decision when §4.4 is picked up.)
 - Whether manual-entry reminder notifications (§5.5) are worth including in v1 or deferred — still undecided; not built yet either way.
 - Exact Tesla Fleet API endpoint/scope names and current free-credit amount for the user's region (confirm against developer.tesla.com at build time, as pricing and endpoint names have changed before and may again) — no Tesla work has started yet.
 
