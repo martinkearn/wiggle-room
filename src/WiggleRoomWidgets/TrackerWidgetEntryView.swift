@@ -67,6 +67,8 @@ struct TrackerWidgetEntryView: View {
             Text(tracker.name)
                 .font(WiggleRoomFont.headline(12, weight: 650))
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity)
             Text(pace(for: tracker).displayDifference(for: tracker))
                 .font(.wiggleNumber(.caption, weight: .bold))
                 .foregroundStyle(pace(for: tracker).status.color)
@@ -85,6 +87,8 @@ struct TrackerWidgetEntryView: View {
                 Text(tracker.name)
                     .font(WiggleRoomFont.headline(16, weight: 650))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Text(pace(for: tracker).status.label(for: tracker))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -94,7 +98,6 @@ struct TrackerWidgetEntryView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
-            Spacer(minLength: 0)
         }
         .padding()
         .containerBackground(for: .widget) { Color.widgetBackground }
@@ -114,6 +117,8 @@ struct TrackerWidgetEntryView: View {
             Text(tracker.name)
                 .font(WiggleRoomFont.headline(20, weight: 650))
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 20) {
                 RingsView(tracker: tracker, now: entry.date, lineWidth: 14, showsCenterContent: false, isAnimated: false)
@@ -133,7 +138,7 @@ struct TrackerWidgetEntryView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Divider()
@@ -180,6 +185,8 @@ struct TrackerWidgetEntryView: View {
             Text(tracker.name)
                 .font(WiggleRoomFont.headline(24, weight: 650))
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity)
 
             RingsView(tracker: tracker, now: entry.date, lineWidth: 20, isAnimated: false)
                 .frame(width: 220, height: 220)
@@ -228,6 +235,8 @@ struct TrackerWidgetEntryView: View {
             Text(tracker.name)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Text(p.displayDifference(for: tracker))
                 .font(.wiggleNumber(.caption))
             Text(p.status.label(for: tracker))
