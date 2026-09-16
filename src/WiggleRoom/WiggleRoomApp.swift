@@ -13,6 +13,7 @@ struct WiggleRoomApp: App {
     let modelContainer: ModelContainer
     @State private var store: TrackerStore
     @State private var deepLinkRouter = DeepLinkRouter()
+    @State private var appCommands = AppCommands()
 
     init() {
         let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
@@ -47,12 +48,31 @@ struct WiggleRoomApp: App {
             ContentView()
                 .environment(store)
                 .environment(deepLinkRouter)
+                .environment(appCommands)
                 .tint(WiggleRoomColors.brand)
                 .onOpenURL { url in
                     deepLinkRouter.handle(url)
                 }
         }
         .modelContainer(modelContainer)
+        #if os(macOS)
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("New Tracker") {
+                    appCommands.requestNewTracker()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            }
+        }
+        #endif
+
+        #if os(macOS)
+        Settings {
+            ConnectedSourcesView()
+                .environment(store)
+                .modelContainer(modelContainer)
+        }
+        #endif
 
         #if os(macOS)
         MenuBarExtra {

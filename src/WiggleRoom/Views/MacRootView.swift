@@ -3,8 +3,12 @@
 //  WiggleRoom
 //
 
+import Combine
 import SwiftUI
 import SwiftData
+#if os(macOS)
+import AppKit
+#endif
 
 /// macOS main window (§7.2): a `NavigationSplitView` sidebar of trackers
 /// with the same dashboard as iOS in the detail pane — the functional
@@ -12,11 +16,11 @@ import SwiftData
 /// itself (that content is identical to `TrackerDetailView` on iOS).
 struct MacRootView: View {
     @Environment(TrackerStore.self) private var store
+    @Environment(AppCommands.self) private var appCommands
     @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
 
     @State private var selection: Tracker.ID?
     @State private var isPresentingAddTracker = false
-    @State private var isPresentingSources = false
 
     var body: some View {
         NavigationSplitView {
@@ -36,13 +40,9 @@ struct MacRootView: View {
             }
             .navigationTitle("Trackers")
             .toolbar {
-                ToolbarItem {
-                    Button {
-                        isPresentingSources = true
-                    } label: {
-                        Label("Connected Sources", systemImage: "gearshape")
-                    }
-                }
+                // Connected Sources moved to the native Settings scene (⌘,,
+                // §7.2) — the standard macOS home for this kind of
+                // configuration, rather than a bespoke sheet duplicating it.
                 ToolbarItem {
                     Button {
                         isPresentingAddTracker = true
@@ -65,15 +65,46 @@ struct MacRootView: View {
         .sheet(isPresented: $isPresentingAddTracker) {
             AddTrackerView()
         }
-        .sheet(isPresented: $isPresentingSources) {
-            ConnectedSourcesView()
-        }
         .onAppear {
             if selection == nil {
                 selection = trackers.first?.id
             }
         }
+        .onChange(of: appCommands.newTrackerRequestCount) { _, _ in
+            isPresentingAddTracker = true
+        }
+        #if os(macOS)
+        .task {
+            PaceCrossingNotifier.shared.requestAuthorizationIfNeeded()
+        }
+        .onAppear {
+            refreshPaceDrivenState()
+        }
+        .onChange(of: trackers) { _, _ in
+            refreshPaceDrivenState()
+        }
+        .onReceive(paceRefreshTimer) { _ in
+            refreshPaceDrivenState()
+        }
+        #endif
     }
+
+    #if os(macOS)
+    /// Ticks once a minute so the Dock badge and pace-crossing notifications
+    /// (§7.2) stay current purely from time passing, not just when tracker
+    /// data changes — the same cadence `TrackerDetailView` recomputes its
+    /// own figures at.
+    private let paceRefreshTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+
+    private func refreshPaceDrivenState() {
+        PaceCrossingNotifier.shared.checkForCrossings(in: trackers)
+        let anyBehindPace = trackers.contains { tracker in
+            guard let reading = tracker.latestReading else { return false }
+            return tracker.pace(actualValue: reading.value).status != .good
+        }
+        NSApplication.shared.dockTile.badgeLabel = anyBehindPace ? "!" : nil
+    }
+    #endif
 }
 
 private struct MacTrackerRow: View {
@@ -90,9 +121,10 @@ private struct MacTrackerRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(tracker.name)
                 if tracker.latestReading != nil {
-                    Text(pace.displayDifference(for: tracker))
+                    Text("\(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))")
                         .font(.caption)
                         .foregroundStyle(pace.status.color)
+                        .lineLimit(1)
                 } else {
                     Text("No data yet")
                         .font(.caption)
