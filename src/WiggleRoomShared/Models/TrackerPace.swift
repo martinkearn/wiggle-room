@@ -118,7 +118,7 @@ enum PaceStatus {
     func label(for tracker: Tracker) -> String {
         switch self {
         case .good: return tracker.usesBudgetLanguage ? "Under Budget" : "On Track"
-        case .warning: return tracker.usesBudgetLanguage ? "Close to Over Budget" : "Slightly Behind"
+        case .warning: return tracker.usesBudgetLanguage ? "Slightly Over Budget" : "Slightly Behind"
         case .bad: return tracker.usesBudgetLanguage ? "Over Budget" : "Needs Attention"
         }
     }

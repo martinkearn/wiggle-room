@@ -226,7 +226,7 @@ final class TrackerPaceTests: XCTestCase {
     func testStatusLine_budgetTracker_warning_omitsBy() {
         let tracker = moneyTracker(totalAllowance: 3000)
         let pace = tracker.pace(actualValue: 1440, asOf: date(2026, 1, 16))
-        XCTAssertEqual(pace.statusLine(for: tracker), "Close to Over Budget", "the warning label already reads as a complete phrase")
+        XCTAssertEqual(pace.statusLine(for: tracker), "Slightly Over Budget", "the warning label already reads as a complete phrase")
     }
 
     func testStatusLine_nonBudgetTracker_neverAppendsBy() {
