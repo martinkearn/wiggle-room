@@ -27,10 +27,10 @@ struct TrackerWidget: Widget {
         .configurationDisplayName("Tracker")
         .description("Shows a tracker's pace at a glance.")
         #if os(macOS)
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
         #else
         .supportedFamilies([
-            .systemSmall, .systemMedium, .systemLarge,
+            .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge,
             .accessoryCircular, .accessoryRectangular, .accessoryInline,
         ])
         #endif

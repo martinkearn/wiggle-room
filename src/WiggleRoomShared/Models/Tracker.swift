@@ -165,4 +165,35 @@ extension Tracker {
     var projectedRemainder: Decimal? {
         Tracker.projectedRemainder(direction: direction, startingValue: startingValue, totalAllowance: totalAllowance)
     }
+
+    /// How much would be left over at the end of the tracker's period, worded
+    /// for display — `nil` exactly when `projectedRemainder` is (i.e. the
+    /// "spend it all" case needs no extra explanation). Shared by the
+    /// dashboard's Target Right Now card and the extra-large widget, which
+    /// mirrors that dashboard layout as closely as a widget's static
+    /// rendering allows.
+    var remainingAtEndCaption: String? {
+        guard let remainder = projectedRemainder else { return nil }
+        if remainder > 0 {
+            return "\(formattedValue(remainder)) will remain at the end"
+        } else {
+            return "Budget exceeds starting value by \(formattedValue(abs(remainder)))"
+        }
+    }
+
+    /// "3 days remaining" / "6 hours remaining" / "Period ended", as of a
+    /// given instant — the days-remaining line under the dashboard's rings,
+    /// also reused by the extra-large widget.
+    func periodRemainingText(asOf now: Date) -> String {
+        let calendar = Calendar.current
+        if now >= endDate {
+            return "Period ended"
+        }
+        let days = calendar.dateComponents([.day], from: now, to: endDate).day ?? 0
+        if days >= 1 {
+            return "\(days) day\(days == 1 ? "" : "s") remaining"
+        }
+        let hours = max(calendar.dateComponents([.hour], from: now, to: endDate).hour ?? 0, 0)
+        return "\(hours) hour\(hours == 1 ? "" : "s") remaining"
+    }
 }

@@ -111,4 +111,55 @@ final class TrackerTests: XCTestCase {
         let t = tracker(direction: .decreasing, startingValue: 500, totalAllowance: 500)
         XCTAssertNil(t.projectedRemainder, "no remainder worth surfacing when the budget exactly matches the starting value")
     }
+
+    // MARK: - remainingAtEndCaption
+
+    func testRemainingAtEndCaption_startingValueExceedsBudget_saysWhatWillRemain() {
+        let t = tracker(unit: "£", direction: .decreasing, startingValue: 500, totalAllowance: 400)
+        XCTAssertEqual(t.remainingAtEndCaption, "£100 will remain at the end")
+    }
+
+    func testRemainingAtEndCaption_budgetExceedsStartingValue_saysByHowMuch() {
+        let t = tracker(unit: "£", direction: .decreasing, startingValue: 400, totalAllowance: 500)
+        XCTAssertEqual(t.remainingAtEndCaption, "Budget exceeds starting value by £100")
+    }
+
+    func testRemainingAtEndCaption_startingValueEqualsBudget_isNil() {
+        let t = tracker(unit: "£", direction: .decreasing, startingValue: 500, totalAllowance: 500)
+        XCTAssertNil(t.remainingAtEndCaption)
+    }
+
+    // MARK: - periodRemainingText(asOf:)
+
+    func testPeriodRemainingText_multipleDaysLeft_pluralizes() {
+        let start = Date()
+        let t = tracker(startingValue: 100, totalAllowance: 100)
+        t.startDate = start
+        t.endDate = start.addingTimeInterval(3 * 24 * 3600 + 3600) // just over 3 days
+        XCTAssertEqual(t.periodRemainingText(asOf: start), "3 days remaining")
+    }
+
+    func testPeriodRemainingText_oneDayLeft_singular() {
+        let start = Date()
+        let t = tracker(startingValue: 100, totalAllowance: 100)
+        t.startDate = start
+        t.endDate = start.addingTimeInterval(1 * 24 * 3600 + 3600)
+        XCTAssertEqual(t.periodRemainingText(asOf: start), "1 day remaining")
+    }
+
+    func testPeriodRemainingText_lessThanADay_fallsBackToHours() {
+        let start = Date()
+        let t = tracker(startingValue: 100, totalAllowance: 100)
+        t.startDate = start
+        t.endDate = start.addingTimeInterval(5 * 3600)
+        XCTAssertEqual(t.periodRemainingText(asOf: start), "5 hours remaining")
+    }
+
+    func testPeriodRemainingText_periodOver_saysEnded() {
+        let start = Date()
+        let t = tracker(startingValue: 100, totalAllowance: 100)
+        t.startDate = start.addingTimeInterval(-7200)
+        t.endDate = start.addingTimeInterval(-3600)
+        XCTAssertEqual(t.periodRemainingText(asOf: start), "Period ended")
+    }
 }

@@ -30,6 +30,8 @@ struct TrackerWidgetEntryView: View {
             mediumHomeScreen(tracker)
         case .systemLarge:
             largeHomeScreen(tracker)
+        case .systemExtraLarge:
+            extraLargeHomeScreen(tracker)
         #if !os(macOS)
         case .accessoryCircular:
             circularLockScreen(tracker)
@@ -63,10 +65,10 @@ struct TrackerWidgetEntryView: View {
             RingsView(tracker: tracker, now: entry.date, lineWidth: 10, showsCenterContent: false, isAnimated: false)
                 .frame(width: 60, height: 60)
             Text(tracker.name)
-                .font(.caption2.weight(.semibold))
+                .font(WiggleRoomFont.headline(12, weight: 650))
                 .lineLimit(1)
             Text(pace(for: tracker).displayDifference(for: tracker))
-                .font(.caption.monospacedDigit().weight(.bold))
+                .font(.wiggleNumber(.caption, weight: .bold))
                 .foregroundStyle(pace(for: tracker).status.color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -81,13 +83,13 @@ struct TrackerWidgetEntryView: View {
                 .frame(width: 70, height: 70)
             VStack(alignment: .leading, spacing: 4) {
                 Text(tracker.name)
-                    .font(.subheadline.weight(.semibold))
+                    .font(WiggleRoomFont.headline(16, weight: 650))
                     .lineLimit(1)
                 Text(pace(for: tracker).status.label(for: tracker))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(pace(for: tracker).displayDifference(for: tracker))
-                    .font(.title3.monospacedDigit().weight(.bold))
+                    .font(.wiggleNumber(.title3, weight: .bold))
                     .foregroundStyle(pace(for: tracker).status.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -110,7 +112,7 @@ struct TrackerWidgetEntryView: View {
         let p = pace(for: tracker)
         return VStack(alignment: .leading, spacing: 16) {
             Text(tracker.name)
-                .font(.headline)
+                .font(WiggleRoomFont.headline(20, weight: 650))
                 .lineLimit(1)
 
             HStack(spacing: 20) {
@@ -123,7 +125,7 @@ struct TrackerWidgetEntryView: View {
                         .tracking(0.5)
                         .foregroundStyle(p.status.color)
                     Text(p.displayDifference(for: tracker))
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .font(.wiggleNumber(size: 30, weight: .bold))
                         .foregroundStyle(p.status.color)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -146,18 +148,64 @@ struct TrackerWidgetEntryView: View {
         .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
-    private func widgetFigure(title: String, value: String, color: Color) -> some View {
+    private func widgetFigure(title: String, value: String, color: Color, caption: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .font(.wiggleNumber(.subheadline))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+            if let caption {
+                Text(caption)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The extra-large family (iOS/iPadOS/macOS 27) has enough room to
+    /// mirror the phone dashboard (`TrackerDetailView`) almost directly,
+    /// rather than the large widget's more compact reinterpretation above —
+    /// full-size rings with their own center content/legend, both figure
+    /// cards with their captions, and the days-remaining line.
+    private func extraLargeHomeScreen(_ tracker: Tracker) -> some View {
+        let p = pace(for: tracker)
+        return VStack(spacing: 20) {
+            Text(tracker.name)
+                .font(WiggleRoomFont.headline(24, weight: 650))
+                .lineLimit(1)
+
+            RingsView(tracker: tracker, now: entry.date, lineWidth: 20, isAnimated: false)
+                .frame(width: 220, height: 220)
+
+            HStack(spacing: 16) {
+                widgetFigure(
+                    title: tracker.currentValueLabel,
+                    value: tracker.formattedValue(p.currentValue),
+                    color: p.status.color,
+                    caption: p.remainingInAllowanceCaption(for: tracker)
+                )
+                widgetFigure(
+                    title: "Target Right Now",
+                    value: tracker.formattedValue(p.targetValueToday),
+                    color: .primary,
+                    caption: tracker.remainingAtEndCaption
+                )
+            }
+
+            Text(tracker.periodRemainingText(asOf: entry.date))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
     #if !os(macOS)
@@ -181,7 +229,7 @@ struct TrackerWidgetEntryView: View {
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
             Text(p.displayDifference(for: tracker))
-                .font(.caption.monospacedDigit())
+                .font(.wiggleNumber(.caption))
             Text(p.status.label(for: tracker))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
