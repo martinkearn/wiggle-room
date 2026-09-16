@@ -37,11 +37,9 @@ struct TrackerDetailView: View {
     /// direction the way flipping true/false/true would.
     @State private var targetFlipCount = 0
 
-    /// Recomputes the live pace/target figures once a minute — the period
-    /// is fixed, so each minute has one exact target value, no finer-grained
-    /// updates are needed. `secondTimer` only drives the visible countdown
-    /// to that update, so a user watching the screen sees it's still live.
-    private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    /// Ticks once a second, both for the visible countdown and to roll the
+    /// live pace/target figures over once a minute (see the `onReceive`
+    /// below for why that rollover isn't a separate, longer-period timer).
     private let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var pace: TrackerPace {
@@ -141,11 +139,22 @@ struct TrackerDetailView: View {
             nextUpdateAt = appearedAt.addingTimeInterval(60)
             secondsUntilUpdate = 60
         }
-        .onReceive(minuteTimer) { date in
-            now = date
-            nextUpdateAt = date.addingTimeInterval(60)
-        }
         .onReceive(secondTimer) { date in
+            // Folded the minute rollover into this same 1-second tick rather
+            // than relying on a separate 60-second `Timer.publish` — a
+            // `let`-stored timer publisher gets recreated fresh every time
+            // this view's body re-evaluates, which happens on every second's
+            // tick here; a 1-second timer only ever needs to survive ~1s
+            // between those recreations, but a 60-second one never gets a
+            // full uninterrupted minute to actually fire, so it silently
+            // never rolls over — the countdown reaches 0 and just sits
+            // there. Comparing against `nextUpdateAt` directly instead
+            // means rollover no longer depends on any timer surviving longer
+            // than the interval it's already proven to survive.
+            if date >= nextUpdateAt {
+                now = date
+                nextUpdateAt = date.addingTimeInterval(60)
+            }
             secondsUntilUpdate = max(0, Int(nextUpdateAt.timeIntervalSince(date).rounded()))
         }
         // Keyed on the reading's own id, not its value — logging a reading
