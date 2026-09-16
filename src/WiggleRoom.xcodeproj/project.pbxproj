@@ -11,9 +11,18 @@
 		4B9BEC6E86E3038255B3C542 /* WiggleRoomWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AC013DBE5CBD724972D4B331 /* WiggleRoomWatch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9391A7D9A0377A729C701CD2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DA585E7618392675CF6D760 /* Foundation.framework */; };
 		951FF7F25912393137B09B3B /* WiggleRoomWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0390A05B6F76AA646812AE87 /* WiggleRoomWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B0717E4E6DB83B9414CEB48C /* WiggleRoomComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B726BF89F335C151F2E1C3C6 /* WiggleRoomComplication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		EFA569431AE7EDCF66301601 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DA585E7618392675CF6D760 /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		16EA2CCD38AF73BE8ECF4FCE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EF63B10E3056875D0092FD24 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D043F7DAC98E201E0E0A7621;
+			remoteInfo = WiggleRoomComplication;
+		};
 		5B6172D4BC984B4F7D80D757 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = EF63B10E3056875D0092FD24 /* Project object */;
@@ -67,12 +76,24 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D5DC156618626F3628EEF6F1 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B0717E4E6DB83B9414CEB48C /* WiggleRoomComplication.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0390A05B6F76AA646812AE87 /* WiggleRoomWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WiggleRoomWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1DA585E7618392675CF6D760 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/WatchOS.platform/Developer/SDKs/WatchOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		AC013DBE5CBD724972D4B331 /* WiggleRoomWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WiggleRoomWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B726BF89F335C151F2E1C3C6 /* WiggleRoomComplication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WiggleRoomComplication.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0BCFAD5620138EFA3C3DD43 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		EF63B1163056875D0092FD24 /* WiggleRoom.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WiggleRoom.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF63B1233056875F0092FD24 /* WiggleRoomTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WiggleRoomTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -80,6 +101,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		23BD0448A404474AB38677E5 /* Exceptions for "WiggleRoomComplication" folder in "WiggleRoomComplication" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				WiggleRoomComplication.entitlements,
+			);
+			target = D043F7DAC98E201E0E0A7621 /* WiggleRoomComplication */;
+		};
 		EECA2B78D83627749202006F /* Exceptions for "WiggleRoomWidgets" folder in "WiggleRoomWidgets" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -104,8 +133,18 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		0015F3C35750D23194AC79DD /* WiggleRoomComplication */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				23BD0448A404474AB38677E5 /* Exceptions for "WiggleRoomComplication" folder in "WiggleRoomComplication" target */,
+			);
+			path = WiggleRoomComplication;
+			sourceTree = "<group>";
+		};
 		0028FDCFB48782B4201280F1 /* WiggleRoomShared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = WiggleRoomShared;
 			sourceTree = "<group>";
 		};
@@ -135,11 +174,15 @@
 		};
 		EF63B1263056875F0092FD24 /* WiggleRoomTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = WiggleRoomTests;
 			sourceTree = "<group>";
 		};
 		EF63B1303056875F0092FD24 /* WiggleRoomUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = WiggleRoomUITests;
 			sourceTree = "<group>";
 		};
@@ -151,6 +194,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				293C1E388C1A2543A9D0ADC2 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		81362274EEBF805DB6A3B105 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EFA569431AE7EDCF66301601 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -213,6 +264,7 @@
 				2C11B2FC0E9DCE55D7D7F125 /* WiggleRoomWidgets */,
 				EFF366F10D5F57DCF7C2B819 /* Frameworks */,
 				469C2E2453225A08530C046C /* WiggleRoomWatch */,
+				0015F3C35750D23194AC79DD /* WiggleRoomComplication */,
 			);
 			sourceTree = "<group>";
 		};
@@ -224,6 +276,7 @@
 				EF63B12D3056875F0092FD24 /* WiggleRoomUITests.xctest */,
 				0390A05B6F76AA646812AE87 /* WiggleRoomWidgets.appex */,
 				AC013DBE5CBD724972D4B331 /* WiggleRoomWatch.app */,
+				B726BF89F335C151F2E1C3C6 /* WiggleRoomComplication.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -268,10 +321,12 @@
 				568B5465461627262D12CD04 /* Sources */,
 				EAE042A4F5C275A25D88A425 /* Frameworks */,
 				EA26A24CFA50FB55F2BD9328 /* Resources */,
+				D5DC156618626F3628EEF6F1 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				FAD78772505C31A4434CB71C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				0028FDCFB48782B4201280F1 /* WiggleRoomShared */,
@@ -281,6 +336,27 @@
 			productName = WiggleRoomWatch;
 			productReference = AC013DBE5CBD724972D4B331 /* WiggleRoomWatch.app */;
 			productType = "com.apple.product-type.application";
+		};
+		D043F7DAC98E201E0E0A7621 /* WiggleRoomComplication */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CFD991FB81ACA69DD1E3837E /* Build configuration list for PBXNativeTarget "WiggleRoomComplication" */;
+			buildPhases = (
+				F5F34B977F6E9BAF8BE57D9F /* Sources */,
+				81362274EEBF805DB6A3B105 /* Frameworks */,
+				7B58403161A28CEB58DE84F1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0015F3C35750D23194AC79DD /* WiggleRoomComplication */,
+				0028FDCFB48782B4201280F1 /* WiggleRoomShared */,
+			);
+			name = WiggleRoomComplication;
+			productName = WiggleRoomComplication;
+			productReference = B726BF89F335C151F2E1C3C6 /* WiggleRoomComplication.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		EF63B1153056875D0092FD24 /* WiggleRoom */ = {
 			isa = PBXNativeTarget;
@@ -391,12 +467,20 @@
 				EF63B12C3056875F0092FD24 /* WiggleRoomUITests */,
 				0320B8BADB9D2DE52BE08FB8 /* WiggleRoomWidgets */,
 				2E72304D8C979446738D729C /* WiggleRoomWatch */,
+				D043F7DAC98E201E0E0A7621 /* WiggleRoomComplication */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		04ACF90D9CCAA9BB21C4AC9E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7B58403161A28CEB58DE84F1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -469,6 +553,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F5F34B977F6E9BAF8BE57D9F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -495,9 +586,41 @@
 			target = EF63B1153056875D0092FD24 /* WiggleRoom */;
 			targetProxy = EF63B12E3056875F0092FD24 /* PBXContainerItemProxy */;
 		};
+		FAD78772505C31A4434CB71C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = WiggleRoomComplication;
+			target = D043F7DAC98E201E0E0A7621 /* WiggleRoomComplication */;
+			targetProxy = 16EA2CCD38AF73BE8ECF4FCE /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		2F95F4C44C8235C27EEC68EB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = WiggleRoomComplication/WiggleRoomComplication.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KP8NBNSB5M;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WiggleRoomComplication/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Wiggle Room Complication";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = martinkearn.WiggleRoom.watchkitapp.WiggleRoomComplication;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchsimulator watchos";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 		53B51C3DC8532438DC5C9D7F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -554,6 +677,31 @@
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
+		};
+		940DF3E73838153078EA6BFC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = WiggleRoomComplication/WiggleRoomComplication.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KP8NBNSB5M;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WiggleRoomComplication/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Wiggle Room Complication";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = martinkearn.WiggleRoom.watchkitapp.WiggleRoomComplication;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchsimulator watchos";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
 		};
 		97AFA819746722E11EC8D67A /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -953,6 +1101,15 @@
 			buildConfigurations = (
 				5C311CD13FA2AEA6BE605763 /* Release */,
 				53B51C3DC8532438DC5C9D7F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CFD991FB81ACA69DD1E3837E /* Build configuration list for PBXNativeTarget "WiggleRoomComplication" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2F95F4C44C8235C27EEC68EB /* Release */,
+				940DF3E73838153078EA6BFC /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
