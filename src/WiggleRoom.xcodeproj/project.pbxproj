@@ -142,8 +142,6 @@
 		};
 		0028FDCFB48782B4201280F1 /* WiggleRoomShared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = WiggleRoomShared;
 			sourceTree = "<group>";
 		};
@@ -173,15 +171,11 @@
 		};
 		EF63B1263056875F0092FD24 /* WiggleRoomTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = WiggleRoomTests;
 			sourceTree = "<group>";
 		};
 		EF63B1303056875F0092FD24 /* WiggleRoomUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = WiggleRoomUITests;
 			sourceTree = "<group>";
 		};
