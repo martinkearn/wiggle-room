@@ -111,7 +111,17 @@ enum WidgetDataStore {
             if trackers.isEmpty {
                 for attempt in 1...8 {
                     try await Task.sleep(nanoseconds: 500_000_000)
-                    trackers = try fetchAllTrackersImmediately()
+                    // `try?` rather than `try` — a transient fetch error on
+                    // any one poll used to throw out of this whole function
+                    // (discarding the wait already done and reporting no
+                    // trackers at all), rather than just trying again on
+                    // the next iteration. Real bug found in practice:
+                    // widening this loop from one attempt to several (see
+                    // the `else` branch's comment below) made a transient
+                    // failure far more likely to be hit at all.
+                    if let latest = try? fetchAllTrackersImmediately() {
+                        trackers = latest
+                    }
                     if !trackers.isEmpty {
                         logger.notice("Trackers appeared after waiting for initial CloudKit import (attempt \(attempt)).")
                         break
@@ -120,7 +130,12 @@ enum WidgetDataStore {
             } else {
                 for _ in 1...3 {
                     await waitForNextCloudKitImport(timeout: 2)
-                    trackers = try fetchAllTrackersImmediately()
+                    // Same `try?` reasoning as above — a single transient
+                    // error on any of these three polls must not blank out
+                    // an otherwise-successful result.
+                    if let latest = try? fetchAllTrackersImmediately() {
+                        trackers = latest
+                    }
                 }
             }
             return trackers
