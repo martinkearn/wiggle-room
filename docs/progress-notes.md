@@ -1,11 +1,15 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after a docs-only planning session (see **2026-09-17 Starling
-refresh-cadence planning** at the end) that recorded refresh-cadence
-decisions for the still-unbuilt Starling integration (30s foreground poll
-reusing the existing scheduler, pull-to-refresh for manual, 5-minute
-background refresh) and the concrete gaps blocking it — no code changed.
+after a docs-only planning pair of sessions (see **2026-09-17 Starling
+rate-limit research follow-up**, and **2026-09-17 Starling refresh-cadence
+planning** just before it) that recorded refresh-cadence decisions for the
+still-unbuilt Starling integration — 30s poll while a tracker detail
+screen is on-screen (reusing the existing per-view `AutoUpdateTicker`),
+pull-to-refresh for manual, 5-minute background refresh, researched
+personal-access-token rate limits (5 req/s, 1000 req/day) and the
+mitigations needed to stay under the daily cap — plus the concrete gaps
+still blocking implementation. No code changed in either session.
 Before that, a long same-day session (see **2026-09-17 chart/scheduling/
 completed-state overhaul**) redesigned the trend chart and
 ring visuals, replaced three separately-coded ~60s refresh timers with one
@@ -975,3 +979,44 @@ entitlement/`Info.plist` state.
 
 No code changed — this was a docs-only planning session. Nothing to build
 or run; the build-spec.md and this file are the only diffs.
+
+## 2026-09-17 Starling rate-limit research follow-up (no code changed)
+
+Same-day follow-up to the session above, answering the open rate-limit
+question it deliberately left unresolved. Still no code changed.
+
+**Research**: `developer.starlingbank.com` was unreachable directly (egress
+blocked in this environment), so the numbers below are cross-verified via
+the Home Assistant Starling integration's own incident report
+([home-assistant/core#73225](https://github.com/home-assistant/core/issues/73225))
+plus independent web search confirmation, not fetched from Starling's own
+docs — **re-confirm at build time**. Personal access tokens are limited to
+**5 requests/second and 1000 requests/day** (Starling tightened this in
+2022 specifically because third-party integrations, including Home
+Assistant's, were over-polling); a breach returns HTTP 429 with a
+`Retry-After` header. 5 req/s is trivial to stay under at a 30s cadence;
+**1000/day is the real constraint** a naive implementation could hit in a
+few hours if each 30s tick makes more than one API call (accounts list +
+balance + spaces, per §5.3, is three).
+
+**Decision refined** (see build-spec.md §5.3 for the full mitigations
+list): the 30s cadence stands, but scoped to **whichever tracker detail
+screen is actually on-screen** (`TrackerDetailView` /
+`WatchTrackerDetailView` / macOS's detail pane), not the whole app —
+confirmed against the existing code, `AutoUpdateTicker` is already
+`@State`-owned per-view (`TrackerDetailView.swift:56`,
+`WatchTrackerDetailView.swift:18`, `MacRootView.swift:24`,
+`TrackerListView.swift:35` each hold their own instance), so this is a
+natural fit rather than a new mechanism — the list view's own ticker
+should stay display-only and not gain a fetch. Required mitigations before
+this cadence is safe to ship, not optional cleanup: cache the accounts
+list instead of re-fetching it every tick (one request per tick, not
+three), share one fetch across multiple trackers on the same connected
+source (already required by §4.4), track a rolling 24h request count
+client-side and back off before hitting the cap, and always honor
+`Retry-After` on 429. None of this is built yet — still no Starling
+provider code exists at all (see the session above).
+
+### Verifying this session's changes
+
+No code changed — research and a spec refinement only.
