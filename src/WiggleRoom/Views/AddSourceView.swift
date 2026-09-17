@@ -11,16 +11,32 @@ import SwiftData
 /// expired token is never silently stored as though it were a working
 /// connection. Tesla's OAuth-based setup (§5.4) isn't built yet, so Starling
 /// is the only option offered here for now.
+///
+/// Doubles as the **reconnect** flow when given `existingSource`: re-enters
+/// a token for an existing `ConnectedSource` in place, rather than
+/// requiring the source (and every tracker using it) to be deleted and
+/// recreated. The token itself lives directly on `ConnectedSource
+/// .credentialToken` (§6/§11) — synced via CloudKit exactly like the rest
+/// of the app's data, so reconnecting is normally only needed after
+/// actually revoking/rotating the token at Starling, not because of a
+/// cross-device sync gap.
 struct AddSourceView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @State private var displayName = "My Starling Account"
+    /// When set, this view reconnects an existing source in place (new
+    /// token, same `ConnectedSource` record) instead of creating a new one.
+    var existingSource: ConnectedSource?
+
+    @State private var displayName: String
     @State private var token = ""
     @State private var isConnecting = false
     @State private var errorMessage: String?
 
-    private let tokenStore: SecureTokenStore = KeychainTokenStore()
+    init(existingSource: ConnectedSource? = nil) {
+        self.existingSource = existingSource
+        _displayName = State(initialValue: existingSource?.displayName ?? "My Starling Account")
+    }
 
     var body: some View {
         Form {
@@ -34,7 +50,7 @@ struct AddSourceView: View {
             } header: {
                 Text("Starling")
             } footer: {
-                Text("Generate a personal access token at developer.starlingbank.com with account:read and balance:read scopes, then paste it here. It's stored in the Keychain, never sent anywhere but Starling itself.")
+                Text(tokenFieldFooter)
             }
 
             if let errorMessage {
@@ -44,7 +60,7 @@ struct AddSourceView: View {
                 }
             }
         }
-        .navigationTitle("Add Source")
+        .navigationTitle(existingSource == nil ? "Add Source" : "Reconnect")
         .inlineNavigationBarIfAvailable()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
@@ -54,12 +70,18 @@ struct AddSourceView: View {
                     if isConnecting {
                         ProgressView()
                     } else {
-                        Text("Connect")
+                        Text(existingSource == nil ? "Connect" : "Reconnect")
                     }
                 }
                 .disabled(trimmedToken.isEmpty || isConnecting)
             }
         }
+    }
+
+    private var tokenFieldFooter: String {
+        let base = "Generate a personal access token at developer.starlingbank.com with account:read and balance:read scopes, then paste it here. It syncs via iCloud with the rest of your data, scoped to your own account."
+        guard existingSource != nil else { return base }
+        return base + " This replaces the token currently stored for this source — trackers using it keep working once it validates."
     }
 
     private var trimmedToken: String {
@@ -71,35 +93,36 @@ struct AddSourceView: View {
         isConnecting = true
         defer { isConnecting = false }
 
-        let keychainKey = "starling.\(UUID().uuidString)"
         let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let source = ConnectedSource(
+        let resolvedName = trimmedName.isEmpty ? "Starling" : trimmedName
+
+        // Validated against a draft, not the persisted `existingSource` —
+        // nothing about the real record changes until the token actually
+        // works.
+        let draftSource = ConnectedSource(
             providerId: "starling",
-            displayName: trimmedName.isEmpty ? "Starling" : trimmedName,
-            credentialKeychainKey: keychainKey
+            displayName: resolvedName,
+            credentialToken: trimmedToken
         )
 
-        do {
-            try tokenStore.save(token: trimmedToken, for: keychainKey)
-        } catch {
-            errorMessage = "Couldn't save the token securely — try again."
-            return
-        }
-
-        let provider = StarlingProvider(connection: source, tokenStore: tokenStore)
+        let provider = StarlingProvider(connection: draftSource)
         do {
             // Validates the token actually works before persisting anything
             // to SwiftData — an empty account list is still a valid token
             // (an edge-case Starling login with no accounts), so only a
             // thrown error counts as a failed connection.
-            _ = try await provider.listAvailableTargets(for: source)
+            _ = try await provider.listAvailableTargets(for: draftSource)
         } catch {
-            try? tokenStore.deleteToken(for: keychainKey)
             errorMessage = Self.errorMessage(for: error)
             return
         }
 
-        modelContext.insert(source)
+        if let existingSource {
+            existingSource.displayName = resolvedName
+            existingSource.credentialToken = trimmedToken
+        } else {
+            modelContext.insert(draftSource)
+        }
         try? modelContext.save()
         dismiss()
     }

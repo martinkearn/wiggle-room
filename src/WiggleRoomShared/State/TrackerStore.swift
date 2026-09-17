@@ -96,10 +96,11 @@ final class TrackerStore {
     /// The provider that owns `tracker`'s connected source, or `nil` for a
     /// manual tracker or one whose source doesn't resolve to a known
     /// provider. A fresh `StarlingProvider` instance is handed back on each
-    /// call (cheap — it just wraps a Keychain lookup and shares the app-wide
-    /// rate-limit budget, see `StarlingProvider.sharedBudget`), so this is
-    /// safe to call as often as needed rather than something callers need
-    /// to cache themselves.
+    /// call (cheap — it just reads `credentialToken` straight off the
+    /// `ConnectedSource` record and shares the app-wide rate-limit budget,
+    /// see `StarlingProvider.sharedBudget`), so this is safe to call as
+    /// often as needed rather than something callers need to cache
+    /// themselves.
     func provider(for tracker: Tracker) -> SourceProvider? {
         guard let source = tracker.connectedSource else { return nil }
         return resolvedProvider(for: source)

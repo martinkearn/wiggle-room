@@ -182,8 +182,8 @@ final class TrackerStoreTests: XCTestCase {
     func testRefreshFromSource_starlingTrackerWithNoStoredToken_throwsNotConnected() async {
         let container = makeInMemoryModelContainer()
         let context = container.mainContext
-        // No credentialKeychainKey — mirrors a source that was never
-        // actually connected (or whose Keychain entry has gone missing).
+        // No credentialToken — mirrors a source that was never actually
+        // connected.
         let starlingSource = ConnectedSource(providerId: "starling", displayName: "My Starling")
         context.insert(starlingSource)
         let store = TrackerStore(modelContext: context)

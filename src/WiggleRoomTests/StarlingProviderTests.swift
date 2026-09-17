@@ -10,7 +10,7 @@ import XCTest
 final class StarlingProviderTests: XCTestCase {
 
     func testProviderIdentity() {
-        let provider = StarlingProvider(tokenStore: InMemoryTokenStore())
+        let provider = StarlingProvider()
 
         XCTAssertEqual(provider.providerId, "starling")
         XCTAssertEqual(provider.displayName, "Starling")
@@ -18,7 +18,7 @@ final class StarlingProviderTests: XCTestCase {
     }
 
     func testFetchCurrentValue_withNoBoundConnection_throwsNotConnected() async {
-        let provider = StarlingProvider(connection: nil, tokenStore: InMemoryTokenStore())
+        let provider = StarlingProvider(connection: nil)
         let target = SourceTarget(id: "abc-123", displayName: "Personal")
 
         do {
@@ -31,9 +31,9 @@ final class StarlingProviderTests: XCTestCase {
         }
     }
 
-    func testFetchCurrentValue_connectionWithNoKeychainKey_throwsNotConnected() async {
-        let source = ConnectedSource(providerId: "starling", displayName: "My Starling", credentialKeychainKey: nil)
-        let provider = StarlingProvider(connection: source, tokenStore: InMemoryTokenStore())
+    func testFetchCurrentValue_connectionWithNoStoredToken_throwsNotConnected() async {
+        let source = ConnectedSource(providerId: "starling", displayName: "My Starling", credentialToken: nil)
+        let provider = StarlingProvider(connection: source)
         let target = SourceTarget(id: "abc-123", displayName: "Personal")
 
         do {
@@ -47,8 +47,8 @@ final class StarlingProviderTests: XCTestCase {
     }
 
     func testListAvailableTargets_connectionWithNoStoredToken_throwsNotConnected() async {
-        let source = ConnectedSource(providerId: "starling", displayName: "My Starling", credentialKeychainKey: "starling.missing")
-        let provider = StarlingProvider(tokenStore: InMemoryTokenStore())
+        let source = ConnectedSource(providerId: "starling", displayName: "My Starling", credentialToken: nil)
+        let provider = StarlingProvider()
 
         do {
             _ = try await provider.listAvailableTargets(for: source)
@@ -61,7 +61,7 @@ final class StarlingProviderTests: XCTestCase {
     }
 
     func testLogManualReading_isNotSupported() async {
-        let provider = StarlingProvider(tokenStore: InMemoryTokenStore())
+        let provider = StarlingProvider()
         let target = SourceTarget(id: "abc-123", displayName: "Personal")
 
         do {

@@ -6,9 +6,9 @@
 import Foundation
 
 enum StarlingProviderError: Error, Equatable {
-    /// No token could be resolved for this connection — either it was never
-    /// connected, or its Keychain entry has gone missing (e.g. removed
-    /// outside the app).
+    /// No token could be resolved for this connection — either it was
+    /// never connected, or `credentialToken` has gone missing (e.g. the
+    /// `ConnectedSource` record was edited outside the app).
     case notConnected
     /// Starling is read-only in this app (§9 — no payment/write scopes) so
     /// there's nothing to override; a manual correction reading should be
@@ -21,12 +21,14 @@ enum StarlingProviderError: Error, Equatable {
 /// backed directly by `StarlingAPIClient`.
 ///
 /// Each instance is created for one specific `ConnectedSource` (its
-/// personal access token lives in Keychain, keyed by
-/// `ConnectedSource.credentialKeychainKey`) — see `TrackerStore.provider(for:)`,
-/// which resolves the right instance for a given tracker. `listAvailableTargets`
-/// takes its own `connection` argument rather than relying on that binding,
-/// since it also needs to work against a not-yet-persisted draft connection
-/// during Add Source setup (§5.2), before anything is bound to it.
+/// personal access token lives on that record's own `credentialToken`
+/// field — synced via CloudKit like everything else, not the Keychain, so
+/// it reaches every device the same way the rest of the user's data does)
+/// — see `TrackerStore.provider(for:)`, which resolves the right instance
+/// for a given tracker. `listAvailableTargets` takes its own `connection`
+/// argument rather than relying on that binding, since it also needs to
+/// work against a not-yet-persisted draft connection during Add Source
+/// setup (§5.2), before anything is bound to it.
 @MainActor
 final class StarlingProvider: SourceProvider {
     nonisolated let providerId = "starling"
@@ -43,22 +45,16 @@ final class StarlingProvider: SourceProvider {
     private static let sharedBudget = StarlingRequestBudget()
 
     private let boundConnection: ConnectedSource?
-    private let tokenStore: SecureTokenStore
     private let budget: StarlingRequestBudget
 
-    /// `tokenStore`/`budget` default to `nil` rather than resolving
-    /// `KeychainTokenStore()`/`sharedBudget` directly as default argument
-    /// values — under this project's default main-actor isolation, a
-    /// default-argument expression runs in the caller's (non-isolated)
-    /// context rather than this initializer's, so resolving them here in
-    /// the (main-actor-isolated) body instead avoids an isolation error.
-    init(
-        connection: ConnectedSource? = nil,
-        tokenStore: SecureTokenStore? = nil,
-        budget: StarlingRequestBudget? = nil
-    ) {
+    /// `budget` defaults to `nil` rather than resolving `sharedBudget`
+    /// directly as a default argument value — under this project's default
+    /// main-actor isolation, a default-argument expression runs in the
+    /// caller's (non-isolated) context rather than this initializer's, so
+    /// resolving it here in the (main-actor-isolated) body instead avoids
+    /// an isolation error.
+    init(connection: ConnectedSource? = nil, budget: StarlingRequestBudget? = nil) {
         self.boundConnection = connection
-        self.tokenStore = tokenStore ?? KeychainTokenStore()
         self.budget = budget ?? Self.sharedBudget
     }
 
@@ -79,8 +75,7 @@ final class StarlingProvider: SourceProvider {
     }
 
     private func makeClient(for connection: ConnectedSource) throws -> StarlingAPIClient {
-        guard let key = connection.credentialKeychainKey,
-              let token = try tokenStore.loadToken(for: key) else {
+        guard let token = connection.credentialToken, !token.isEmpty else {
             throw StarlingProviderError.notConnected
         }
         return StarlingAPIClient(token: token, budget: budget)

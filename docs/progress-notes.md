@@ -1,12 +1,24 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Fix Swift type-checker crash in ReadingHistoryView** —
-the first real build attempt on this branch failed outright ("Failed to
-produce diagnostic for expression") from a ternary mixing a function
-reference and `nil` at an `.onDelete(perform:)` call site, a known Swift
-compiler crash trigger; fixed by extracting it into an explicitly-typed
-computed property. Before that, **2026-09-17 Starling reading dedup +
+after **2026-09-17 Connected Source management + token storage moved off
+Keychain** — real multi-device testing surfaced a Starling source that
+synced (via CloudKit) but showed "Not connected" on a second device,
+because its token lived in the Keychain, a separate sync system (iCloud
+Keychain) with its own per-device toggle and its own lag. Per the user's
+explicit direction ("everything should use the same sync system"), the
+token now lives directly on `ConnectedSource.credentialToken`, synced by
+the same CloudKit path as everything else — no more Keychain dependency
+anywhere in the app. Settings → Connected Sources also gained real
+reconnect (re-enter a token in place) and remove (blocked while any
+tracker still uses that source) actions, which is also the practical fix
+for "there's no way to edit sources." Before that, **2026-09-17 Fix Swift
+type-checker crash in ReadingHistoryView** — the first real build attempt
+on this branch failed outright ("Failed to produce diagnostic for
+expression") from a ternary mixing a function reference and `nil` at an
+`.onDelete(perform:)` call site, a known Swift compiler crash trigger;
+fixed by extracting it into an explicitly-typed computed property. Before
+that, **2026-09-17 Starling reading dedup +
 Update History for real sources** — `TrackerStore.refreshFromSource` now
 skips logging a reading when the fetched value hasn't changed (was
 flooding the trend chart with overlapping same-value points every 30s
@@ -1609,3 +1621,97 @@ pinpointing directly from Xcode's own (admittedly unhelpful) diagnostic —
 worth trying to isolate by temporarily commenting out sections of the
 file to binary-search for the exact line, since Xcode's crash message
 doesn't reliably point at the real culprit's line number.
+
+## 2026-09-17 Connected Source management + token storage moved off Keychain
+
+Two related fixes from continued real-device, multi-device testing: the
+user ran the app on a second device and got "Not connected — reconnect
+this source in Settings" for their Starling tracker, then pointed out (1)
+there was no way to actually reconnect/manage a source from Settings at
+all, and (2) the token should travel between devices on the same Apple ID
+the same way everything else in the app does — "everything should use the
+same sync system, including sources."
+
+**Root cause of the cross-device failure**: `kSecAttrSynchronizable`
+Keychain items sync via **iCloud Keychain**, a genuinely separate sync
+system from the CloudKit private-database sync that carries every other
+piece of this app's data. It has its own per-device on/off toggle
+(Settings → [name] → iCloud → Passwords and Keychain) that most people
+never think to check, and even when on, it can lag CloudKit's near-real-time
+sync by a noticeable margin. So a `ConnectedSource` record could (and, per
+the user's report, did) arrive on a second device via CloudKit well before
+— or without ever — its Keychain-held token arriving via the separate
+iCloud Keychain path, leaving a source that looked connected but wasn't.
+
+**Fix, per the user's explicit direction**: moved the token off the
+Keychain entirely and onto `ConnectedSource.credentialToken` — a plain
+`String?` field on the same `@Model` record, synced via the exact same
+CloudKit mechanism as trackers, readings, and everything else. One sync
+system, not two. This is still within the security boundary build-spec.md
+§11 always allowed ("stored outside Keychain/CloudKit" was the actual
+line, not "Keychain only" — that stricter wording has been corrected)
+since it's still the user's own private CloudKit database under their own
+Apple ID, never transmitted anywhere but Starling and Apple's own sync
+infrastructure.
+
+**Files deleted**: `src/WiggleRoomShared/Security/SecureTokenStore.swift`
+(the `SecureTokenStore` protocol, `KeychainTokenStore`, `InMemoryTokenStore`
+— no longer needed once nothing reads/writes the Keychain) and
+`src/WiggleRoomTests/SecureTokenStoreTests.swift`.
+
+**Files changed**:
+- `ConnectedSource.swift` — `credentialKeychainKey: String?` renamed/
+  repurposed to `credentialToken: String?`, now holding the actual token
+  value directly rather than a Keychain lookup key.
+- `StarlingProvider.swift` — dropped the `tokenStore: SecureTokenStore`
+  dependency entirely; `makeClient(for:)` now reads
+  `connection.credentialToken` straight off the record. `init` simplified
+  to just `connection`/`budget` params.
+- `AddSourceView.swift` — dropped all Keychain calls; `connect()` now sets
+  `credentialToken` directly on the (draft, then real) `ConnectedSource`.
+  Also gained an **existing-source mode**: `AddSourceView(existingSource:)`
+  reconnects a source in place (same record, same `credentialToken` field,
+  so every tracker already pointed at it keeps working) instead of only
+  ever creating a new one — this is the practical fix for "no option to
+  edit sources," not just the sync-system change.
+- `ConnectedSourcesView.swift` — rows are now `NavigationLink`s into the
+  reconnect flow, plus swipe-to-remove. Removal is blocked while any
+  tracker still uses that source — `ConnectedSource`'s relationship to
+  `Tracker` has no cascade-delete rule (defaults to `.nullify`), so
+  deleting a source out from under active trackers would silently leave
+  them with a `nil` connection rather than cleanly failing; the blocked-
+  removal alert names the trackers still using it instead.
+- Test files (`StarlingProviderTests.swift`, `TrackerStoreTests.swift`) —
+  updated to construct `ConnectedSource` with `credentialToken` instead of
+  `credentialKeychainKey`, and `StarlingProvider`/`InMemoryTokenStore`
+  call sites simplified to match the new, Keychain-free constructor.
+
+**Docs**: build-spec.md §5.2 (table + prose), §5.3, §5.4, §11, and §12
+all rewritten to describe CloudKit-synced token storage and the
+reconnect/remove UI as the current, built behavior rather than a Keychain
+design with known gaps; README's status line updated to match.
+
+**Trade-off understood, not treated as free**: a Keychain entry gets
+OS-level encryption-at-rest and biometric/passcode-gated access by
+default; a plain SwiftData field synced through CloudKit relies on
+CloudKit's own private-database encryption and the device's standard
+Data Protection instead — a different, not strictly lesser, protection
+model, and a reasonable one for a personal single-user app already
+trusting CloudKit with every other piece of financial data it stores
+(balances, budgets). Not treated as a decision to revisit without being
+asked.
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every entry in this
+Starling-adjacent stretch (no Swift toolchain in this environment).
+Manually re-checked every changed file and ran a repo-wide grep for
+`credentialKeychainKey`/`SecureTokenStore`/`KeychainTokenStore`/
+`InMemoryTokenStore`/`tokenStore:`/`Keychain` to confirm nothing stale was
+left behind (three intentional doc-comment mentions remain, explaining
+*why* the design moved away from Keychain — not leftover references to
+code that no longer exists). Needs a real build, the test suite, and
+ideally the exact scenario that surfaced this — connecting Starling on one
+device, then opening the app on a second device signed into the same
+Apple ID — to confirm the source now shows connected there without any
+iCloud Keychain dependency.
