@@ -38,7 +38,7 @@ struct TrackerTimelineProvider: AppIntentTimelineProvider {
         let entry = TrackerTimelineEntry(date: now, tracker: tracker)
         let nextUpdate = tracker.map {
             TrackerUpdateScheduling.nextWidgetReloadDate(after: now, until: $0.endDate)
-        } ?? now.addingTimeInterval(300)
+        } ?? now.addingTimeInterval(TrackerUpdateScheduling.defaultWidgetFarInterval)
         return Timeline(entries: [entry], policy: .after(nextUpdate))
     }
 

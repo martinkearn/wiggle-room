@@ -231,9 +231,11 @@ enum WidgetDataStore {
                 if latest.count > best.count {
                     best = latest
                     consecutiveStablePolls = 0
-                } else if !best.isEmpty {
+                } else if latest.count == best.count, !best.isEmpty {
                     consecutiveStablePolls += 1
                     if consecutiveStablePolls >= stablePollsBeforeSettled { break }
+                } else {
+                    consecutiveStablePolls = 0
                 }
             }
             return best

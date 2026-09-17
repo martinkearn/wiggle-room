@@ -176,7 +176,7 @@ struct TrendChartView: View {
     /// continuous idea rather than an unconnected, unexplained dot.
     private var liveContinuationColor: Color {
         guard let latestReading else { return .secondary }
-        return isAheadOfPace(value: latestReading.value, at: latestReading.date) ? WiggleRoomColors.good : WiggleRoomColors.bad
+        return paceColor(for: latestReading.value, at: latestReading.date)
     }
 
     /// Whether a given logged value, at the date it was logged, was ahead of
@@ -185,6 +185,10 @@ struct TrendChartView: View {
     /// "above/below the line" separately for each direction.
     private func isAheadOfPace(value: Decimal, at date: Date) -> Bool {
         tracker.pace(actualValue: value, asOf: date, zoomLevel: zoomLevel).isAheadOfPace
+    }
+
+    private func paceColor(for value: Decimal, at date: Date) -> Color {
+        isAheadOfPace(value: value, at: date) ? WiggleRoomColors.good : WiggleRoomColors.bad
     }
 
     /// Consecutive reading pairs, each tagged with whether the *later*
@@ -267,7 +271,7 @@ struct TrendChartView: View {
                     x: .value("Date", reading.date),
                     y: .value("Actual", reading.value)
                 )
-                .foregroundStyle(isAheadOfPace(value: reading.value, at: reading.date) ? WiggleRoomColors.good : WiggleRoomColors.bad)
+                .foregroundStyle(paceColor(for: reading.value, at: reading.date))
             }
 
             if let liveNowPoint, let latestReading {

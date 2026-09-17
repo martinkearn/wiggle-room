@@ -14,6 +14,8 @@ import Foundation
 /// source like Starling or Tesla — "when should we next poll?") can reuse
 /// directly.
 enum TrackerUpdateScheduling {
+    static let defaultWidgetFarInterval: TimeInterval = 300
+
     /// The next moment a display should refresh, walking backward from
     /// `endDate` in `interval`-second steps rather than forward from `now` —
     /// so ticks are anchored to *when the tracker ends*, and the very last
@@ -39,7 +41,7 @@ enum TrackerUpdateScheduling {
     /// storage keeps same-device app/widget data fresh; `farInterval` controls
     /// the periodic reload policy, especially for cross-device CloudKit updates
     /// and elapsed-time recomputes when no explicit reload was triggered.
-    static func nextWidgetReloadDate(after now: Date, until endDate: Date, farInterval: TimeInterval = 300, nearInterval: TimeInterval = 60) -> Date {
+    static func nextWidgetReloadDate(after now: Date, until endDate: Date, farInterval: TimeInterval = defaultWidgetFarInterval, nearInterval: TimeInterval = 60) -> Date {
         let interval = endDate.timeIntervalSince(now) <= 3600 ? nearInterval : farInterval
         return nextUpdateDate(after: now, until: endDate, interval: interval)
     }
