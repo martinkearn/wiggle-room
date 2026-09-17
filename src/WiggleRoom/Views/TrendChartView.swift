@@ -6,7 +6,7 @@
 import SwiftUI
 import Charts
 
-/// Secondary detail view (§3.5): a solid pace reference line from starting
+/// Secondary detail view (§3.5): a solid target reference line from starting
 /// value to the end-of-period target, with actual logged readings plotted on
 /// top — colored green where that segment is ahead of pace and red where
 /// it's behind, so the shape relative to the reference line reads at a
@@ -14,7 +14,7 @@ import Charts
 /// through the actual readings, following the history as it developed and
 /// then projected on to the period's end — shows where things are headed
 /// overall if the current trend continues, distinct from both the target
-/// pace and the noisy point-to-point reading history. Minimal axis
+/// line and the noisy point-to-point reading history. Minimal axis
 /// labeling — the shape is the point, not precise chart-reading.
 struct TrendChartView: View {
     let tracker: Tracker
@@ -205,7 +205,7 @@ struct TrendChartView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(color: WiggleRoomColors.paceRing, label: "Pace")
+            legendItem(color: WiggleRoomColors.paceRing, label: "Target")
             legendItem(color: WiggleRoomColors.good, label: "Actual")
             legendItem(color: WiggleRoomColors.brand, label: "Trend")
         }
@@ -224,19 +224,19 @@ struct TrendChartView: View {
 
     private var chart: some View {
         Chart {
-            // Pace reference line — the strongest line on the chart, since
+            // Target reference line — the strongest line on the chart, since
             // it's the fixed yardstick everything else is read against.
             LineMark(
                 x: .value("Date", window.start),
-                y: .value("Pace", windowStartingValue),
-                series: .value("Series", "Pace")
+                y: .value("Target", windowStartingValue),
+                series: .value("Series", "Target")
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
             .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round))
             LineMark(
                 x: .value("Date", window.end),
-                y: .value("Pace", targetEndValue),
-                series: .value("Series", "Pace")
+                y: .value("Target", targetEndValue),
+                series: .value("Series", "Target")
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
             .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round))
