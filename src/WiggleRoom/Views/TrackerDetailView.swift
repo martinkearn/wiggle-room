@@ -31,23 +31,6 @@ struct TrackerDetailView: View {
     @State private var isPresentingEditTracker = false
     @State private var isPresentingDeleteConfirmation = false
     @State private var isPresentingReadingHistory = false
-    /// The zoom-level lens (§4.5) the dashboard is currently scoped to —
-    /// re-scopes the rings, figures, and trend chart together. Only shown
-    /// as a picker when `tracker.availableZoomLevels` offers more than just
-    /// `.overall` (i.e. the tracker runs longer than a week — see
-    /// `Tracker.availableZoomLevels`). Defaults to `.thisWeek` whenever
-    /// that's on offer, set in `init` below rather than here so it's
-    /// correct on the very first render rather than flipping a beat after
-    /// appearing — "how am I doing lately" is a more useful first look than
-    /// the whole, possibly multi-year, period for a tracker long enough to
-    /// zoom at all.
-    @State private var zoomLevel: ZoomLevel
-
-    init(tracker: Tracker) {
-        self.tracker = tracker
-        let defaultZoom: ZoomLevel = tracker.availableZoomLevels.contains(.thisWeek) ? .thisWeek : .overall
-        _zoomLevel = State(initialValue: defaultZoom)
-    }
 
     /// Drives `now` forward on a schedule aligned to this tracker's own end
     /// date (see `AutoUpdateTicker`/`TrackerUpdateScheduling`) instead of a
@@ -85,7 +68,7 @@ struct TrackerDetailView: View {
     }
 
     private var pace: TrackerPace {
-        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now, zoomLevel: zoomLevel)
+        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
     }
 
     /// The tracker's pace pinned to its own end date, using the last reading
@@ -94,24 +77,6 @@ struct TrackerDetailView: View {
     private var finalPace: TrackerPace? {
         guard let latest = tracker.latestReading else { return nil }
         return tracker.pace(actualValue: latest.value, asOf: tracker.endDate)
-    }
-
-    private var availableZoomLevels: [ZoomLevel] {
-        tracker.availableZoomLevels
-    }
-
-    /// The zoomed window's own end — the days-remaining caption and the
-    /// trend chart's readings should both scope to the sub-period, not the
-    /// tracker's full period, once zoomed in.
-    private var zoomWindowEnd: Date {
-        tracker.subPeriod(for: zoomLevel, asOf: now)?.end ?? tracker.endDate
-    }
-
-    private var windowedReadingCount: Int {
-        guard let subPeriod = tracker.subPeriod(for: zoomLevel, asOf: now) else {
-            return tracker.sortedReadings.count
-        }
-        return tracker.sortedReadings.filter { $0.date >= subPeriod.start && $0.date <= subPeriod.end }.count
     }
 
     var body: some View {
@@ -159,11 +124,7 @@ struct TrackerDetailView: View {
                     CompletedBadge()
                 }
 
-                if availableZoomLevels.count > 1 && !isCompleted {
-                    zoomLevelPicker
-                }
-
-                RingsView(tracker: tracker, now: now, zoomLevel: zoomLevel)
+                RingsView(tracker: tracker, now: now)
                     .frame(width: 260, height: 260)
 
                 if isCompleted {
@@ -193,8 +154,8 @@ struct TrackerDetailView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
-                } else if windowedReadingCount > 1 {
-                    TrendChartView(tracker: tracker, zoomLevel: zoomLevel, now: now)
+                } else if tracker.sortedReadings.count > 1 {
+                    TrendChartView(tracker: tracker, now: now)
                         .frame(height: 240)
                         .padding(.horizontal)
                 }
@@ -541,23 +502,7 @@ struct TrackerDetailView: View {
     }
 
     private var periodRemainingText: String {
-        tracker.periodRemainingText(asOf: now, until: zoomWindowEnd)
-    }
-
-    /// Segmented zoom-level control (§4.5, §7.1) sitting above the rings —
-    /// re-scopes the whole dashboard (rings, figures, chart) to the selected
-    /// sub-period. Only shown when the tracker's own length actually offers
-    /// more than `.overall` (see `Tracker.availableZoomLevels`), and not
-    /// once completed — zooming into a sub-period of a finished tracker
-    /// doesn't apply once there's only a final summary to show.
-    private var zoomLevelPicker: some View {
-        Picker("Zoom", selection: $zoomLevel) {
-            ForEach(availableZoomLevels) { level in
-                Text(level.label).tag(level)
-            }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal)
+        tracker.periodRemainingText(asOf: now)
     }
 }
 

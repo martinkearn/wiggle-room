@@ -38,7 +38,7 @@ Rough shape of what's implemented vs. still to come:
 - [x] watchOS complication
 - [x] Siri/Shortcuts (log a reading, check a tracker's status)
 - [ ] Live Activities (deliberately skipped — see progress notes for why)
-- [x] §4.5 zoom levels (This year/This month/This week sub-periods) — on the dashboard; not yet per-widget
+- [ ] §4.5 zoom levels (This year/This month/This week sub-periods) — built, then removed pending a redesign; see progress-notes.md
 - [ ] visionOS / Mac Catalyst (deliberately removed — iOS and macOS only, see progress notes)
 
 ## Requirements

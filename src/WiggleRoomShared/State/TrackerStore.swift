@@ -8,6 +8,13 @@ import Observation
 import SwiftData
 import WidgetKit
 
+enum TrackerStoreError: Error, Equatable {
+    /// `source.providerId` didn't resolve to any known provider (manual or
+    /// Starling) — reachable only for a source with a provider id from a
+    /// future/unsupported provider.
+    case unresolvableProvider
+}
+
 /// App-wide actions and the fixed manual-entry source, backed by SwiftData
 /// (§6) rather than in-memory storage. Tracker/source lists themselves are
 /// read via `@Query` directly in views (the idiomatic, auto-updating
@@ -95,6 +102,30 @@ final class TrackerStore {
     /// to cache themselves.
     func provider(for tracker: Tracker) -> SourceProvider? {
         guard let source = tracker.connectedSource else { return nil }
+        return resolvedProvider(for: source)
+    }
+
+    /// Lists the pickable targets (Starling accounts, etc.) within `source`
+    /// — used by `AddTrackerView`'s target picker once a real (non-manual)
+    /// source is selected, before any `Tracker` exists to resolve a
+    /// provider from via `provider(for:)`.
+    func listAvailableTargets(for source: ConnectedSource) async throws -> [SourceTarget] {
+        guard let provider = resolvedProvider(for: source) else { return [] }
+        return try await provider.listAvailableTargets(for: source)
+    }
+
+    /// Fetches `target`'s current value directly from `source`'s provider —
+    /// used by `AddTrackerView` to prefill "Starting value" with the live
+    /// balance once the user picks a Starling account (§5.3), before any
+    /// `Tracker` exists yet to resolve a provider from via `provider(for:)`.
+    func fetchCurrentValue(for target: SourceTarget, from source: ConnectedSource) async throws -> Decimal {
+        guard let provider = resolvedProvider(for: source) else {
+            throw TrackerStoreError.unresolvableProvider
+        }
+        return try await provider.fetchCurrentValue(target: target)
+    }
+
+    private func resolvedProvider(for source: ConnectedSource) -> SourceProvider? {
         switch source.providerId {
         case manualProvider.providerId:
             return manualProvider
@@ -105,28 +136,11 @@ final class TrackerStore {
         }
     }
 
-    /// Lists the pickable targets (Starling accounts, etc.) within `source`
-    /// — used by `AddTrackerView`'s target picker once a real (non-manual)
-    /// source is selected, before any `Tracker` exists to resolve a
-    /// provider from via `provider(for:)`.
-    func listAvailableTargets(for source: ConnectedSource) async throws -> [SourceTarget] {
-        let provider: SourceProvider
-        switch source.providerId {
-        case manualProvider.providerId:
-            provider = manualProvider
-        case "starling":
-            provider = StarlingProvider(connection: source)
-        default:
-            return []
-        }
-        return try await provider.listAvailableTargets(for: source)
-    }
-
     /// Fetches a fresh value from `tracker`'s connected source (Starling,
     /// and any future auto-fetch provider) and logs it as a new timestamped
-    /// reading (§6) — the same shape as a manual log, so history/zoom
-    /// levels work identically regardless of where a reading came from.
-    /// No-ops for a manual-entry tracker (nothing to fetch) or one with no
+    /// reading (§6) — the same shape as a manual log, so trend-chart history
+    /// works identically regardless of where a reading came from. No-ops
+    /// for a manual-entry tracker (nothing to fetch) or one with no
     /// resolvable provider/target.
     func refreshFromSource(_ tracker: Tracker) async throws {
         guard !tracker.isManualEntry,

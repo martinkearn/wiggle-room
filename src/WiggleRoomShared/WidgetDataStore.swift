@@ -43,7 +43,10 @@ enum WidgetDataStore {
     /// Once at least one tracker has appeared, two no-growth import polls is
     /// "settled enough": one could be a quiet import notification, while two
     /// avoids spending the full picker deadline on an already-warm App Group
-    /// store.
+    /// store. This is intentionally count-based: this longer wait is for the
+    /// interactive configuration picker discovering rows, while timeline
+    /// freshness for value changes is handled by `fetchAllTrackers()`'s shorter
+    /// update wait and explicit widget reload triggers.
     private static let stablePollsBeforeSettled = 2
 
     @MainActor
@@ -123,16 +126,16 @@ enum WidgetDataStore {
             if trackers.isEmpty {
                 for attempt in 1...8 {
                     try await Task.sleep(nanoseconds: 500_000_000)
-                    // `try?` rather than `try` — a transient fetch error on
-                    // any one poll used to throw out of this whole function
-                    // (discarding the wait already done and reporting no
-                    // trackers at all), rather than just trying again on
-                    // the next iteration. Real bug found in practice:
-                    // widening this loop from one attempt to several (see
-                    // the `else` branch's comment below) made a transient
-                    // failure far more likely to be hit at all.
-                    if let latest = try? fetchAllTrackersImmediately() {
+                    // A transient fetch error on any one poll used to throw
+                    // out of this whole function (discarding the wait already
+                    // done and reporting no trackers at all), rather than just
+                    // trying again on the next iteration. Log and continue so
+                    // persistent failures are still visible.
+                    do {
+                        let latest = try fetchAllTrackersImmediately()
                         trackers = latest
+                    } catch {
+                        logger.error("Failed to refetch trackers while waiting for CloudKit import: \(error, privacy: .public)")
                     }
                     if !trackers.isEmpty {
                         logger.notice("Trackers appeared after waiting for initial CloudKit import (attempt \(attempt)).")
@@ -141,11 +144,13 @@ enum WidgetDataStore {
                 }
             } else {
                 await waitForNextCloudKitImport(timeout: 2)
-                // `try?` rather than `try` — see the empty-branch comment
-                // above; a transient error here must fall back to the
-                // already-known-good `trackers` rather than throwing.
-                if let latest = try? fetchAllTrackersImmediately() {
+                // A transient error here must fall back to the already-known-
+                // good `trackers` rather than throwing, but still gets logged.
+                do {
+                    let latest = try fetchAllTrackersImmediately()
                     trackers = latest
+                } catch {
+                    logger.error("Failed to refetch trackers after CloudKit import wait: \(error, privacy: .public)")
                 }
             }
             return trackers
@@ -231,9 +236,13 @@ enum WidgetDataStore {
                 if latest.count > best.count {
                     best = latest
                     consecutiveStablePolls = 0
-                } else if !best.isEmpty {
+                } else if latest.count == best.count, !best.isEmpty {
                     consecutiveStablePolls += 1
                     if consecutiveStablePolls >= stablePollsBeforeSettled { break }
+                } else {
+                    // Fewer rows than `best` is treated as a transient/
+                    // regressing fetch, not evidence that the store settled.
+                    consecutiveStablePolls = 0
                 }
             }
             return best

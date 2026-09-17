@@ -26,7 +26,14 @@ enum KeychainError: Error, Equatable {
 /// is set so a token syncs via iCloud Keychain across the user's own
 /// devices without needing re-entry per device. Never stores a token in
 /// UserDefaults or a plain file.
-final class KeychainTokenStore: SecureTokenStore {
+///
+/// `nonisolated`: plain synchronous Keychain/Security calls, with no
+/// reason to be confined to the main actor — explicit rather than left to
+/// this project's default main-actor isolation, so it's safe to call from
+/// any context (this type's methods satisfy `SecureTokenStore`'s
+/// synchronous, non-`async` requirements, which a main-actor-isolated
+/// conformance couldn't).
+nonisolated final class KeychainTokenStore: SecureTokenStore {
     private let service: String
 
     init(service: String = "martinkearn.WiggleRoom.connectedSource") {
@@ -84,8 +91,9 @@ final class KeychainTokenStore: SecureTokenStore {
 }
 
 /// In-memory stand-in for previews and unit tests — never used for a real
-/// token, since nothing here is actually secure storage.
-final class InMemoryTokenStore: SecureTokenStore {
+/// token, since nothing here is actually secure storage. `nonisolated` for
+/// the same reason as `KeychainTokenStore` above.
+nonisolated final class InMemoryTokenStore: SecureTokenStore {
     private var storage: [String: String] = [:]
 
     func save(token: String, for key: String) throws {

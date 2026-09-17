@@ -46,14 +46,20 @@ final class StarlingProvider: SourceProvider {
     private let tokenStore: SecureTokenStore
     private let budget: StarlingRequestBudget
 
+    /// `tokenStore`/`budget` default to `nil` rather than resolving
+    /// `KeychainTokenStore()`/`sharedBudget` directly as default argument
+    /// values — under this project's default main-actor isolation, a
+    /// default-argument expression runs in the caller's (non-isolated)
+    /// context rather than this initializer's, so resolving them here in
+    /// the (main-actor-isolated) body instead avoids an isolation error.
     init(
         connection: ConnectedSource? = nil,
-        tokenStore: SecureTokenStore = KeychainTokenStore(),
-        budget: StarlingRequestBudget = StarlingProvider.sharedBudget
+        tokenStore: SecureTokenStore? = nil,
+        budget: StarlingRequestBudget? = nil
     ) {
         self.boundConnection = connection
-        self.tokenStore = tokenStore
-        self.budget = budget
+        self.tokenStore = tokenStore ?? KeychainTokenStore()
+        self.budget = budget ?? Self.sharedBudget
     }
 
     func listAvailableTargets(for connection: ConnectedSource) async throws -> [SourceTarget] {

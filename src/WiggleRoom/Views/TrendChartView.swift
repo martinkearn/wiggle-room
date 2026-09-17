@@ -18,44 +18,12 @@ import Charts
 /// labeling — the shape is the point, not precise chart-reading.
 struct TrendChartView: View {
     let tracker: Tracker
-
-    /// Re-scopes the chart to a zoom level's calendar-aligned sub-period
-    /// (§4.5) — the reference line runs the sub-period's own local starting
-    /// value to its own target-end, and only readings actually logged
-    /// within the sub-period are plotted. Defaults to `.overall`, the
-    /// existing full-period behavior.
-    var zoomLevel: ZoomLevel = .overall
     var now: Date = .now
 
     private static let liveContinuationLineStyle = StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 4])
 
     private var window: DateInterval {
-        if let subPeriod = tracker.subPeriod(for: zoomLevel, asOf: now) {
-            return subPeriod
-        }
-        return DateInterval(start: tracker.startDate, end: tracker.endDate)
-    }
-
-    private var windowStartingValue: Decimal {
-        zoomLevel == .overall ? tracker.startingValue : tracker.actualValue(atOrBefore: window.start)
-    }
-
-    private var windowAllowance: Decimal {
-        guard zoomLevel != .overall else { return tracker.totalAllowance }
-        let totalPeriodDays = tracker.endDate.timeIntervalSince(tracker.startDate) / 86400
-        guard totalPeriodDays > 0 else { return tracker.totalAllowance }
-        let subPeriodDays = window.end.timeIntervalSince(window.start) / 86400
-        return tracker.totalAllowance * Decimal(subPeriodDays / totalPeriodDays)
-    }
-
-    /// Readings that actually fall within the zoomed window — the reading
-    /// history as a whole still holds everything ever logged, but a zoomed
-    /// chart should only plot what happened inside the sub-period it's
-    /// showing. A zoom's sub-period is always the one that contains `now`
-    /// (see `Tracker.subPeriod(for:asOf:)`), so the latest logged reading
-    /// (always at or before `now`) is naturally always inside this window.
-    private var windowedReadings: [ValueSnapshot] {
-        tracker.sortedReadings.filter { $0.date >= window.start && $0.date <= window.end }
+        DateInterval(start: tracker.startDate, end: tracker.endDate)
     }
 
     private var latestReading: ValueSnapshot? {
@@ -64,8 +32,8 @@ struct TrendChartView: View {
 
     private var targetEndValue: Decimal {
         switch tracker.direction {
-        case .decreasing: windowStartingValue - windowAllowance
-        case .increasing: windowStartingValue + windowAllowance
+        case .decreasing: tracker.startingValue - tracker.totalAllowance
+        case .increasing: tracker.startingValue + tracker.totalAllowance
         }
     }
 
@@ -80,8 +48,8 @@ struct TrendChartView: View {
     /// property for why leaving the raw, un-clamped values for Charts' own
     /// axis-driven clipping to handle isn't enough.
     private var yDomain: ClosedRange<Double> {
-        var values = [windowStartingValue, targetEndValue].map { ($0 as NSDecimalNumber).doubleValue }
-        values += windowedReadings.map { ($0.value as NSDecimalNumber).doubleValue }
+        var values = [tracker.startingValue, targetEndValue].map { ($0 as NSDecimalNumber).doubleValue }
+        values += tracker.sortedReadings.map { ($0.value as NSDecimalNumber).doubleValue }
         let low = values.min() ?? 0
         let high = values.max() ?? 0
         let padding = max((high - low) * 0.1, 1)
@@ -143,7 +111,7 @@ struct TrendChartView: View {
     /// visibly runs to the domain's top/bottom edge, which reads as "steep"
     /// just as well as the true extrapolated value would.
     private var trendPoints: [(date: Date, value: Decimal)]? {
-        let readings = windowedReadings
+        let readings = tracker.sortedReadings
         guard readings.count > 1 else { return nil }
         let domain = yDomain
         func clamped(_ raw: Double) -> Decimal {
@@ -176,7 +144,7 @@ struct TrendChartView: View {
     /// continuous idea rather than an unconnected, unexplained dot.
     private var liveContinuationColor: Color {
         guard let latestReading else { return .secondary }
-        return isAheadOfPace(value: latestReading.value, at: latestReading.date) ? WiggleRoomColors.good : WiggleRoomColors.bad
+        return paceColor(for: latestReading.value, at: latestReading.date)
     }
 
     /// Whether a given logged value, at the date it was logged, was ahead of
@@ -184,14 +152,18 @@ struct TrendChartView: View {
     /// of the app (`TrackerPace.isAheadOfPace`) rather than re-deriving
     /// "above/below the line" separately for each direction.
     private func isAheadOfPace(value: Decimal, at date: Date) -> Bool {
-        tracker.pace(actualValue: value, asOf: date, zoomLevel: zoomLevel).isAheadOfPace
+        tracker.pace(actualValue: value, asOf: date).isAheadOfPace
+    }
+
+    private func paceColor(for value: Decimal, at date: Date) -> Color {
+        isAheadOfPace(value: value, at: date) ? WiggleRoomColors.good : WiggleRoomColors.bad
     }
 
     /// Consecutive reading pairs, each tagged with whether the *later*
     /// point was ahead of pace — a segment is colored by where it ends up,
     /// same convention as coloring a stock chart's rising/falling days.
     private var segments: [(id: String, start: ValueSnapshot, end: ValueSnapshot, isAhead: Bool)] {
-        let readings = windowedReadings
+        let readings = tracker.sortedReadings
         guard readings.count > 1 else { return [] }
         return zip(readings, readings.dropFirst()).map { start, end in
             (id: "\(start.id)-\(end.id)", start: start, end: end, isAhead: isAheadOfPace(value: end.value, at: end.date))
@@ -232,7 +204,7 @@ struct TrendChartView: View {
             // it's the fixed yardstick everything else is read against.
             LineMark(
                 x: .value("Date", window.start),
-                y: .value("Target", windowStartingValue),
+                y: .value("Target", tracker.startingValue),
                 series: .value("Series", "Target")
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
@@ -262,12 +234,12 @@ struct TrendChartView: View {
                 .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
             }
 
-            ForEach(windowedReadings) { reading in
+            ForEach(tracker.sortedReadings) { reading in
                 PointMark(
                     x: .value("Date", reading.date),
                     y: .value("Actual", reading.value)
                 )
-                .foregroundStyle(isAheadOfPace(value: reading.value, at: reading.date) ? WiggleRoomColors.good : WiggleRoomColors.bad)
+                .foregroundStyle(paceColor(for: reading.value, at: reading.date))
             }
 
             if let liveNowPoint, let latestReading {
