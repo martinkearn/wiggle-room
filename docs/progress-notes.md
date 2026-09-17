@@ -1,11 +1,19 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Starling implementation: first real Xcode feedback** —
-the user's own Xcode caught a deprecated `BGTaskScheduler.submit` call and
-two default-main-actor-isolation errors in the Starling code below, both
-fixed (see that entry) — merged alongside the separately-developed
-**2026-09-17 App Group migration** landed on this same branch in the
+after **2026-09-17 Starling real-device testing: findings and a fix** — the
+user connected a real Starling account and tested end to end, surfacing
+three real findings (an inner-ring opacity-fade bug for small settled
+values, a "This Week" zoom silently scoping budget figures to a fraction
+of the real total, and the app's intentional linear-pace model producing a
+nonzero under/over-budget figure from minute one even with zero spending —
+the last one isn't a bug) plus a shipped fix (Starting value now auto-fills
+from the picked account's live balance). Before that, **2026-09-17 Starling
+implementation: first real Xcode feedback** — the user's own Xcode caught a
+deprecated `BGTaskScheduler.submit` call and two default-main-actor-isolation
+errors in the Starling code below, both fixed (see that entry) — merged
+alongside the separately-developed **2026-09-17 App Group migration**
+landed on this same branch in the
 meantime, which moved the app/widgets/watch/complication/Shortcuts onto a
 shared App Group container as the real fix for widget staleness (the
 scheduling-interval tightening from earlier that day turned out to be only
@@ -1317,3 +1325,72 @@ Isolation" build setting directly rather than guessing further blind.
 
 Not verified by a compiler — see above. Reasoned fixes only, based on the
 exact diagnostic text reported from a real Xcode session.
+
+## 2026-09-17 Starling real-device testing: findings and a fix
+
+The user connected a real Starling account and tested end to end, catching
+three distinct issues worth separating clearly:
+
+1. **The inner ring looked empty on a freshly-added tracker.** Traced to
+   real numbers (self-reported: starting value and total budget both
+   £639, nothing spent since creation): with essentially nothing consumed
+   yet, the inner ring's fraction is genuinely tiny, and
+   `RingsView.progressOpacity` fades any fraction below its
+   `dotFadeThreshold` (3.5%) proportionally — a fade meant only to mask a
+   transient animation artifact during the drain/refill "recycle"
+   animation, but which (per its own doc comment's stated intent) ends up
+   applying permanently to any small **settled** value too, not just
+   mid-transition ones. Not fixed this pass — flagged as a real, pre-existing
+   defect (not Starling-specific; would reproduce identically for any
+   fresh manual tracker) since fixing it means touching carefully-tuned
+   animation code without being asked to.
+2. **"X left in this budget" showed a fraction of the real total.**
+   Confirmed via `Tracker.availableZoomLevels`/`subPeriod(for:asOf:)`: any
+   tracker over 7 days defaults its dashboard to the "This Week" zoom
+   (`TrackerDetailView.init`'s `defaultZoom` logic), which scopes
+   `Target Right Now`/`Under Budget`/`remainingInAllowanceCaption` to a
+   **calendar-week-clamped sub-period's fractional allowance**
+   (`Tracker.pace(...zoomLevel:)`'s `subAllowance`), not the tracker's real
+   total. For an 8-day tracker, "This Week" clamps to just a few days,
+   producing a materially smaller number than the real budget with no
+   on-screen indication the figures are scoped rather than whole-tracker.
+   Also not Starling-specific — same math for a manual tracker of the same
+   length. Not fixed this pass either — it's a deliberate prior design
+   (zoom re-scopes "the whole dashboard," per `TrackerDetailView`'s own
+   doc comment) with real tradeoffs (short-tracker default threshold vs.
+   caption wording vs. leaving as-is), presented to the user as options
+   rather than picked unilaterally.
+3. **"Under Budget by £67.20" with zero actual spending.** Not a bug —
+   confirmed as the app's core, intentional pace model:
+   `TrackerPace.computePace`'s `difference = expectedConsumedByNow -
+   consumedSoFar`, so with `consumedSoFar == 0` the moment *any* time
+   elapses after creation, `difference` is simply `expectedConsumedByNow`
+   (total budget × elapsed-time fraction) — a small nonzero "ahead of
+   pace" figure appears immediately by design (§3.1: a steady linear pace
+   from second one, not "have I spent anything yet"). True for every
+   tracker, always has been. Presented to the user as a design question
+   (leave as-is / suppress the verdict until a real post-seed reading
+   exists / something else), not treated as something to silently patch.
+
+**Fixed this pass**: "Starting value" now auto-fills from the picked
+account's live Starling balance in Add Tracker, rather than requiring the
+user to type in today's real number blind. `TrackerStore` gained
+`fetchCurrentValue(for:from:)` (refactored alongside `provider(for:)` and
+`listAvailableTargets(for:)` to share one `resolvedProvider(for:)` helper
+rather than three copies of the same provider-id switch) and
+`AddTrackerView` now has a `.task(id: selectedTargetId)` that fetches and
+overwrites `startingValueText` whenever the user picks/changes an account,
+with a small "Fetching live balance…" indicator in place of the usual
+hint text while it's in flight. Deliberately overwrites rather than only
+filling when empty — picking an account is the user asking this field to
+reflect that account's real number — and only "Starting value," not
+"Total budget," per what was actually asked; the two remain independent
+decisions. Fails silently (the user can still type a value by hand) since
+a failed prefetch shouldn't block tracker creation.
+
+### Verifying this session's changes
+
+Not verified by a compiler, same caveat as every Starling-related entry
+above. The three findings above, though, **were** verified against a real
+device/Starling account by the user — those are confirmed real, not
+speculative.

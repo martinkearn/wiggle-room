@@ -64,6 +64,7 @@ struct AddTrackerView: View {
     @State private var selectedTargetId: String?
     @State private var isLoadingTargets = false
     @State private var targetLoadErrorMessage: String?
+    @State private var isPrefillingStartingValue = false
 
     /// §5.5 — a lightweight local-notification reminder to log a new
     /// reading, on a user-set cadence in minutes. `nil` means no reminder.
@@ -116,9 +117,18 @@ struct AddTrackerView: View {
                     LabeledContent("Starting value") {
                         unitValueField(text: $startingValueText, field: .startingValue)
                     }
-                    Text(startingValueHint)
+                    if isPrefillingStartingValue {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                            Text("Fetching live balance…")
+                        }
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    } else {
+                        Text(startingValueHint)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
                     LabeledContent("Total budget") {
                         unitValueField(text: $totalAllowanceText, field: .totalAllowance)
@@ -241,6 +251,9 @@ struct AddTrackerView: View {
             .task(id: selectedSourceId) {
                 await loadAvailableTargetsIfNeeded()
             }
+            .task(id: selectedTargetId) {
+                await prefillStartingValueIfNeeded()
+            }
         }
     }
 
@@ -296,6 +309,26 @@ struct AddTrackerView: View {
         } catch {
             targetLoadErrorMessage = "Couldn't load accounts for this source — try again."
         }
+    }
+
+    /// Prefills "Starting value" with the picked account's live balance
+    /// rather than leaving the user to guess/type today's real number —
+    /// only for a fresh tracker on a real (non-manual) source; skipped
+    /// entirely for manual entry (nothing to fetch) and when editing an
+    /// existing tracker (its source/target can't change). Overwrites
+    /// whatever was already typed there, since picking an account is what
+    /// the user just asked this field to reflect. Silent on failure — the
+    /// user can still type a starting value by hand if the fetch fails.
+    private func prefillStartingValueIfNeeded() async {
+        guard existingTracker == nil, !isManualEntrySelected,
+              let selectedTargetId,
+              let selectedSourceId, let source = resolveSource(withId: selectedSourceId),
+              let target = availableTargets.first(where: { $0.id == selectedTargetId })
+        else { return }
+        isPrefillingStartingValue = true
+        defer { isPrefillingStartingValue = false }
+        guard let value = try? await store.fetchCurrentValue(for: target, from: source) else { return }
+        startingValueText = value.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
     }
 
     /// The only units a tracker can be created with — picking from a fixed
