@@ -4,20 +4,26 @@ Status snapshot for picking this work back up. **Last updated 2026-09-17**,
 after **2026-09-17 Starling implementation: first real Xcode feedback** —
 the user's own Xcode caught a deprecated `BGTaskScheduler.submit` call and
 two default-main-actor-isolation errors in the Starling code below, both
-fixed (see that entry). Before that, **2026-09-17 Starling connected-source
-implementation** — Starling is now a real, code-level `SourceProvider`
-(Keychain-backed token storage, `StarlingAPIClient`, the
-30s-foreground/5-minute-background refresh cadence with a Low Power Mode
-backoff and a client-side daily rate-limit budget, a real Add Source
-token-entry flow, and a live account-target picker in Add Tracker) — but
-**still not fully verified by a compiler**, since this environment has
-never had a Swift toolchain at all; read that entry's
-"Verifying this session's changes" before trusting any of it. That session
-followed three same-day docs-only planning sessions further below (**2026-09-17
-Low Power Mode backoff decision**, **Starling rate-limit research
-follow-up**, and **Starling refresh-cadence planning**) that made the
-decisions this implementation followed — no code changed in any of those
-three. Before all of that, a long same-day session (see **2026-09-17
+fixed (see that entry) — merged alongside the separately-developed
+**2026-09-17 App Group migration** landed on this same branch in the
+meantime, which moved the app/widgets/watch/complication/Shortcuts onto a
+shared App Group container as the real fix for widget staleness (the
+scheduling-interval tightening from earlier that day turned out to be only
+a partial mitigation). Before the Xcode-feedback fixes, **2026-09-17
+Starling connected-source implementation** — Starling is now a real,
+code-level `SourceProvider` (Keychain-backed token storage,
+`StarlingAPIClient`, the 30s-foreground/5-minute-background refresh
+cadence with a Low Power Mode backoff and a client-side daily rate-limit
+budget, a real Add Source token-entry flow, and a live account-target
+picker in Add Tracker) — but **still not fully verified by a compiler**,
+since neither environment that touched it has had a Swift toolchain at
+all; read that entry's "Verifying this session's changes" before trusting
+any of it. That session followed three same-day docs-only planning
+sessions further below (**2026-09-17 Low Power Mode backoff decision**,
+**Starling rate-limit research follow-up**, and **Starling refresh-cadence
+planning**) that made the decisions the implementation followed — no code
+changed in any of those three. Before all of that, a long same-day session
+(see **2026-09-17
 chart/scheduling/completed-state overhaul**) redesigned the trend chart and
 ring visuals, replaced three separately-coded ~60s refresh timers with one
 shared end-aligned scheduler, added a first-class completed-tracker state,
@@ -936,6 +942,61 @@ and the widget picker fixes all need a real build to confirm. Build in
 Xcode and run the test suite before trusting any of this further; if
 anything doesn't compile or behave as described, that's expected until
 someone with real Xcode access does that pass.
+
+## 2026-09-17 App Group migration
+
+A same-day follow-up specifically to fix widget/complication staleness for
+real, after the scheduling-interval tightening earlier that day turned out
+to be a smaller mitigation, not a fix — the user asked for the App Group
+architecture change previously declined earlier in the day.
+
+- [`AppGroup.swift`](../src/WiggleRoomShared/AppGroup.swift) (new) — a
+  single shared constant, `AppGroup.identifier = "group.martinkearn.WiggleRoom"`,
+  used everywhere a `ModelConfiguration` is built so the literal string only
+  exists in one place.
+- Every `ModelConfiguration(schema:cloudKitDatabase:)` call site now also
+  passes `groupContainer: .identifier(AppGroup.identifier)` — the four
+  places a container gets built:
+  [`WiggleRoomApp.swift`](../src/WiggleRoom/WiggleRoomApp.swift) (both the
+  CloudKit config and its local-only fallback),
+  [`WiggleRoomWatchApp.swift`](../src/WiggleRoomWatch/WiggleRoomWatchApp.swift)
+  (same, both configs),
+  [`WidgetDataStore.makeContainer()`](../src/WiggleRoomShared/WidgetDataStore.swift)
+  (shared by `WiggleRoomWidgets` and `WiggleRoomComplication`), and
+  [`IntentDataStore.makeContainer()`](../src/WiggleRoom/Intents/IntentDataStore.swift)
+  (Shortcuts/Siri). CloudKit sync (`cloudKitDatabase: .automatic`) is
+  unchanged everywhere — the App Group only affects *where the local file
+  lives*, not cross-device sync, which is still CloudKit's job.
+- `com.apple.security.application-groups` (`group.martinkearn.WiggleRoom`)
+  added to all four targets' entitlements files:
+  `WiggleRoom.entitlements`, `WiggleRoomWidgets.entitlements`,
+  `WiggleRoomWatch.entitlements`, `WiggleRoomComplication.entitlements`.
+- **This environment now has working `xcodebuild` access** (a change from
+  earlier the same day — `xcode-select` now points at the full `Xcode.app`
+  rather than the command-line-tools-only path it did before), which let an
+  iOS Simulator build be confirmed directly. It does **not**, however, have
+  access to the signed-in Apple ID/account context Xcode.app's own GUI
+  process has (confirmed: `~/Library/MobileDevice/Provisioning Profiles/`
+  is root-owned and unwritable from this session, and `xcodebuild
+  -allowProvisioningUpdates` fails with "No Accounts: Add a new account in
+  Accounts settings" even after the user added the App Groups capability
+  through Xcode's own Signing & Capabilities UI and confirmed clean builds
+  there for both iOS and macOS). **Registering a brand-new capability like
+  this always needs a real pass through Xcode's GUI with a signed-in
+  account** — same lesson as CloudKit's own capabilities earlier in this
+  project's history (see the "CloudKit — enabled and confirmed working"
+  section above) — command-line `-allowProvisioningUpdates` alone is not
+  sufficient for a capability that has never been registered before, at
+  least not from a session without real account access.
+- **Verification**: `swiftc -parse` clean on every changed file, entitlements
+  plists validated for well-formed XML. The iOS Simulator build succeeded
+  via `xcodebuild` from this session directly. The macOS build (which
+  actually signs and would have caught a broken App Group setup) could not
+  be verified from this session due to the account-access gap above — **the
+  user confirmed a clean build for both iOS and macOS themselves, in Xcode,
+  after adding the App Groups capability to all four targets** — that's the
+  verification this change actually rests on, not anything run from this
+  session.
 
 ## 2026-09-17 Starling refresh-cadence planning (no code changed)
 

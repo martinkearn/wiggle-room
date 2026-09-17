@@ -8,18 +8,24 @@ import Foundation
 import SwiftData
 import os
 
-/// A glanceable extension's own read access to the same CloudKit-synced
-/// SwiftData store the main app uses (§6 of the build spec). Shared by every
-/// WidgetKit-based extension in this app — the iOS/macOS Home/Lock Screen
-/// widgets (`WiggleRoomWidgets`) and the watchOS complication
-/// (`WiggleRoomComplication`, §7.3) — since each runs in its own process and
-/// needs the identical CloudKit cold-start/import-wait handling below; living
-/// here instead of duplicated per-extension means a fix to that handling
-/// (like the CloudKit-import-notification wait) only has to happen once.
-/// Each process opens its own `ModelContainer` against the same
-/// `iCloud.martinkearn.WiggleRoom` container rather than sharing the main
-/// app's in-memory one — no App Group is needed for this: CloudKit sync (not
-/// a shared local file) is what keeps every process's data consistent.
+/// A glanceable extension's own read access to the same CloudKit-synced,
+/// App Group-shared SwiftData store the main app uses (§6 of the build
+/// spec). Shared by every WidgetKit-based extension in this app — the
+/// iOS/macOS Home/Lock Screen widgets (`WiggleRoomWidgets`) and the watchOS
+/// complication (`WiggleRoomComplication`, §7.3) — since each runs in its
+/// own process and needs the identical CloudKit cold-start/import-wait
+/// handling below; living here instead of duplicated per-extension means a
+/// fix to that handling (like the CloudKit-import-notification wait) only
+/// has to happen once. Each process opens its own `ModelContainer`, but all
+/// of them point at the same on-disk file — the shared App Group container
+/// (`AppGroup.identifier`), not each target's own private sandbox — so a
+/// same-device change (the phone app writing, this extension reading) is
+/// visible instantly, with no CloudKit round-trip needed for that. CloudKit
+/// sync is still what keeps *different devices* (the phone and the Mac, or
+/// the phone and the Watch) consistent with each other — the cold-start/
+/// import-wait handling below exists for that cross-device case, and for
+/// this extension's own very first launch before it's ever shared the App
+/// Group container with a process that already warmed it.
 enum WidgetDataStore {
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "martinkearn.WiggleRoom",
@@ -34,11 +40,28 @@ enum WidgetDataStore {
     @MainActor
     private static var cachedContainer: ModelContainer?
 
+    /// Once at least one tracker has appeared, two no-growth import polls is
+    /// "settled enough": one could be a quiet import notification, while two
+    /// avoids spending the full picker deadline on an already-warm App Group
+    /// store. This is intentionally count-based: this longer wait is for the
+    /// interactive configuration picker discovering rows, while timeline
+    /// freshness for value changes is handled by `fetchAllTrackers()`'s shorter
+    /// update wait and explicit widget reload triggers.
+    private static let stablePollsBeforeSettled = 2
+
     @MainActor
     static func makeContainer() throws -> ModelContainer {
         if let cachedContainer { return cachedContainer }
         let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
-        let configuration = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
+        // Shared App Group container (see `AppGroup`) — the same on-disk
+        // store the host app (WiggleRoom/WiggleRoomWatch) opens, so this
+        // extension sees a same-device change the instant it's asked for,
+        // with no CloudKit round-trip needed for same-device freshness.
+        let configuration = ModelConfiguration(
+            schema: schema,
+            groupContainer: .identifier(AppGroup.identifier),
+            cloudKitDatabase: .automatic
+        )
         do {
             let container = try ModelContainer(for: schema, configurations: [configuration])
             cachedContainer = container
@@ -78,14 +101,24 @@ enum WidgetDataStore {
     /// a reading is logged in the main app, which makes WidgetKit re-invoke
     /// this immediately — almost always well before that change has
     /// actually round-tripped through CloudKit into this extension's own
-    /// separate local store (see the type doc above: no App Group, CloudKit
-    /// sync is the only channel). Without this, a value *update* to a
-    /// tracker the widget already knows about was invisible until the
-    /// store's own hourly refresh or the next unrelated reload, since only
-    /// the true-empty case above ever waited at all. This wait is much
-    /// shorter than `fetchAllTrackersForConfiguration()`'s — this runs
-    /// inside WidgetKit's own timeline-generation budget, not behind an
-    /// interactive "Loading" sheet, so it can't afford to be generous.
+    /// separate local store. Without this, a value *update* to a tracker
+    /// the widget already knows about was invisible until the store's own
+    /// periodic refresh or the next unrelated reload, since only the
+    /// true-empty case above ever waited at all.
+    ///
+    /// **Deliberately a single ~2s wait, not several** — a real regression
+    /// was found in practice from widening this to three (~6s total): the
+    /// system only gives a widget's live render a few seconds (~3, per
+    /// device logs) to actually produce content before it gives up and
+    /// leaves the widget on its last/placeholder state. A widget with no
+    /// prior cached render for its exact configuration (e.g. right after
+    /// picking a tracker for the first time) hit that slow path on every
+    /// single attempt and never finished in time — a persistently blank
+    /// widget, not just occasional staleness. This is much shorter than
+    /// `fetchAllTrackersForConfiguration()`'s wait for exactly that reason —
+    /// this runs inside WidgetKit's own timeline-generation budget, not
+    /// behind an interactive "Loading" sheet, so it can't afford to be
+    /// generous at all.
     @MainActor
     static func fetchAllTrackers() async throws -> [Tracker] {
         do {
@@ -93,7 +126,17 @@ enum WidgetDataStore {
             if trackers.isEmpty {
                 for attempt in 1...8 {
                     try await Task.sleep(nanoseconds: 500_000_000)
-                    trackers = try fetchAllTrackersImmediately()
+                    // A transient fetch error on any one poll used to throw
+                    // out of this whole function (discarding the wait already
+                    // done and reporting no trackers at all), rather than just
+                    // trying again on the next iteration. Log and continue so
+                    // persistent failures are still visible.
+                    do {
+                        let latest = try fetchAllTrackersImmediately()
+                        trackers = latest
+                    } catch {
+                        logger.error("Failed to refetch trackers while waiting for CloudKit import: \(error, privacy: .public)")
+                    }
                     if !trackers.isEmpty {
                         logger.notice("Trackers appeared after waiting for initial CloudKit import (attempt \(attempt)).")
                         break
@@ -101,7 +144,14 @@ enum WidgetDataStore {
                 }
             } else {
                 await waitForNextCloudKitImport(timeout: 2)
-                trackers = try fetchAllTrackersImmediately()
+                // A transient error here must fall back to the already-known-
+                // good `trackers` rather than throwing, but still gets logged.
+                do {
+                    let latest = try fetchAllTrackersImmediately()
+                    trackers = latest
+                } catch {
+                    logger.error("Failed to refetch trackers after CloudKit import wait: \(error, privacy: .public)")
+                }
             }
             return trackers
         } catch {
@@ -155,7 +205,19 @@ enum WidgetDataStore {
             // generous window; a picker that occasionally waits a few
             // seconds longer when there's nothing new to find is a much
             // smaller cost than a tracker that can't be picked at all.
+            // Stops as soon as results look settled, rather than always
+            // burning the full 25s deadline regardless of how quickly data
+            // actually showed up — with the shared App Group container
+            // (see `AppGroup`), a same-device fetch is now usually
+            // instant, and this loop used to have no early-exit at all,
+            // so the picker waited the full 25 seconds on essentially
+            // every open even when nothing was ever going to change.
+            // Two consecutive no-growth polls (each up to 3s) once `best`
+            // is non-empty is judged "settled enough" — still leaves the
+            // full deadline available for the genuine cold-start case
+            // where nothing has appeared yet at all.
             let deadline = Date().addingTimeInterval(25)
+            var consecutiveStablePolls = 0
             while Date() < deadline {
                 let timeRemaining = deadline.timeIntervalSinceNow
                 guard timeRemaining > 0 else { break }
@@ -173,6 +235,14 @@ enum WidgetDataStore {
                 guard let latest = try? fetchAllTrackersImmediately() else { continue }
                 if latest.count > best.count {
                     best = latest
+                    consecutiveStablePolls = 0
+                } else if latest.count == best.count, !best.isEmpty {
+                    consecutiveStablePolls += 1
+                    if consecutiveStablePolls >= stablePollsBeforeSettled { break }
+                } else {
+                    // Fewer rows than `best` is treated as a transient/
+                    // regressing fetch, not evidence that the store settled.
+                    consecutiveStablePolls = 0
                 }
             }
             return best

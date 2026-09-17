@@ -23,10 +23,14 @@ struct TrackerTimelineProvider: AppIntentTimelineProvider {
 
     /// A tracker's pace figures drift continuously, but they only need to be
     /// legible at a glance — `TrackerUpdateScheduling.nextWidgetReloadDate`
-    /// keeps a budget-friendly ~15 minute cadence for most of a tracker's
+    /// keeps a budget-friendly ~5 minute cadence for most of a tracker's
     /// life, tightening to every minute in the final hour so the widget's
     /// last reload lines up with the tracker's own end instead of a flat
-    /// "always an hour away" ceiling.
+    /// "always an hour away" ceiling. This is the periodic backstop for
+    /// drift from time passing alone; `WidgetCenter.reloadAllTimelines()`
+    /// (triggered on every actual data change — see `TrackerStore` and
+    /// `CloudSyncWidgetRefresher`) is what makes a *new* reading show up
+    /// promptly rather than waiting out this interval.
     @MainActor
     func timeline(for configuration: SelectTrackerIntent, in context: Context) async -> Timeline<TrackerTimelineEntry> {
         let now = Date.now
@@ -34,7 +38,7 @@ struct TrackerTimelineProvider: AppIntentTimelineProvider {
         let entry = TrackerTimelineEntry(date: now, tracker: tracker)
         let nextUpdate = tracker.map {
             TrackerUpdateScheduling.nextWidgetReloadDate(after: now, until: $0.endDate)
-        } ?? now.addingTimeInterval(900)
+        } ?? now.addingTimeInterval(TrackerUpdateScheduling.defaultWidgetFarInterval)
         return Timeline(entries: [entry], policy: .after(nextUpdate))
     }
 

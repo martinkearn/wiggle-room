@@ -27,11 +27,23 @@ struct WiggleRoomApp: App {
         // CODE_SIGN_ENTITLEMENTS build setting). Falls back to local-only
         // storage if CloudKit is ever unavailable (e.g. no iCloud account
         // signed in on this device) rather than hard-crashing the app.
-        let cloudConfiguration = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
+        //
+        // `groupContainer: .identifier(AppGroup.identifier)` puts the local
+        // store inside the shared App Group container instead of this
+        // target's own private one — the widget extension (`WidgetDataStore`)
+        // opens the exact same file, so a reading logged here is visible to
+        // the widget instantly, with no CloudKit round-trip needed for
+        // same-device freshness. CloudKit is still what syncs across
+        // different devices.
+        let cloudConfiguration = ModelConfiguration(
+            schema: schema,
+            groupContainer: .identifier(AppGroup.identifier),
+            cloudKitDatabase: .automatic
+        )
         if let container = try? ModelContainer(for: schema, configurations: [cloudConfiguration]) {
             modelContainer = container
         } else {
-            let localConfiguration = ModelConfiguration(schema: schema)
+            let localConfiguration = ModelConfiguration(schema: schema, groupContainer: .identifier(AppGroup.identifier))
             guard let localContainer = try? ModelContainer(for: schema, configurations: [localConfiguration]) else {
                 fatalError("Could not create a ModelContainer")
             }

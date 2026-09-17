@@ -32,7 +32,7 @@ struct TrackerComplicationProvider: AppIntentTimelineProvider {
         let entry = TrackerComplicationEntry(date: now, tracker: tracker)
         let nextUpdate = tracker.map {
             TrackerUpdateScheduling.nextWidgetReloadDate(after: now, until: $0.endDate)
-        } ?? now.addingTimeInterval(900)
+        } ?? now.addingTimeInterval(TrackerUpdateScheduling.defaultWidgetFarInterval)
         return Timeline(entries: [entry], policy: .after(nextUpdate))
     }
 

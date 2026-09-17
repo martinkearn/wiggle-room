@@ -15,7 +15,14 @@ enum IntentDataStore {
     @MainActor
     static func makeContainer() throws -> ModelContainer {
         let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
-        let configuration = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
+        // Shared App Group container (see `AppGroup`) — same store the app
+        // and widget extension use, so a Shortcut logging a reading is
+        // reflected everywhere instantly rather than waiting on CloudKit.
+        let configuration = ModelConfiguration(
+            schema: schema,
+            groupContainer: .identifier(AppGroup.identifier),
+            cloudKitDatabase: .automatic
+        )
         return try ModelContainer(for: schema, configurations: [configuration])
     }
 
