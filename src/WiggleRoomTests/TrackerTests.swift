@@ -116,7 +116,7 @@ final class TrackerTests: XCTestCase {
 
     func testRemainingAtEndCaption_startingValueExceedsBudget_saysWhatWillRemain() {
         let t = tracker(unit: "£", direction: .decreasing, startingValue: 500, totalAllowance: 400)
-        XCTAssertEqual(t.remainingAtEndCaption, "£100 will remain at the end")
+        XCTAssertEqual(t.remainingAtEndCaption, "£100 should remain at the end")
     }
 
     func testRemainingAtEndCaption_budgetExceedsStartingValue_saysByHowMuch() {
@@ -161,5 +161,32 @@ final class TrackerTests: XCTestCase {
         t.startDate = start.addingTimeInterval(-7200)
         t.endDate = start.addingTimeInterval(-3600)
         XCTAssertEqual(t.periodRemainingText(asOf: start), "Period ended")
+    }
+
+    func testPeriodRemainingText_lessThanAnHour_fallsBackToMinutes() {
+        let start = Date()
+        let t = tracker(startingValue: 100, totalAllowance: 100)
+        t.startDate = start
+        t.endDate = start.addingTimeInterval(42 * 60)
+        XCTAssertEqual(t.periodRemainingText(asOf: start), "42 minutes remaining")
+    }
+
+    // MARK: - isCompleted(asOf:)
+
+    func testIsCompleted_beforeEndDate_isFalse() {
+        let start = Date()
+        let t = tracker(startingValue: 100, totalAllowance: 100)
+        t.startDate = start
+        t.endDate = start.addingTimeInterval(3600)
+        XCTAssertFalse(t.isCompleted(asOf: start))
+    }
+
+    func testIsCompleted_atOrAfterEndDate_isTrue() {
+        let start = Date()
+        let t = tracker(startingValue: 100, totalAllowance: 100)
+        t.startDate = start
+        t.endDate = start.addingTimeInterval(3600)
+        XCTAssertTrue(t.isCompleted(asOf: t.endDate))
+        XCTAssertTrue(t.isCompleted(asOf: t.endDate.addingTimeInterval(1)))
     }
 }

@@ -34,11 +34,11 @@ final class Tracker {
     var totalAllowance: Decimal = 0
 
     /// A lightweight local-notification reminder to log a new reading, on a
-    /// user-set cadence in days (§5.5 — a nice-to-have, only meaningful for
-    /// a manual-entry tracker). `nil` means no reminder. See
+    /// user-set cadence in minutes (§5.5 — a nice-to-have, only meaningful
+    /// for a manual-entry tracker). `nil` means no reminder. See
     /// `ReminderScheduler`, which schedules/cancels the actual notification
     /// whenever this changes.
-    var reminderCadenceDays: Int?
+    var reminderCadenceMinutes: Int?
 
     /// Whether the "closed under budget/on track" celebration has already
     /// been shown for this tracker's completion — a one-shot flag so
@@ -65,7 +65,7 @@ final class Tracker {
         endDate: Date,
         startingValue: Decimal,
         totalAllowance: Decimal,
-        reminderCadenceDays: Int? = nil
+        reminderCadenceMinutes: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -77,7 +77,7 @@ final class Tracker {
         self.endDate = endDate
         self.startingValue = startingValue
         self.totalAllowance = totalAllowance
-        self.reminderCadenceDays = reminderCadenceDays
+        self.reminderCadenceMinutes = reminderCadenceMinutes
         self.readings = []
     }
 }
@@ -103,6 +103,14 @@ extension Tracker {
             return startingValue
         }
         return reading.value
+    }
+
+    /// Whether this tracker's period has already ended as of a given
+    /// instant — the single source of truth for "completed," used to gate
+    /// balance updates/reminders and to switch the dashboard and other
+    /// surfaces into their completed presentation.
+    func isCompleted(asOf now: Date = .now) -> Bool {
+        now >= endDate
     }
 }
 
@@ -203,18 +211,19 @@ extension Tracker {
     var remainingAtEndCaption: String? {
         guard let remainder = projectedRemainder else { return nil }
         if remainder > 0 {
-            return "\(formattedValue(remainder)) will remain at the end"
+            return "\(formattedValue(remainder)) should remain at the end"
         } else {
             return "Budget exceeds starting value by \(formattedValue(abs(remainder)))"
         }
     }
 
-    /// "3 days remaining" / "6 hours remaining" / "Period ended", as of a
-    /// given instant — the days-remaining line under the dashboard's rings,
-    /// also reused by the extra-large widget. `until` defaults to the
-    /// tracker's own `endDate`, but a zoom level (§4.5) passes its
-    /// sub-period's end instead, so the caption reads correctly when zoomed
-    /// (e.g. "12 days remaining" in the current month, not the whole lease).
+    /// "3 days remaining" / "6 hours remaining" / "42 minutes remaining" /
+    /// "Period ended", as of a given instant — the days-remaining line under
+    /// the dashboard's rings, also reused by the extra-large widget. `until`
+    /// defaults to the tracker's own `endDate`, but a zoom level (§4.5)
+    /// passes its sub-period's end instead, so the caption reads correctly
+    /// when zoomed (e.g. "12 days remaining" in the current month, not the
+    /// whole lease).
     func periodRemainingText(asOf now: Date, until: Date? = nil) -> String {
         let calendar = Calendar.current
         let until = until ?? endDate
@@ -226,7 +235,11 @@ extension Tracker {
             return "\(days) day\(days == 1 ? "" : "s") remaining"
         }
         let hours = max(calendar.dateComponents([.hour], from: now, to: until).hour ?? 0, 0)
-        return "\(hours) hour\(hours == 1 ? "" : "s") remaining"
+        if hours >= 1 {
+            return "\(hours) hour\(hours == 1 ? "" : "s") remaining"
+        }
+        let minutes = max(calendar.dateComponents([.minute], from: now, to: until).minute ?? 0, 0)
+        return "\(minutes) minute\(minutes == 1 ? "" : "s") remaining"
     }
 }
 
