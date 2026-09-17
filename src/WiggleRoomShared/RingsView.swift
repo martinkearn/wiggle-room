@@ -17,8 +17,11 @@ import Foundation
 ///
 /// There are only ever these two rings — no more are added for additional
 /// trackers or metrics. `showsCenterContent` hides the difference/status
-/// overlay and legend for small indicator-sized uses (e.g. list rows),
-/// where there isn't room for them to be legible.
+/// overlay for small indicator-sized uses (e.g. list rows), where there
+/// isn't room for it to be legible. No separate color key is drawn below
+/// the rings — the figure cards elsewhere on screen (Current Balance,
+/// Target Right Now) already use these exact same two colors, so a legend
+/// here would just be repeating what's already unambiguous at a glance.
 ///
 /// Both rings spring in on first appearance, and fully **re-cycle** — drain
 /// back to empty and refill, with a little overshoot bounce at the end —
@@ -132,10 +135,6 @@ struct RingsView: View {
                 .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
             }
             .aspectRatio(1, contentMode: .fit)
-
-            if showsCenterContent {
-                legend
-            }
         }
         .onAppear {
             guard isAnimated else { return }
@@ -239,27 +238,6 @@ struct RingsView: View {
 
     private var centerAmountText: String {
         pace.displayDifference(for: tracker)
-    }
-
-    /// Uses the exact same wording as the figure cards below (§7.1's
-    /// Current Balance/Target Right Now), in the same left-to-right order,
-    /// so it's unambiguous which ring is which — not a separately-worded
-    /// "Progress"/"Time elapsed" pair a reader has to map onto the figures
-    /// themselves.
-    private var legend: some View {
-        HStack(spacing: 20) {
-            legendItem(color: statusColor, label: tracker.currentValueLabel)
-            legendItem(color: WiggleRoomColors.paceRing, label: "Target Right Now")
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-
-    private func legendItem(color: Color, label: String) -> some View {
-        HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text(label)
-        }
     }
 
     /// Builds one ring: a full faint track plus a trimmed, colored progress
