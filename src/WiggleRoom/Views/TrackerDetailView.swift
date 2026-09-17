@@ -122,12 +122,21 @@ struct TrackerDetailView: View {
                 // The whole screen's figures update on this cadence (Target
                 // Right Now, the ring, the difference) — not just one card —
                 // so the countdown lives up top rather than tucked under a
-                // single figure.
+                // single figure. The pull-gesture hint sits right beside it
+                // rather than lower on the screen — this is the one spot on
+                // the dashboard already telling you your figures are about
+                // to move on their own, so it's the natural place to also
+                // say how to make that happen right now instead of waiting.
                 if let screenUpdateCaption {
-                    Text(screenUpdateCaption)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 4)
+                    VStack(spacing: 2) {
+                        Text(screenUpdateCaption)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        #if !os(macOS)
+                        pullToUpdateHint
+                        #endif
+                    }
+                    .padding(.top, 4)
                 }
 
                 if isCompleted {
@@ -145,13 +154,11 @@ struct TrackerDetailView: View {
                     completedSummary
                 } else {
                     figuresRow
+                    #if os(macOS)
                     if tracker.isManualEntry {
-                        #if os(macOS)
                         updateBalanceButton
-                        #else
-                        pullToUpdateHint
-                        #endif
                     }
+                    #endif
                 }
 
                 VStack(spacing: 2) {
@@ -357,10 +364,13 @@ struct TrackerDetailView: View {
     /// A persistent affordance for the pull-to-refresh gesture — unlike a
     /// button, `.refreshable`'s own control only appears once a pull is
     /// already underway, so without this there'd be nothing on screen
-    /// hinting the gesture exists at all.
+    /// hinting the gesture exists at all. Worded per source: "update" for a
+    /// manual tracker (it opens the log sheet), "refresh" for a connected
+    /// one (it re-fetches) — same gesture, described as whichever action it
+    /// actually performs for this tracker.
     private var pullToUpdateHint: some View {
-        Label("Pull down to update", systemImage: "arrow.down")
-            .font(.caption)
+        Label("Pull down to \(tracker.isManualEntry ? "update" : "refresh")", systemImage: "arrow.down")
+            .font(.caption2)
             .foregroundStyle(.secondary)
     }
     #else
