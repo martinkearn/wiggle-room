@@ -35,14 +35,8 @@ struct TrackerComplicationEntryView: View {
         }
     }
 
-    /// A "syncing" icon rather than "circle.dashed" — matches the phone
-    /// widget's own empty state (see its own doc comment): almost always
-    /// means the shared store just hasn't finished its first sync into
-    /// this complication yet, not a genuine dead end. No accompanying
-    /// text — every complication family here is too cramped for it,
-    /// `.accessoryInline` especially (a single line next to the clock).
     private var emptyState: some View {
-        Image(systemName: "arrow.triangle.2.circlepath")
+        Image(systemName: "circle.dashed")
             .containerBackground(for: .widget) { Color.clear }
     }
 

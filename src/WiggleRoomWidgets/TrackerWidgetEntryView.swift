@@ -45,27 +45,14 @@ struct TrackerWidgetEntryView: View {
         }
     }
 
-    /// Shown whenever there's no tracker to render yet — which in practice
-    /// is almost always "the shared store hasn't finished its first sync
-    /// into this widget yet" (a brand-new widget instance, or right after
-    /// a fresh install) rather than a genuine "nothing configured" dead
-    /// end, so it reads as an active wait rather than a bare, unexplained
-    /// blank/dashed-circle state. A static icon rather than an animated
-    /// spinner — plain widgets don't continuously animate, so a spinner
-    /// here would just render as one frozen frame.
     private var emptyState: some View {
         VStack(spacing: 4) {
-            Image(systemName: "arrow.triangle.2.circlepath")
+            Image(systemName: "circle.dashed")
                 .foregroundStyle(.secondary)
-            Text("Loading data")
+            Text("No Tracker")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            Text("Can take up to a minute")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
         }
-        .padding(4)
         .containerBackground(for: .widget) { Color.clear }
     }
 
