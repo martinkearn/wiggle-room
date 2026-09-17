@@ -6,15 +6,16 @@
 import SwiftUI
 import Charts
 
-/// Secondary detail view (§3.5): a straight pace reference line from
-/// starting value to the end-of-period target, with actual logged readings
-/// plotted on top — colored green where that segment is ahead of pace and
-/// red where it's behind, so the shape relative to the reference line reads
-/// at a glance rather than needing a legend. A third line — a best-fit trend
-/// through the actual readings, extended across the full period — shows
-/// where things are headed overall if the current trend continues, distinct
-/// from both the target pace and the noisy point-to-point reading history.
-/// Minimal axis labeling — the shape is the point, not precise chart-reading.
+/// Secondary detail view (§3.5): a solid pace reference line from starting
+/// value to the end-of-period target, with actual logged readings plotted on
+/// top — colored green where that segment is ahead of pace and red where
+/// it's behind, so the shape relative to the reference line reads at a
+/// glance rather than needing a legend. A dotted trend line — a best-fit
+/// through the actual readings, following the history as it developed and
+/// then projected on to the period's end — shows where things are headed
+/// overall if the current trend continues, distinct from both the target
+/// pace and the noisy point-to-point reading history. Minimal axis
+/// labeling — the shape is the point, not precise chart-reading.
 struct TrendChartView: View {
     let tracker: Tracker
 
@@ -48,9 +49,15 @@ struct TrendChartView: View {
     /// Readings that actually fall within the zoomed window — the reading
     /// history as a whole still holds everything ever logged, but a zoomed
     /// chart should only plot what happened inside the sub-period it's
-    /// showing.
+    /// showing. A zoom's sub-period is always the one that contains `now`
+    /// (see `Tracker.subPeriod(for:asOf:)`), so the latest logged reading
+    /// (always at or before `now`) is naturally always inside this window.
     private var windowedReadings: [ValueSnapshot] {
         tracker.sortedReadings.filter { $0.date >= window.start && $0.date <= window.end }
+    }
+
+    private var latestReading: ValueSnapshot? {
+        tracker.sortedReadings.last
     }
 
     private var targetEndValue: Decimal {
@@ -62,14 +69,14 @@ struct TrendChartView: View {
 
     /// The Y range the chart should actually be scaled to — based only on
     /// the pace reference line and the real logged readings, deliberately
-    /// *excluding* the trend line's own extrapolated endpoints. A trend
-    /// fitted from just a couple of early readings can imply a very steep
-    /// slope; letting Swift Charts auto-scale the axis to fit that
-    /// extrapolation all the way out to the period's end would squash the
-    /// pace line and the actual readings into an unreadable sliver at one
-    /// edge. `trendLine` below also clamps its own values into this range
-    /// directly — see that property for why leaving the raw, un-clamped
-    /// values for Charts' own axis-driven clipping to handle isn't enough.
+    /// *excluding* the trend line's own extrapolated values. A trend fitted
+    /// from just a couple of early readings can imply a very steep slope;
+    /// letting Swift Charts auto-scale the axis to fit that extrapolation
+    /// all the way out to the period's end would squash the pace line and
+    /// the actual readings into an unreadable sliver at one edge. `trendPoints`
+    /// below also clamps its own values into this range directly — see that
+    /// property for why leaving the raw, un-clamped values for Charts' own
+    /// axis-driven clipping to handle isn't enough.
     private var yDomain: ClosedRange<Double> {
         var values = [windowStartingValue, targetEndValue].map { ($0 as NSDecimalNumber).doubleValue }
         values += windowedReadings.map { ($0.value as NSDecimalNumber).doubleValue }
@@ -79,31 +86,22 @@ struct TrendChartView: View {
         return (low - padding)...(high + padding)
     }
 
-    /// A least-squares line of best fit through the logged readings
-    /// (date vs. value), extended across the tracker's full period so it can
-    /// be compared directly against the dashed pace reference line — "if
-    /// this trend continues, here's roughly where it ends up," as opposed to
-    /// the jagged actual-readings line, which only shows what's already
-    /// happened. `nil` until there are at least two readings to fit a line
-    /// through, and if every reading landed at the exact same instant
-    /// (a degenerate, zero-width span) since a slope isn't meaningful then.
-    ///
-    /// The two endpoint values are clamped into `yDomain` rather than left
-    /// at whatever the raw extrapolation computes — a trend fitted from a
-    /// couple of readings with a big early swing can imply a wildly steep
-    /// slope, and passing that raw, far-out-of-frame value to Swift Charts
-    /// (even with `.chartYScale(domain:)` set) triggers a real rendering bug
-    /// here: the line's stroke bleeds straight through the rest of the
-    /// screen above the chart instead of being cleanly clipped to the plot
-    /// area. Clamping the values themselves — so nothing handed to Charts is
-    /// ever far outside the visible domain — avoids that entirely. The line
-    /// still visibly runs to the domain's top/bottom edge, which reads as
-    /// "steep" just as well as the true extrapolated value would.
-    private var trendLine: (start: (date: Date, value: Decimal), end: (date: Date, value: Decimal))? {
-        let readings = windowedReadings
-        guard readings.count > 1 else { return nil }
+    private struct LinearFit {
+        let slope: Double
+        let intercept: Double
+        let referenceDate: Date
 
-        let referenceDate = readings[0].date
+        func value(at date: Date) -> Double {
+            intercept + slope * date.timeIntervalSince(referenceDate)
+        }
+    }
+
+    /// A least-squares line of best fit through a set of readings
+    /// (date vs. value). `nil` if there are fewer than two readings, or if
+    /// every reading landed at the exact same instant (a degenerate,
+    /// zero-width span) since a slope isn't meaningful then.
+    private func fit(_ readings: ArraySlice<ValueSnapshot>) -> LinearFit? {
+        guard readings.count > 1, let referenceDate = readings.first?.date else { return nil }
         let xs = readings.map { $0.date.timeIntervalSince(referenceDate) }
         let ys = readings.map { ($0.value as NSDecimalNumber).doubleValue }
 
@@ -117,16 +115,64 @@ struct TrendChartView: View {
 
         let slope = (n * sumXY - sumX * sumY) / denominator
         let intercept = (sumY - slope * sumX) / n
+        return LinearFit(slope: slope, intercept: intercept, referenceDate: referenceDate)
+    }
 
-        let startX = window.start.timeIntervalSince(referenceDate)
-        let endX = window.end.timeIntervalSince(referenceDate)
+    /// The trend line's anchor points. Rather than a single straight line
+    /// fitted once across every reading, each historical anchor is the
+    /// *expanding-window* fit — the best-fit line through every reading up
+    /// to and including that point, evaluated at that point's own date. As
+    /// more readings arrive the fit shifts slightly, so the line traces
+    /// gentle curves through history instead of being perfectly rigid — the
+    /// trend "as understood at the time," rather than one line retroactively
+    /// applied to the whole past. The final anchor projects the full-data
+    /// fit forward to the window's end — where the balance is expected to
+    /// land by the end of the tracker.
+    ///
+    /// Every value is clamped into `yDomain` rather than left at whatever
+    /// the raw extrapolation computes — a fit from a couple of readings with
+    /// a big early swing can imply a wildly steep slope, and passing that
+    /// raw, far-out-of-frame value to Swift Charts (even with
+    /// `.chartYScale(domain:)` set) triggers a real rendering bug here: the
+    /// line's stroke bleeds straight through the rest of the screen above
+    /// the chart instead of being cleanly clipped to the plot area. Clamping
+    /// the values themselves — so nothing handed to Charts is ever far
+    /// outside the visible domain — avoids that entirely. The line still
+    /// visibly runs to the domain's top/bottom edge, which reads as "steep"
+    /// just as well as the true extrapolated value would.
+    private var trendPoints: [(date: Date, value: Decimal)]? {
+        let readings = windowedReadings
+        guard readings.count > 1 else { return nil }
         let domain = yDomain
-        let clampedStartY = min(max(intercept + slope * startX, domain.lowerBound), domain.upperBound)
-        let clampedEndY = min(max(intercept + slope * endX, domain.lowerBound), domain.upperBound)
-        return (
-            start: (window.start, Decimal(clampedStartY)),
-            end: (window.end, Decimal(clampedEndY))
-        )
+        func clamped(_ raw: Double) -> Decimal {
+            Decimal(min(max(raw, domain.lowerBound), domain.upperBound))
+        }
+
+        var points: [(date: Date, value: Decimal)] = []
+        for index in 1..<readings.count {
+            guard let expandingFit = fit(readings[0...index]) else { continue }
+            points.append((readings[index].date, clamped(expandingFit.value(at: readings[index].date))))
+        }
+        guard !points.isEmpty, let fullFit = fit(readings[readings.startIndex...]) else { return nil }
+        points.append((window.end, clamped(fullFit.value(at: window.end))))
+        return points
+    }
+
+    /// A subtle marker carrying the latest logged balance forward to "now" —
+    /// keeps the chart feeling live even between readings, distinct from the
+    /// trend projection. `nil` once the tracker's period has ended, since the
+    /// last real reading already sits at that edge.
+    private var liveNowPoint: (date: Date, value: Decimal)? {
+        guard let latestReading, now < window.end else { return nil }
+        return (min(now, window.end), latestReading.value)
+    }
+
+    /// A subtle marker carrying the latest logged balance all the way to the
+    /// window's end, so the actual-data series visually spans the tracker's
+    /// full duration even with sparse readings.
+    private var liveEndPoint: (date: Date, value: Decimal)? {
+        guard let latestReading, now < window.end else { return nil }
+        return (window.end, latestReading.value)
     }
 
     /// Whether a given logged value, at the date it was logged, was ahead of
@@ -151,7 +197,7 @@ struct TrendChartView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             chart
-            if trendLine != nil {
+            if trendPoints != nil {
                 legend
             }
         }
@@ -178,18 +224,22 @@ struct TrendChartView: View {
 
     private var chart: some View {
         Chart {
+            // Pace reference line — the strongest line on the chart, since
+            // it's the fixed yardstick everything else is read against.
             LineMark(
                 x: .value("Date", window.start),
-                y: .value("Pace", windowStartingValue)
+                y: .value("Pace", windowStartingValue),
+                series: .value("Series", "Pace")
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
-            .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 5]))
+            .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round))
             LineMark(
                 x: .value("Date", window.end),
-                y: .value("Pace", targetEndValue)
+                y: .value("Pace", targetEndValue),
+                series: .value("Series", "Pace")
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
-            .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 5]))
+            .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round))
 
             ForEach(segments, id: \.id) { segment in
                 LineMark(
@@ -216,21 +266,35 @@ struct TrendChartView: View {
                 .foregroundStyle(isAheadOfPace(value: reading.value, at: reading.date) ? WiggleRoomColors.good : WiggleRoomColors.bad)
             }
 
-            if let trendLine {
-                LineMark(
-                    x: .value("Date", trendLine.start.date),
-                    y: .value("Trend", trendLine.start.value),
-                    series: .value("Series", "Trend")
+            if let liveNowPoint {
+                PointMark(
+                    x: .value("Date", liveNowPoint.date),
+                    y: .value("Now", liveNowPoint.value)
                 )
-                .foregroundStyle(WiggleRoomColors.brand)
-                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                LineMark(
-                    x: .value("Date", trendLine.end.date),
-                    y: .value("Trend", trendLine.end.value),
-                    series: .value("Series", "Trend")
+                .foregroundStyle(.secondary.opacity(0.5))
+                .symbolSize(24)
+            }
+
+            if let liveEndPoint {
+                PointMark(
+                    x: .value("Date", liveEndPoint.date),
+                    y: .value("End", liveEndPoint.value)
                 )
-                .foregroundStyle(WiggleRoomColors.brand)
-                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .foregroundStyle(.secondary.opacity(0.35))
+                .symbolSize(24)
+            }
+
+            if let trendPoints {
+                ForEach(Array(trendPoints.enumerated()), id: \.offset) { _, point in
+                    LineMark(
+                        x: .value("Date", point.date),
+                        y: .value("Trend", point.value),
+                        series: .value("Series", "Trend")
+                    )
+                    .foregroundStyle(WiggleRoomColors.brand)
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 5]))
+                    .interpolationMethod(.catmullRom)
+                }
             }
         }
         .chartXAxis {
