@@ -138,9 +138,9 @@ final class TrackerStore {
 
     /// Fetches a fresh value from `tracker`'s connected source (Starling,
     /// and any future auto-fetch provider) and logs it as a new timestamped
-    /// reading (§6) — the same shape as a manual log, so history/zoom
-    /// levels work identically regardless of where a reading came from.
-    /// No-ops for a manual-entry tracker (nothing to fetch) or one with no
+    /// reading (§6) — the same shape as a manual log, so trend-chart history
+    /// works identically regardless of where a reading came from. No-ops
+    /// for a manual-entry tracker (nothing to fetch) or one with no
     /// resolvable provider/target.
     func refreshFromSource(_ tracker: Tracker) async throws {
         guard !tracker.isManualEntry,

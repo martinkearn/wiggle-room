@@ -1,13 +1,22 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Starling real-device testing: findings and a fix** — the
-user connected a real Starling account and tested end to end, surfacing
-three real findings (an inner-ring opacity-fade bug for small settled
-values, a "This Week" zoom silently scoping budget figures to a fraction
-of the real total, and the app's intentional linear-pace model producing a
-nonzero under/over-budget figure from minute one even with zero spending —
-the last one isn't a bug) plus a shipped fix (Starting value now auto-fills
+after **2026-09-17 Zoom levels removed** — §4.5's whole feature (the
+`ZoomLevel` type, the picker, sub-period scoping everywhere it touched:
+`Tracker`, `TrackerPace`, `RingsView`, `TrendChartView`,
+`TrackerDetailView`) was pulled out of the app entirely, cleanly rather
+than hidden/disabled, after real-device testing showed its default "This
+Week" scoping producing wrong-looking headline dashboard figures with no
+on-screen indication they were scoped. Every tracker's dashboard/chart/
+widget always shows its real, whole-period figures now — build-spec.md
+§4.5 is rewritten to record the original idea for a future redesign rather
+than deleted outright. Before that, **2026-09-17 Starling real-device
+testing: findings and a fix** — the user connected a real Starling account
+and tested end to end, surfacing three real findings (an inner-ring
+opacity-fade bug for small settled values, the zoom-scoping issue just
+described, and the app's intentional linear-pace model producing a nonzero
+under/over-budget figure from minute one even with zero spending — the
+last one isn't a bug) plus a shipped fix (Starting value now auto-fills
 from the picked account's live balance). Before that, **2026-09-17 Starling
 implementation: first real Xcode feedback** — the user's own Xcode caught a
 deprecated `BGTaskScheduler.submit` call and two default-main-actor-isolation
@@ -1400,3 +1409,96 @@ Not verified by a compiler, same caveat as every Starling-related entry
 above. The three findings above, though, **were** verified against a real
 device/Starling account by the user — those are confirmed real, not
 speculative.
+
+## 2026-09-17 Zoom levels removed
+
+Following finding #2 from the real-device testing session above (the
+default "This Week" zoom silently scoping headline dashboard figures to a
+calendar-week-clamped fraction of a tracker's real budget, with no visual
+indication), the user asked to remove zoom levels from the app entirely
+rather than patch the default threshold or caption wording as a stopgap —
+"not working well so need a re-think... not important just yet anyway."
+Removed cleanly, not disabled/hidden: no `ZoomLevel` type, no zoom picker,
+no sub-period scoping anywhere in the app. A tracker's dashboard, trend
+chart, and every widget/complication family now always show the tracker's
+real, whole-period figures — exactly the pre-zoom-levels behavior.
+
+**Files deleted**: `src/WiggleRoomShared/Models/ZoomLevel.swift`,
+`src/WiggleRoomTests/ZoomLevelTests.swift`.
+
+**Files changed**:
+- `Tracker.swift` — removed `actualValue(atOrBefore:)` (only had one
+  caller, the now-removed zoomed pace calculation), `availableZoomLevels`,
+  and `subPeriod(for:asOf:)`. `periodRemainingText(asOf:until:)` lost its
+  `until` parameter (every other caller already used the default) and
+  reverted to always measuring against the tracker's own `endDate`.
+- `TrackerPace.swift` — removed the zoomed `pace(actualValue:asOf:zoomLevel:)`
+  overload entirely. The previously-separate `computePace` static function
+  (kept apart specifically so the zoomed overload could reuse it against a
+  sub-period) had only one caller left once that overload was gone, so it's
+  now inlined directly into the plain `pace(actualValue:asOf:)` — one
+  function, not two, doing the exact same math as before for every
+  existing caller.
+- `RingsView.swift` — removed the `zoomLevel: ZoomLevel = .overall`
+  parameter; `pace` always computes against the tracker's real period now.
+- `TrendChartView.swift` — removed the `zoomLevel` parameter along with
+  the whole "window" abstraction it existed to support
+  (`windowStartingValue`, `windowAllowance`, `windowedReadings` are gone);
+  every call site now reads `tracker.startingValue`/`tracker.totalAllowance`/
+  `tracker.sortedReadings` directly, since the chart always covers the
+  tracker's real full period again.
+- `TrackerDetailView.swift` — removed the `@State private var zoomLevel`
+  property, the custom `init` that used to pick its default (the type now
+  relies on Swift's synthesized memberwise `init(tracker:)`, since `let
+  tracker: Tracker` is the only stored property left without a default
+  value), `availableZoomLevels`, `zoomWindowEnd`, `windowedReadingCount`
+  (now just `tracker.sortedReadings.count` inlined at its one call site),
+  the zoom picker section in `body`, and the `zoomLevelPicker` view itself.
+  `RingsView`/`TrendChartView` are called with no zoom argument;
+  `periodRemainingText` dropped its `until:` argument to match `Tracker`'s
+  simplified signature.
+- `ValueSnapshot.swift`, `TrackerPace.swift` (`finalPaceStatus` doc
+  comment), `TrackerStore.swift` (`refreshFromSource` doc comment) — doc
+  comments that referenced zoom levels as a reason for the timestamped-
+  snapshot history requirement or as a caveat, reworded to stand on their
+  own (the trend chart alone already justifies keeping reading history;
+  `finalPaceStatus`/`refreshFromSource` no longer need to disclaim
+  anything zoom-related).
+- `docs/wiggleroom-build-spec.md` — §4.5 rewritten from a feature
+  description into a "removed, needs a rethink" section explaining what
+  broke and why it was pulled rather than patched in place, keeping the
+  original design idea on record for whenever it's revisited; every other
+  cross-reference to zoom levels (§6, §7.1, §8.1, §9, §12) updated to
+  match current (zoom-free) behavior rather than left stale.
+- `README.md` — status checklist line for §4.5 changed from done to "built,
+  then removed pending a redesign."
+
+**Widgets/complication were never touched** — they never adopted zoom
+levels in the first place (confirmed by grep before starting this removal:
+zero references anywhere in `WiggleRoomWidgets`/`WiggleRoomComplication`),
+so §8.1's build-spec line about "zoom-level configuration not yet built
+for widgets" is now moot rather than resolved — there's no base feature
+left for a widget to configure a zoom level against.
+
+**No regressions intended**: every simplified function computes exactly
+the same result it did before for the `.overall` case (which was already
+the only case most trackers — anything a week or shorter — ever used),
+since removing the zoom branch just means that code path is gone, not that
+the surviving path's math changed. `TrackerPaceTests`/`TrackerTests`
+already only exercised the plain `pace(actualValue:asOf:)` overload and
+`periodRemainingText(asOf:)` with no `until:` argument, so neither needed
+updating — only `ZoomLevelTests.swift` (entirely zoom-specific) was
+deleted outright.
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every Starling/
+real-device-testing entry above (no Swift toolchain in this environment).
+Manually re-checked every changed file for leftover references (a repo-wide
+grep for `zoomLevel`/`ZoomLevel`/`subPeriod`/`availableZoomLevels`/
+`windowedReadings`/`windowStartingValue`/`windowAllowance`/
+`actualValue(atOrBefore` returns nothing after this change) and for
+structural correctness (brace matching, the synthesized memberwise init
+replacing the deleted custom one). Build in Xcode and run the test suite
+before trusting this further, same as everything else in this file's
+Starling-adjacent entries.
