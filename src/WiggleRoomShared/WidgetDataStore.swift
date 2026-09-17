@@ -8,18 +8,24 @@ import Foundation
 import SwiftData
 import os
 
-/// A glanceable extension's own read access to the same CloudKit-synced
-/// SwiftData store the main app uses (§6 of the build spec). Shared by every
-/// WidgetKit-based extension in this app — the iOS/macOS Home/Lock Screen
-/// widgets (`WiggleRoomWidgets`) and the watchOS complication
-/// (`WiggleRoomComplication`, §7.3) — since each runs in its own process and
-/// needs the identical CloudKit cold-start/import-wait handling below; living
-/// here instead of duplicated per-extension means a fix to that handling
-/// (like the CloudKit-import-notification wait) only has to happen once.
-/// Each process opens its own `ModelContainer` against the same
-/// `iCloud.martinkearn.WiggleRoom` container rather than sharing the main
-/// app's in-memory one — no App Group is needed for this: CloudKit sync (not
-/// a shared local file) is what keeps every process's data consistent.
+/// A glanceable extension's own read access to the same CloudKit-synced,
+/// App Group-shared SwiftData store the main app uses (§6 of the build
+/// spec). Shared by every WidgetKit-based extension in this app — the
+/// iOS/macOS Home/Lock Screen widgets (`WiggleRoomWidgets`) and the watchOS
+/// complication (`WiggleRoomComplication`, §7.3) — since each runs in its
+/// own process and needs the identical CloudKit cold-start/import-wait
+/// handling below; living here instead of duplicated per-extension means a
+/// fix to that handling (like the CloudKit-import-notification wait) only
+/// has to happen once. Each process opens its own `ModelContainer`, but all
+/// of them point at the same on-disk file — the shared App Group container
+/// (`AppGroup.identifier`), not each target's own private sandbox — so a
+/// same-device change (the phone app writing, this extension reading) is
+/// visible instantly, with no CloudKit round-trip needed for that. CloudKit
+/// sync is still what keeps *different devices* (the phone and the Mac, or
+/// the phone and the Watch) consistent with each other — the cold-start/
+/// import-wait handling below exists for that cross-device case, and for
+/// this extension's own very first launch before it's ever shared the App
+/// Group container with a process that already warmed it.
 enum WidgetDataStore {
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "martinkearn.WiggleRoom",
@@ -38,7 +44,15 @@ enum WidgetDataStore {
     static func makeContainer() throws -> ModelContainer {
         if let cachedContainer { return cachedContainer }
         let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
-        let configuration = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
+        // Shared App Group container (see `AppGroup`) — the same on-disk
+        // store the host app (WiggleRoom/WiggleRoomWatch) opens, so this
+        // extension sees a same-device change the instant it's asked for,
+        // with no CloudKit round-trip needed for same-device freshness.
+        let configuration = ModelConfiguration(
+            schema: schema,
+            groupContainer: .identifier(AppGroup.identifier),
+            cloudKitDatabase: .automatic
+        )
         do {
             let container = try ModelContainer(for: schema, configurations: [configuration])
             cachedContainer = container
@@ -72,7 +86,7 @@ enum WidgetDataStore {
     /// one-time cold-start cost per extension process — once
     /// `cachedContainer` above is warm, later calls return immediately.
     ///
-    /// When trackers *are* already present, this still gives CloudKit one
+    /// When trackers *are* already present, this still gives CloudKit a
     /// short, bounded chance to deliver a fresher import before returning.
     /// `TrackerStore` calls `WidgetCenter.reloadAllTimelines()` the instant
     /// a reading is logged in the main app, which makes WidgetKit re-invoke
@@ -81,11 +95,15 @@ enum WidgetDataStore {
     /// separate local store (see the type doc above: no App Group, CloudKit
     /// sync is the only channel). Without this, a value *update* to a
     /// tracker the widget already knows about was invisible until the
-    /// store's own hourly refresh or the next unrelated reload, since only
-    /// the true-empty case above ever waited at all. This wait is much
-    /// shorter than `fetchAllTrackersForConfiguration()`'s — this runs
-    /// inside WidgetKit's own timeline-generation budget, not behind an
-    /// interactive "Loading" sheet, so it can't afford to be generous.
+    /// store's own periodic refresh or the next unrelated reload, since
+    /// only the true-empty case above ever waited at all. Polls up to three
+    /// times (~6s total) rather than one single 2s attempt — a wider net
+    /// for actually catching the freshly-synced change on this triggered
+    /// reload, rather than falling back to whatever the *next* scheduled
+    /// reload happens to be. Still much shorter than
+    /// `fetchAllTrackersForConfiguration()`'s — this runs inside WidgetKit's
+    /// own timeline-generation budget, not behind an interactive "Loading"
+    /// sheet, so it can't afford to be as generous.
     @MainActor
     static func fetchAllTrackers() async throws -> [Tracker] {
         do {
@@ -100,8 +118,10 @@ enum WidgetDataStore {
                     }
                 }
             } else {
-                await waitForNextCloudKitImport(timeout: 2)
-                trackers = try fetchAllTrackersImmediately()
+                for _ in 1...3 {
+                    await waitForNextCloudKitImport(timeout: 2)
+                    trackers = try fetchAllTrackersImmediately()
+                }
             }
             return trackers
         } catch {
