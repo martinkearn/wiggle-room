@@ -119,6 +119,24 @@ struct TrackerDetailView: View {
     private var dashboardScrollView: some View {
         ScrollView {
             VStack(spacing: 28) {
+                // Two lines rather than one combined string — the system
+                // navigation subtitle this used to live in only ever gets a
+                // single line, and "date range · days remaining" together
+                // routinely overflowed that space (especially with a timed,
+                // not just dated, range) and got truncated. Living in the
+                // body instead, right under the title, gives each its own
+                // line with room to actually fit.
+                VStack(spacing: 2) {
+                    Text(periodRangeText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(periodRemainingText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .multilineTextAlignment(.center)
+                .padding(.top, 4)
+
                 // The whole screen's figures update on this cadence (Target
                 // Right Now, the ring, the difference) — not just one card —
                 // so the countdown lives up top rather than tucked under a
@@ -185,7 +203,6 @@ struct TrackerDetailView: View {
         }
         #endif
         .navigationTitle(tracker.name)
-        .navigationSubtitle(dashboardSubtitle)
         .inlineNavigationBarIfAvailable()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -448,23 +465,14 @@ struct TrackerDetailView: View {
         .hour()
         .minute()
 
-    /// "12 Jan, 9:00 AM – 19 Jan, 9:00 AM" — the tracker's own bounds,
-    /// distinct from `periodRemainingText`'s live countdown alongside it.
+    /// "12 Jan, 9:00 AM – 19 Jan, 9:00 AM" — the tracker's own bounds, on
+    /// its own line above `periodRemainingText`'s live countdown.
     private var periodRangeText: String {
         "\(tracker.startDate.formatted(Self.periodRangeFormatter)) \u{2013} \(tracker.endDate.formatted(Self.periodRangeFormatter))"
     }
 
     private var periodRemainingText: String {
         tracker.periodRemainingText(asOf: now, until: zoomWindowEnd)
-    }
-
-    /// "12 Jan, 9:00 AM – 19 Jan, 9:00 AM · 3 days remaining" — the
-    /// tracker's own bounds and live countdown, combined into the
-    /// navigation bar's subtitle rather than sitting as their own row in
-    /// the scrollable content, so they read as context for the screen
-    /// (right under its title) rather than another dashboard figure.
-    private var dashboardSubtitle: String {
-        "\(periodRangeText) \u{00B7} \(periodRemainingText)"
     }
 
     /// Segmented zoom-level control (§4.5, §7.1) sitting above the rings —
