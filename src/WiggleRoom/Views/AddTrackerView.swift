@@ -66,6 +66,15 @@ struct AddTrackerView: View {
     @State private var targetLoadErrorMessage: String?
     @State private var isPrefillingStartingValue = false
 
+    /// The bound account's display name, resolved read-only when editing an
+    /// existing tracker on a real (non-manual) source — `Tracker` only
+    /// stores `sourceTargetId` (a bare id like a Starling `accountUid`), not
+    /// a human-readable label, so this is fetched live the same way the
+    /// target picker fetches its list. `nil` while loading or for a manual
+    /// tracker (which has nothing to resolve).
+    @State private var resolvedAccountName: String?
+    @State private var isResolvingAccountName = false
+
     /// §5.5 — a lightweight local-notification reminder to log a new
     /// reading, on a user-set cadence in minutes. `nil` means no reminder.
     /// Only offered for a manual-entry tracker (see `isManualEntrySelected`)
@@ -184,8 +193,17 @@ struct AddTrackerView: View {
                 } else {
                     Section {
                         LabeledContent("Source", value: existingTracker?.connectedSource?.displayName ?? "Manual Entry")
+                        if existingTracker?.isManualEntry == false {
+                            if isResolvingAccountName {
+                                LabeledContent("Account") {
+                                    ProgressView()
+                                }
+                            } else {
+                                LabeledContent("Account", value: resolvedAccountName ?? existingTracker?.sourceTargetId ?? "Unknown")
+                            }
+                        }
                     } footer: {
-                        Text("A tracker's source can't be changed after it's created.")
+                        Text("A tracker's source and account can't be changed after it's created.")
                     }
                 }
 
@@ -241,6 +259,7 @@ struct AddTrackerView: View {
                     totalAllowanceText = existingTracker.totalAllowance.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                     sourceSelection = .source(existingTracker.connectedSource?.id ?? store.manualEntrySource.id)
                     reminderCadenceMinutes = existingTracker.reminderCadenceMinutes
+                    await resolveAccountNameIfNeeded(for: existingTracker)
                 } else if sourceSelection == nil {
                     sourceSelection = .source(store.manualEntrySource.id)
                 }
@@ -309,6 +328,26 @@ struct AddTrackerView: View {
         } catch {
             targetLoadErrorMessage = "Couldn't load accounts for this source — try again."
         }
+    }
+
+    /// Read-only resolution of a bound account's display name when editing
+    /// an existing tracker on a real (non-manual) source — `Tracker` only
+    /// stores `sourceTargetId` (a bare id like a Starling `accountUid`), not
+    /// a human-readable label, so this fetches the source's current
+    /// account list (same call the target picker makes for a new tracker)
+    /// and finds the matching one. Never lets the user change anything —
+    /// this only fills in the "Account" row for display. Falls back to the
+    /// raw id if the fetch fails or the account is no longer listed (e.g.
+    /// renamed/closed at Starling) rather than leaving the row blank.
+    private func resolveAccountNameIfNeeded(for tracker: Tracker) async {
+        guard !tracker.isManualEntry,
+              let source = tracker.connectedSource,
+              let targetId = tracker.sourceTargetId
+        else { return }
+        isResolvingAccountName = true
+        defer { isResolvingAccountName = false }
+        guard let targets = try? await store.listAvailableTargets(for: source) else { return }
+        resolvedAccountName = targets.first(where: { $0.id == targetId })?.displayName
     }
 
     /// Prefills "Starting value" with the picked account's live balance

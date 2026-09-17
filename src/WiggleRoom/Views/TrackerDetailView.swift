@@ -61,6 +61,14 @@ struct TrackerDetailView: View {
     /// the same tracker.
     @State private var isRefreshingFromSource = false
 
+    /// The bound account's display name for a real, non-manual source —
+    /// `Tracker` only stores `sourceTargetId` (a bare id), not a
+    /// human-readable label, so this is resolved live once on appear
+    /// (`resolveAccountNameIfNeeded()`), not on every 30s tick, to avoid
+    /// spending a Starling request on something that never changes for a
+    /// given tracker. Falls back to the raw id if unresolved.
+    @State private var resolvedAccountName: String?
+
     private var now: Date { ticker.now }
 
     private var isCompleted: Bool {
@@ -96,6 +104,13 @@ struct TrackerDetailView: View {
     private var dashboardScrollView: some View {
         ScrollView {
             VStack(spacing: 28) {
+                if let sourceCaption {
+                    Text(sourceCaption)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 4)
+                }
+
                 // The whole screen's figures update on this cadence (Target
                 // Right Now, the ring, the difference) — not just one card —
                 // so the countdown lives up top rather than tucked under a
@@ -117,7 +132,7 @@ struct TrackerDetailView: View {
                         pullToUpdateHint
                         #endif
                     }
-                    .padding(.top, 4)
+                    .padding(.top, sourceCaption == nil ? 4 : 0)
                 }
 
                 if isCompleted {
@@ -248,6 +263,9 @@ struct TrackerDetailView: View {
             if !tracker.isManualEntry && !isCompleted {
                 Task { await refreshFromSourceIfNeeded() }
             }
+            if !tracker.isManualEntry && resolvedAccountName == nil {
+                Task { await resolveAccountNameIfNeeded() }
+            }
         }
         // Keyed on the reading's own id, not its value — logging a reading
         // that happens to match the previous one is still a genuine update
@@ -365,6 +383,33 @@ struct TrackerDetailView: View {
         } catch {
             refreshErrorMessage = Self.errorMessage(for: error)
         }
+    }
+
+    /// Read-only resolution of the bound account's display name — fetches
+    /// the source's current account list (the same call the target picker
+    /// makes) and finds the one matching `tracker.sourceTargetId`. Never
+    /// re-fetched on a tick, only once per appearance (guarded by the
+    /// `resolvedAccountName == nil` check at the call site) — a tracker's
+    /// bound account never changes after creation (§7.1), so there's
+    /// nothing to keep polling for here. Falls back to the raw id (still
+    /// shown via `sourceCaption`) if the fetch fails or the account is no
+    /// longer listed.
+    private func resolveAccountNameIfNeeded() async {
+        guard let source = tracker.connectedSource, let targetId = tracker.sourceTargetId,
+              let provider = store.provider(for: tracker)
+        else { return }
+        guard let targets = try? await provider.listAvailableTargets(for: source) else { return }
+        resolvedAccountName = targets.first(where: { $0.id == targetId })?.displayName
+    }
+
+    /// "My Starling Account · Personal" — shown for a real, non-manual
+    /// source so it's clear at a glance which connection/account this
+    /// tracker's figures actually come from, without needing to open Edit
+    /// Tracker. `nil` for a manual tracker (nothing to name).
+    private var sourceCaption: String? {
+        guard !tracker.isManualEntry, let source = tracker.connectedSource else { return nil }
+        let account = resolvedAccountName ?? tracker.sourceTargetId ?? ""
+        return account.isEmpty ? source.displayName : "\(source.displayName) \u{00B7} \(account)"
     }
 
     /// A short, distinct-from-stale-data error line (§8.4) — never leaves a

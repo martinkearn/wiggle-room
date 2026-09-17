@@ -1,7 +1,13 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Fix Starting-value auto-fill clobbering manual entry**
+after **2026-09-17 Surface the bound account read-only, in two places** —
+confirmed a tracker's connected source/account is already fully locked
+after creation (only the initializer ever sets those fields), then made
+the binding visible rather than editable: a read-only "Account" row in
+Edit Tracker, and a small source/account caption on the Tracker Detail
+dashboard, both resolved once and never on the 30s refresh tick. Before
+that, **2026-09-17 Fix Starting-value auto-fill clobbering manual entry**
 — a Starling tracker backdated to reflect an earlier balance (£639) had
 its starting value silently overwritten with the balance *at save time*
 (£615) once the user picked the Starling account, because the auto-fill
@@ -1784,3 +1790,50 @@ guessed at, and the fix directly addresses the traced mechanism, but
 hasn't been confirmed against a real build or the exact reported scenario
 (backdated start time + manual starting value + picking a Starling
 account) on a device.
+
+## 2026-09-17 Surface the bound account read-only, in two places
+
+Confirmed with the user that a tracker's connected source and account are
+already fully locked after creation — the only code that ever sets
+`Tracker.connectedSource`/`sourceTargetId` is the initializer itself, and
+`AddTrackerView`'s edit mode has never rendered an editable picker for
+either. Two follow-up asks from that conversation, both about *showing*
+that binding rather than changing it:
+
+1. **Edit Tracker** showed the source's display name as a read-only row
+   already, but never which specific account within it. Added an
+   "Account" row alongside it (`AddTrackerView.swift`) — resolved live via
+   `store.listAvailableTargets(for:)`, matched against the tracker's
+   stored `sourceTargetId`, with a loading spinner while in flight and a
+   fallback to the raw id if the fetch fails or the account's no longer
+   listed. New state: `resolvedAccountName`/`isResolvingAccountName`, a
+   `resolveAccountNameIfNeeded(for:)` async function, called once from the
+   existing `.task { }` that populates the edit form. Footer text updated
+   from "source can't be changed" to "source and account can't be
+   changed."
+2. **Tracker Detail dashboard** had no indication anywhere of which
+   source/account a tracker's live figures come from. Added a small
+   tertiary-style caption ("My Starling Account · Personal") above the
+   "Refreshes in Xs" countdown, shown only for a real (non-manual) source
+   (`TrackerDetailView.swift`). Same resolution approach as Edit Tracker
+   (`resolveAccountNameIfNeeded()`, `sourceCaption`), but deliberately
+   **not** tied to the 30s refresh tick — it resolves once per appearance
+   (guarded by `resolvedAccountName == nil`) since a tracker's bound
+   account never changes, and re-fetching the full account list every 30
+   seconds alongside the balance poll would burn extra Starling requests
+   for information that's already static.
+
+Neither change touches `Tracker.connectedSource`/`sourceTargetId` at all —
+both are pure display, confirming (not just preserving) the existing
+lock.
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every entry in this
+stretch. Both new resolution functions follow the exact pattern already
+used (and manually re-checked) by `AddTrackerView`'s target-picker
+prefill from earlier sessions, so the risk profile is similar; still
+needs a real build and a look at an actual Starling tracker's Edit screen
+and dashboard to confirm the caption/row render sensibly and don't
+crowd already-tight layouts (the watch app and small widget families
+were deliberately left untouched — no room for this there).
