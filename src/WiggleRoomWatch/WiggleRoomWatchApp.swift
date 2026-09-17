@@ -19,11 +19,19 @@ struct WiggleRoomWatchApp: App {
 
     init() {
         let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
-        let cloudConfiguration = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
+        // Shared App Group container (see `AppGroup`) so the complication
+        // extension (`WidgetDataStore`, embedded alongside this app on the
+        // same Watch) reads the exact same on-disk store instead of its own
+        // separate copy — same reasoning as the phone app/widgets pairing.
+        let cloudConfiguration = ModelConfiguration(
+            schema: schema,
+            groupContainer: .identifier(AppGroup.identifier),
+            cloudKitDatabase: .automatic
+        )
         if let container = try? ModelContainer(for: schema, configurations: [cloudConfiguration]) {
             modelContainer = container
         } else {
-            let localConfiguration = ModelConfiguration(schema: schema)
+            let localConfiguration = ModelConfiguration(schema: schema, groupContainer: .identifier(AppGroup.identifier))
             guard let localContainer = try? ModelContainer(for: schema, configurations: [localConfiguration]) else {
                 fatalError("Could not create a ModelContainer")
             }
