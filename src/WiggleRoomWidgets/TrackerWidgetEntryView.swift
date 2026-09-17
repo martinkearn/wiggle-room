@@ -249,7 +249,7 @@ struct TrackerWidgetEntryView: View {
                         title: "Target Right Now",
                         value: tracker.formattedValue(p.targetValueToday),
                         color: .primary,
-                        caption: "Final balance will be \(tracker.formattedValue(tracker.projectedFinalValue))"
+                        caption: "Final target will be \(tracker.formattedValue(tracker.projectedFinalValue))"
                     )
                 }
             }

@@ -421,11 +421,11 @@ struct TrackerDetailView: View {
 
     /// The small, subtle line under Target Right Now's own number — same
     /// weight/position as Current Balance's "£X left in this budget" — but
-    /// stating the tracker's projected final balance instead: where the
+    /// stating the tracker's projected final target instead: where the
     /// number above is landing right now, this is where it's designed to
     /// land by the very end of the period.
     private var finalBalanceCaption: String {
-        "Final balance will be \(tracker.formattedValue(tracker.projectedFinalValue))"
+        "Final target will be \(tracker.formattedValue(tracker.projectedFinalValue))"
     }
 
     private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {
@@ -449,13 +449,21 @@ struct TrackerDetailView: View {
     private static let periodRangeFormatter: Date.FormatStyle = .init()
         .month(.abbreviated)
         .day()
+
+    private static let periodRangeWithTimeFormatter: Date.FormatStyle = .init()
+        .month(.abbreviated)
+        .day()
         .hour()
         .minute()
 
-    /// "12 Jan, 9:00 AM – 19 Jan, 9:00 AM" — the tracker's own bounds, on
-    /// its own line above `periodRemainingText`'s live countdown.
+    /// "12 Jan – 19 Jan", or "12 Jan, 9:00 AM – 19 Jan, 9:00 AM" only once
+    /// the tracker actually has a set time of day (`hasExplicitTimes`) —
+    /// otherwise both bounds sit at an implicit midnight, and printing that
+    /// out as "12:00 AM" reads as a real, deliberately-chosen time rather
+    /// than the meaningless default it actually is.
     private var periodRangeText: String {
-        "\(tracker.startDate.formatted(Self.periodRangeFormatter)) \u{2013} \(tracker.endDate.formatted(Self.periodRangeFormatter))"
+        let formatter = tracker.hasExplicitTimes ? Self.periodRangeWithTimeFormatter : Self.periodRangeFormatter
+        return "\(tracker.startDate.formatted(formatter)) \u{2013} \(tracker.endDate.formatted(formatter))"
     }
 
     private var periodRemainingText: String {
