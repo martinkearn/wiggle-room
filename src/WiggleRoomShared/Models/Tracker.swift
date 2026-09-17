@@ -112,6 +112,18 @@ extension Tracker {
     func isCompleted(asOf now: Date = .now) -> Bool {
         now >= endDate
     }
+
+    /// Whether `startDate`/`endDate` carry a meaningful time of day, rather
+    /// than both sitting at midnight — mirrors the "Set specific times"
+    /// toggle in the Add/Edit Tracker form (`AddTrackerView`), so a date
+    /// display elsewhere (the dashboard's header) can decide whether
+    /// showing a time alongside the date is actually telling the user
+    /// something they set, or just repeating an implicit midnight default.
+    var hasExplicitTimes: Bool {
+        let calendar = Calendar.current
+        return !calendar.isDate(startDate, equalTo: calendar.startOfDay(for: startDate), toGranularity: .minute)
+            || !calendar.isDate(endDate, equalTo: calendar.startOfDay(for: endDate), toGranularity: .minute)
+    }
 }
 
 extension Tracker {
@@ -160,9 +172,13 @@ extension Tracker {
     /// Formats a value in this tracker's unit, placing a currency symbol on
     /// the left with no space (e.g. "£1,234.56") or any other unit on the
     /// right with a space (e.g. "1,234 miles"). `signed` prefixes a "+" for
-    /// non-negative values (negative values always show their own "-"). A
-    /// whole number shows no decimal places ("£684"); anything with a
-    /// fractional part always shows exactly 2 ("£692.40", never "£692.4").
+    /// non-negative values (negative values always show their own "-"). For
+    /// a currency unit, a whole number shows no decimal places ("£684") and
+    /// anything with a fractional part always shows exactly 2 ("£692.40",
+    /// never "£692.4"). A non-currency unit (mileage and the like) never
+    /// shows decimal places at all — a fraction of a mile isn't a
+    /// meaningful reading, so it's rounded to the nearest whole number
+    /// rather than surfacing precision nobody logged on purpose.
     func formattedValue(_ value: Decimal, signed: Bool = false) -> String {
         Tracker.formattedValue(value, unit: unit, signed: signed)
     }
@@ -172,8 +188,10 @@ extension Tracker {
     /// Tracker" form.
     static func formattedValue(_ value: Decimal, unit: String, signed: Bool = false) -> String {
         let absoluteValue = abs(value)
+        let showsDecimals = isCurrencyUnit(unit)
         let isWhole = (absoluteValue as NSDecimalNumber).doubleValue.truncatingRemainder(dividingBy: 1) == 0
-        let magnitude = absoluteValue.formatted(.number.precision(.fractionLength(isWhole ? 0 : 2)))
+        let fractionLength = showsDecimals && !isWhole ? 2 : 0
+        let magnitude = absoluteValue.formatted(.number.precision(.fractionLength(fractionLength)))
         let sign: String
         if value < 0 {
             sign = "-"

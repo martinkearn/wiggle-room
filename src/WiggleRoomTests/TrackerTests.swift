@@ -90,6 +90,11 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(t.formattedValue(50, signed: false), "£50")
     }
 
+    func testFormattedValue_suffixUnit_neverShowsDecimalPlaces() {
+        let t = tracker(unit: "mi")
+        XCTAssertEqual(t.formattedValue(1234.56), "1,235 mi", "a fractional mile isn't a meaningful reading, so it rounds rather than showing decimals")
+    }
+
     // MARK: - projectedRemainder
 
     func testProjectedRemainder_increasingTracker_isAlwaysNil() {
