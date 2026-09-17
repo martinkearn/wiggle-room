@@ -21,15 +21,18 @@ struct TrackerComplicationProvider: AppIntentTimelineProvider {
         TrackerComplicationEntry(date: .now, tracker: await resolvedTracker(for: configuration))
     }
 
-    /// Same hourly ceiling as the phone/Mac widgets (§8.1) — a complication
-    /// only needs to look live at a glance, not tick in real time, and
-    /// `CloudSyncWidgetRefresher`/`TrackerStore.reloadWidgets()` already
-    /// force an earlier reload on any real data change.
+    /// Same end-aligned reload policy as the phone/Mac widgets (§8.1) — a
+    /// complication only needs to look live at a glance, not tick in real
+    /// time, and `CloudSyncWidgetRefresher`/`TrackerStore.reloadWidgets()`
+    /// already force an earlier reload on any real data change.
     @MainActor
     func timeline(for configuration: SelectTrackerIntent, in context: Context) async -> Timeline<TrackerComplicationEntry> {
         let now = Date.now
-        let entry = TrackerComplicationEntry(date: now, tracker: await resolvedTracker(for: configuration))
-        let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: now) ?? now.addingTimeInterval(3600)
+        let tracker = await resolvedTracker(for: configuration)
+        let entry = TrackerComplicationEntry(date: now, tracker: tracker)
+        let nextUpdate = tracker.map {
+            TrackerUpdateScheduling.nextWidgetReloadDate(after: now, until: $0.endDate)
+        } ?? now.addingTimeInterval(900)
         return Timeline(entries: [entry], policy: .after(nextUpdate))
     }
 

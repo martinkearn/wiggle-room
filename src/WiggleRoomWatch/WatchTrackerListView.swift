@@ -46,9 +46,14 @@ private struct WatchTrackerRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(tracker.name)
-                .font(.headline)
-                .lineLimit(1)
+            HStack(spacing: 4) {
+                Text(tracker.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                if tracker.isCompleted() {
+                    CompletedBadge()
+                }
+            }
             if tracker.latestReading != nil {
                 Text(pace.displayDifference(for: tracker))
                     .font(.subheadline.weight(.semibold))

@@ -66,7 +66,7 @@ struct TrackerComplicationEntryView: View {
                 .lineLimit(1)
             Text(p.displayDifference(for: tracker))
                 .font(.wiggleNumber(.caption))
-            Text(p.status.label(for: tracker))
+            Text(tracker.isCompleted(asOf: entry.date) ? "Completed" : p.status.label(for: tracker))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
