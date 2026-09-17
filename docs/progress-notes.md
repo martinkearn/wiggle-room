@@ -1020,3 +1020,31 @@ provider code exists at all (see the session above).
 ### Verifying this session's changes
 
 No code changed — research and a spec refinement only.
+
+## 2026-09-17 Low Power Mode backoff decision (no code changed)
+
+Same-day follow-up, closing out a question the user raised about whether
+the refresh cadence should back off under Low Power Mode, Sleep Focus, or
+StandBy. No code changed.
+
+**Decision** (see build-spec.md §5.3): back off the foreground 30s
+detail-screen poll (widen to roughly 60–120s, exact figure left to tune at
+build time) whenever `ProcessInfo.processInfo.isLowPowerModeEnabled` is
+true, observed live via `NSProcessInfoPowerStateDidChange`. Foreground-only
+— the 5-minute `BGAppRefreshTask` background path needs no app-side change,
+since iOS already deprioritizes background task scheduling itself under
+Low Power Mode/low battery.
+
+Sleep Focus and StandBy were both considered and explicitly **not**
+adopted as backoff signals: Sleep Focus has no public API to detect
+specifically (`INFocusStatusCenter`'s `focusStatus.isFocused` only reports
+that *some* Focus is active — Sleep, Work, and Do Not Disturb are
+indistinguishable — and needs a user authorization prompt to use at all,
+which isn't worth it for what it buys); StandBy isn't a distinct
+app-observable state at all — it's a display mode while locked/charging,
+and is already covered by the existing foreground-vs-background split (the
+30s poll only runs while a detail screen is genuinely on-screen).
+
+### Verifying this session's changes
+
+No code changed — a scoped decision recorded in the spec only.
