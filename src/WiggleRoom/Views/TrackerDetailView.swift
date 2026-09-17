@@ -122,17 +122,21 @@ struct TrackerDetailView: View {
                 // The whole screen's figures update on this cadence (Target
                 // Right Now, the ring, the difference) — not just one card —
                 // so the countdown lives up top rather than tucked under a
-                // single figure. The pull-gesture hint sits right beside it
-                // rather than lower on the screen — this is the one spot on
-                // the dashboard already telling you your figures are about
-                // to move on their own, so it's the natural place to also
-                // say how to make that happen right now instead of waiting.
+                // single figure. The pull-gesture hint sits right next to it
+                // on the same line, above the rings, rather than lower on
+                // the screen — this is the one spot on the dashboard already
+                // telling you your figures are about to move on their own,
+                // so it's the natural place to also say how to make that
+                // happen right now instead of waiting.
                 if let screenUpdateCaption {
-                    VStack(spacing: 2) {
+                    HStack(spacing: 6) {
                         Text(screenUpdateCaption)
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                         #if !os(macOS)
+                        Text("\u{00B7}")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                         pullToUpdateHint
                         #endif
                     }
