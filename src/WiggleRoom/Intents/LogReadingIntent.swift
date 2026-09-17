@@ -9,11 +9,14 @@ import SwiftData
 
 enum LogReadingIntentError: Error, CustomLocalizedStringResourceConvertible {
     case notManualEntry(name: String)
+    case completed(name: String)
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
         case .notManualEntry(let name):
             return "\"\(name)\" isn't a manual tracker, so it can't be updated from Shortcuts."
+        case .completed(let name):
+            return "\"\(name)\" has already completed, so it can't be updated anymore."
         }
     }
 }
@@ -41,6 +44,9 @@ struct LogReadingIntent: AppIntent {
         guard let liveTracker = try container.mainContext.fetch(descriptor).first,
               liveTracker.isManualEntry else {
             throw LogReadingIntentError.notManualEntry(name: tracker.name)
+        }
+        guard !liveTracker.isCompleted() else {
+            throw LogReadingIntentError.completed(name: tracker.name)
         }
 
         store.logReading(value: Decimal(value), date: .now, for: liveTracker)
