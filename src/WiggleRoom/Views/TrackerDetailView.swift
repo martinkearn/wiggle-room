@@ -8,13 +8,20 @@ import SwiftData
 
 /// Tracker detail / dashboard (§7.1): the two-ring visual as the primary
 /// visual (with the difference-from-target as its centerpiece — that's the
-/// key number, per §3.2), current value, live target, days remaining, an
-/// "Update Current Balance" button (manual, not-yet-completed trackers
-/// only — no auto-fetch providers exist yet, so no refresh button), and a
+/// key number, per §3.2), current value, live target, days remaining, and a
 /// trend chart once at least one reading exists. Once the tracker's period
 /// has actually ended, the dashboard switches into a completed presentation
 /// (see `isCompleted`) — the live projection and update controls no longer
 /// apply, so they're replaced with a final summary instead.
+///
+/// On iOS/iPadOS, updating is a pull-to-refresh gesture on the whole screen
+/// (`.refreshable`, see `handleUpdateGesture()`) rather than a dedicated
+/// button — today that opens the manual "log a reading" sheet, but the same
+/// gesture is meant to double as the eventual refresh action for a real
+/// auto-fetching connected source (Starling, Tesla), so there's exactly one
+/// gesture to learn for "bring this tracker's figures up to date" no matter
+/// where its data comes from. macOS has no pull gesture, so it keeps an
+/// explicit "Update Current Balance" button instead.
 struct TrackerDetailView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -139,7 +146,11 @@ struct TrackerDetailView: View {
                 } else {
                     figuresRow
                     if tracker.isManualEntry {
+                        #if os(macOS)
                         updateBalanceButton
+                        #else
+                        pullToUpdateHint
+                        #endif
                     }
                 }
 
@@ -166,6 +177,11 @@ struct TrackerDetailView: View {
             }
             .padding(.bottom, 32)
         }
+        #if !os(macOS)
+        .refreshable {
+            await handleUpdateGesture()
+        }
+        #endif
         .navigationTitle(tracker.name)
         .inlineNavigationBarIfAvailable()
         .toolbar {
@@ -272,8 +288,10 @@ struct TrackerDetailView: View {
     /// Two visually separate cards, not one shared row — Current Balance
     /// and Target Right Now are different things updated in different ways
     /// (one by logging a reading, one automatically by the clock) — but
-    /// otherwise identical in shape/weight, since the "Update Current
-    /// Balance" action now lives outside both of them (`updateBalanceButton`).
+    /// otherwise identical in shape/weight, since the update action now
+    /// lives outside both of them (a pull-to-refresh gesture on iOS, an
+    /// explicit button on macOS — see `handleUpdateGesture()`/
+    /// `updateBalanceButton`).
     private var figuresRow: some View {
         HStack(alignment: .top, spacing: 12) {
             card(tint: pace.status.color) {
@@ -316,11 +334,39 @@ struct TrackerDetailView: View {
         return "\(finalPace.statusLine(for: tracker)) \(finalPace.displayDifference(for: tracker))"
     }
 
-    /// Moved out from inside the Current Balance card so both figure cards
-    /// share identical visual weight — this now sits as its own full-width
-    /// control beneath them, only for a manual, not-yet-completed tracker
-    /// (an auto-fetching source's readings arrive on their own, and a
-    /// completed tracker no longer accepts updates).
+    #if !os(macOS)
+    /// The system pull-to-refresh gesture's action (`.refreshable` above) —
+    /// today the only "source" is manual entry, so this just opens the log
+    /// sheet, but the gesture itself is meant to be source-agnostic: once a
+    /// real auto-fetching connected source exists, the same pull-down
+    /// re-fetches from it instead, with no new gesture or control to learn.
+    /// A short pause before returning gives the refresh control a beat to
+    /// visibly settle before the sheet takes over, rather than the sheet
+    /// snapping up mid-pull.
+    private func handleUpdateGesture() async {
+        guard !isCompleted else { return }
+        guard tracker.isManualEntry else {
+            // No auto-fetching provider exists yet (§9) — nothing to
+            // refresh from until one does.
+            return
+        }
+        try? await Task.sleep(for: .milliseconds(300))
+        isPresentingLogReading = true
+    }
+
+    /// A persistent affordance for the pull-to-refresh gesture — unlike a
+    /// button, `.refreshable`'s own control only appears once a pull is
+    /// already underway, so without this there'd be nothing on screen
+    /// hinting the gesture exists at all.
+    private var pullToUpdateHint: some View {
+        Label("Pull down to update", systemImage: "arrow.down")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+    #else
+    /// macOS has no pull-to-refresh gesture, so it keeps an explicit button
+    /// instead — moved out from inside the Current Balance card so both
+    /// figure cards share identical visual weight.
     private var updateBalanceButton: some View {
         Button {
             isPresentingLogReading = true
@@ -336,6 +382,7 @@ struct TrackerDetailView: View {
         .tint(WiggleRoomColors.brand)
         .padding(.horizontal)
     }
+    #endif
 
     private func card(tint: Color, @ViewBuilder content: () -> some View) -> some View {
         VStack(spacing: 12) {
