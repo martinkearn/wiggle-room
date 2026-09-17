@@ -27,9 +27,7 @@ struct TrendChartView: View {
     var zoomLevel: ZoomLevel = .overall
     var now: Date = .now
 
-    private var liveContinuationLineStyle: StrokeStyle {
-        StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 4])
-    }
+    private static let liveContinuationLineStyle = StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 4])
 
     private var window: DateInterval {
         if let subPeriod = tracker.subPeriod(for: zoomLevel, asOf: now) {
@@ -283,14 +281,14 @@ struct TrendChartView: View {
                     series: .value("Series", "LiveContinuation")
                 )
                 .foregroundStyle(liveContinuationColor)
-                .lineStyle(liveContinuationLineStyle)
+                .lineStyle(Self.liveContinuationLineStyle)
                 LineMark(
                     x: .value("Date", liveNowPoint.date),
                     y: .value("Now", liveNowPoint.value),
                     series: .value("Series", "LiveContinuation")
                 )
                 .foregroundStyle(liveContinuationColor)
-                .lineStyle(liveContinuationLineStyle)
+                .lineStyle(Self.liveContinuationLineStyle)
 
                 PointMark(
                     x: .value("Date", liveNowPoint.date),
