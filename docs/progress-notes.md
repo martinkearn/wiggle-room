@@ -1,12 +1,24 @@
 # Wiggle Room — Progress Notes
 
-Status snapshot for picking this work back up. Last updated 2026-09-16, after
-a second follow-up pass the same day (see **2026-09-16 zoom levels &
-reminders follow-up** near the end) that implemented §4.5 zoom levels on the
-main dashboard, §5.5 manual-entry reminder notifications, and two small
-known-gap fixes (macOS Update History delete, the budget-footer copy). Before
-that: an earlier follow-up the same day (see **2026-09-16 follow-up**) added
-the watch complication, widget-to-tracker deep linking, macOS Dock badge +
+Status snapshot for picking this work back up. **Last updated 2026-09-17**,
+after a long same-day session (see **2026-09-17 chart/scheduling/
+completed-state overhaul** near the end) that redesigned the trend chart and
+ring visuals, replaced three separately-coded ~60s refresh timers with one
+shared end-aligned scheduler, added a first-class completed-tracker state,
+moved to pull-to-refresh on iOS, and fixed several real bugs (a pace-status
+grace zone that could show a tracker as "under budget" while its actual
+value sat below its own target, an inverted sign/wording convention for
+increasing trackers, mileage trackers showing decimals, and the widget
+"choose a tracker" picker resolving an already-selected tracker too eagerly).
+Two small changes landed the same day outside that session, directly in the
+project file — removing visionOS/Mac Catalyst from the supported platforms,
+and adding Xcode Cloud configuration — noted where relevant below but not
+otherwise elaborated on here. Before that: a same-day pass (see **2026-09-16
+zoom levels & reminders follow-up**) implemented §4.5 zoom levels on the main
+dashboard, §5.5 manual-entry reminder notifications, and two small known-gap
+fixes (macOS Update History delete, the budget-footer copy). Before that: an
+earlier follow-up the same day (see **2026-09-16 follow-up**) added the watch
+complication, widget-to-tracker deep linking, macOS Dock badge +
 pace-crossing notifications, a custom app font system, an app icon redesign,
 and various widget/countdown bug fixes. Before that: an overnight session on
 2026-09-14 added the widget extension, watch app, macOS parity, and
@@ -14,6 +26,11 @@ Shortcuts/Siri integration — see **Overnight platform expansion** below for
 that work; everything above it predates that session. Read alongside
 [wiggleroom-build-spec.md](wiggleroom-build-spec.md) — this file tracks *what's
 actually been built*, not the spec itself.
+
+**Keeping this file and the build spec in sync**: see
+[`CLAUDE.md`](../CLAUDE.md) at the repo root for the standing instruction —
+every session that changes app behavior updates both docs (and this file's
+intro paragraph) before finishing, not just when explicitly asked to.
 
 **Scope note**: the overnight session was explicitly told to stay manual-entry
 only — no Starling/Tesla work was done or attempted, despite the new
@@ -670,3 +687,236 @@ session's changes, including the embedded extensions that compile
 build` (`WiggleRoomWidgets`, `WiggleRoomWatch`, `WiggleRoomComplication` all
 embedded and signed) and `xcodebuild -scheme WiggleRoom -destination
 'platform=macOS' -allowProvisioningUpdates build`.
+
+## 2026-09-17 chart/scheduling/completed-state overhaul
+
+A long same-day session covering six areas requested together: chart
+visualization, scheduling/reminders, the tracker-details "Current Balance"
+UI, a first-class completed-tracker state, cross-platform data freshness,
+and widget/ring visual polish — followed by several rounds of bug fixes and
+refinements against real usage/screenshots. Unlike prior sessions recorded
+in this file, **this environment had no Xcode/simulator/`xcodebuild` access
+at all** — every change was verified with `swiftc -parse` (syntax only, no
+type-checking or SDK-availability checking) plus careful reading, not a real
+build. Treat everything below as reviewed-but-not-built-and-run until
+confirmed in Xcode; a few specific verification gaps are called out inline.
+
+### Chart & ring redesign
+
+- [`TrendChartView.swift`](../src/WiggleRoom/Views/TrendChartView.swift) —
+  the "Pace" reference line is renamed **"Target"** everywhere (legend,
+  Swift Charts series/value labels) to match the rest of the app's own
+  "Target Right Now" language, and is now the visually dominant line (solid,
+  `lineWidth: 3.5`) while the trend line is now **dotted** and distinct.
+  `trendPoints` no longer fits one straight line across the whole window —
+  it's an **expanding-window regression**, re-fit at each historical
+  reading and evaluated at that reading's own date, so the line traces
+  gentle curves as the trend shifts rather than being rigid; the final
+  point projects the full-data fit to the window's end (the "expected final
+  balance"), rendered with `interpolationMethod: .catmullRom`. Two new
+  subtle "carried-forward" points (`liveNowPoint`/`liveEndPoint`) hold the
+  latest reading's value flat out to "now" and to the window's end, so the
+  actual-data series visually spans the whole period even with sparse
+  readings — both skipped once the tracker has completed.
+- [`RingsView.swift`](../src/WiggleRoomShared/RingsView.swift) — went
+  through **two** passes this session. The first attempt shrank the
+  outer/inner ring gap to `lineWidth * 0.15` and added a self-closure
+  overlap arc, but the gap change was wrong: it didn't account for each
+  ring's stroke extending `lineWidth / 2` to either side of its own
+  center-line radius, so the two rings' *painted bands* actually overlapped
+  each other rather than just sitting close together. Fixed by separating
+  `ringGap` (the radius inset, which must exceed a full `lineWidth` to keep
+  the bands apart at all) from a new `bandGap` (`lineWidth * 0.12`, the
+  actual visible gap once that's accounted for) — see the type's own doc
+  comment for the exact geometry. The self-closure overlap (a short extra
+  arc drawn on top of a ring's own start once it's ≥98% closed, matching
+  Apple Fitness) is unrelated to that bug and was correct as designed; only
+  its threshold moved slightly (0.999 → 0.98) to fire a touch before an
+  exact 100% match. The below-the-rings color-key **legend was removed
+  entirely** (`legend`/`legendItem` deleted) — the figure cards elsewhere on
+  the same screen already use the identical two colors, so it was pure
+  repetition.
+
+### One shared, end-aligned scheduler replacing three separate timers
+
+- [`TrackerUpdateScheduling.swift`](../src/WiggleRoomShared/Models/TrackerUpdateScheduling.swift)
+  (new) — a pure, dependency-free function,
+  `nextUpdateDate(after:until:interval:)`, that walks backward from a
+  tracker's `endDate` in fixed steps rather than forward from "now", so the
+  *last* computed tick always lands exactly on `endDate` instead of
+  possibly overshooting by up to a full interval. `nextWidgetReloadDate`
+  wraps it with a budget-friendly ~15 minute cadence that tightens to 1
+  minute in the final hour. Deliberately has no `Timer`/`WidgetKit`/SwiftUI
+  dependency so it can be reused later by a real background fetch for a
+  connected source (Starling/Tesla) — "when should we next poll?" is the
+  same question either way.
+- [`AutoUpdateTicker.swift`](../src/WiggleRoomShared/State/AutoUpdateTicker.swift)
+  (new) — an `@Observable` class wrapping a 1-second poll (same trick the
+  old dashboard timer used — a `let`-stored `Timer.publish` gets recreated
+  every SwiftUI body re-evaluation, so anything relying on it surviving
+  longer than that interval silently never fires) that reschedules itself
+  via the function above against the nearest relevant tracker end date.
+  Replaced the three independently-coded ~60s-ish timers that used to live
+  separately in `TrackerDetailView` (1s + manual 60s rollover),
+  `TrackerListView`/`WatchTrackerDetailView` (bare 60s), and `MacRootView`
+  (a separate 60s timer for the Dock badge).
+- Widget/complication timeline reload policy
+  ([`TrackerTimelineProvider.swift`](../src/WiggleRoomWidgets/TrackerTimelineProvider.swift),
+  [`TrackerComplicationProvider.swift`](../src/WiggleRoomComplication/TrackerComplicationProvider.swift))
+  now uses `nextWidgetReloadDate` instead of a flat `now + 1h` — the direct
+  fix for widgets lagging the main app by several minutes.
+- Reminder cadence (§5.5) is now minute-granularity: `Tracker.reminderCadenceDays`
+  became **`reminderCadenceMinutes`** (a straight in-place rename — a
+  one-time reset of anyone's existing reminder selection, judged acceptable
+  for a solo-dev app under active iteration), with new **Every Minute** and
+  **Hourly** options in [`AddTrackerView.swift`](../src/WiggleRoom/Views/AddTrackerView.swift)'s
+  picker alongside Daily/Weekly/Every 2 Weeks/Monthly.
+  [`ReminderScheduler.swift`](../src/WiggleRoomShared/ReminderScheduler.swift)'s
+  trigger interval math changed accordingly (floored at 60s — `UNTimeIntervalNotificationTrigger`'s
+  own OS-enforced minimum for a repeating trigger), and it now also refuses
+  to (re-)schedule a reminder for a completed tracker, cancelling any
+  existing one instead.
+
+### Completed-tracker state (new)
+
+- [`Tracker.swift`](../src/WiggleRoomShared/Models/Tracker.swift) gained
+  `isCompleted(asOf:)` — the single source of truth for "this tracker's
+  period has ended," replacing ad hoc `now >= endDate` checks scattered
+  around the codebase. Used to: disable the update button/pull-to-refresh
+  action and the `LogReadingIntent` Shortcut, cancel reminders, hide the
+  zoom picker, and switch the dashboard into a completed presentation.
+- [`CompletedBadge.swift`](../src/WiggleRoomShared/CompletedBadge.swift)
+  (new) — a small shared "Completed" pill, shown on the tracker list, the
+  dashboard, the watch list, and every widget/complication family.
+- [`TrackerDetailView.swift`](../src/WiggleRoom/Views/TrackerDetailView.swift)'s
+  completed presentation replaces the live figure cards with a single
+  final-stats card (`completedSummary`) pinned to the tracker's own
+  `endDate` via a new `finalPace` computed property, rather than whatever
+  "now" happens to be well after closing — so re-opening a long-finished
+  tracker always shows the same final numbers.
+- The extra-large widget mirrors the same completed swap (final stats
+  instead of the live "Target Right Now" figure).
+
+### Tracker-details UI restructure
+
+Went through several rounds of layout changes based on live feedback, so
+the *current* end state is what matters, not the intermediate ones:
+
+- The date range and days-remaining line moved around a few times —
+  **current layout**: the date range lives in `.navigationSubtitle` (pinned
+  under the nav title, stays visible while scrolling), and
+  days-remaining sits as its own line beneath the Current
+  Balance/Target Right Now cards (or the completed summary). The date
+  range only includes a time of day when the tracker actually has one set
+  — new `Tracker.hasExplicitTimes` (mirrors `AddTrackerView`'s own "Set
+  specific times" toggle logic) — rather than always printing a
+  meaningless "12:00 AM" for the plain-date default.
+- The "Update" button moved out from inside the Current Balance card (both
+  figure cards now share identical visual weight) and, on iOS/iPadOS, was
+  **replaced entirely by a pull-to-refresh gesture** (`.refreshable` on the
+  dashboard's `ScrollView`) — deliberately the same gesture that's meant to
+  double as a future connected source's refresh action, not just today's
+  manual log-reading sheet. A small hint ("Pull down to update"/"Pull down
+  to refresh", wording depends on `tracker.isManualEntry`) sits on the same
+  line as the live-update countdown, above the rings — `.refreshable`'s own
+  system control only appears mid-pull, so without a persistent hint
+  there'd be no on-screen indication the gesture exists. macOS, which has
+  no pull gesture, keeps the explicit button (still labeled "Update Current
+  Balance").
+- The top-of-screen countdown is now worded **"Refreshes in Xs"** (was
+  "Updates in Xs"), matching the pull-to-refresh gesture it announces.
+- The Target Right Now card's caption changed twice this session: first
+  from the static "£X should remain at the end" to a new, universal "Final
+  target will be £X" (`Tracker.projectedFinalValue`, at the same visual
+  weight as Current Balance's "£X left in this budget"), driven by explicit
+  feedback that "balance" doesn't fit every tracker type.
+- The dashboard's default zoom level (§4.5) is now **This Week**, not
+  Overall, whenever a tracker is long enough to offer zoom levels at all —
+  set in a custom `init` so the very first render is already correct.
+
+### Real bugs fixed this session (not just polish)
+
+- **Pace-status grace zone hid small overages as "under budget"/green** —
+  [`TrackerPace.swift`](../src/WiggleRoomShared/Models/TrackerPace.swift)'s
+  `status` used to let a shortfall under 1% of `totalAllowance` still read
+  as `.good`, so a tracker whose actual value sat visibly *below* its own
+  target figure could still say "Under Budget" in green. Reported against a
+  real screenshot (balance £840, target £846.53, shown green/"under
+  budget"). Fixed: any `difference < 0` is now at least `.warning`; the
+  1–5%/>5% split (unchanged) only decides warning vs. bad from there. See
+  the updated §3.2 in the build spec — this reverses part of decision #26
+  below and is the new source of truth for that threshold.
+- **Increasing trackers showed the wrong sign and wording for "over"** —
+  a higher-than-target actual value (the bad/over case for an increasing
+  tracker, e.g. mileage) was displayed with a **minus sign** (via
+  `displayDifference`'s raw, unoriented `difference`) and labeled "Needs
+  Attention" instead of reading as "over budget." Fixed: `displayDifference`
+  negates `difference` first for an increasing tracker, so "over" (bad, a
+  higher number) shows without a minus and "under" (good, a lower number)
+  shows with one; `PaceStatus.label(for:)` now gives an increasing tracker
+  "Slightly Over Budget"/"Over Budget" wording (matching the decreasing
+  budget case) regardless of currency, keeping only a decreasing
+  non-currency tracker on the fully neutral "On Track"/"Needs Attention".
+- **Mileage (and other non-currency) trackers showed decimal places** —
+  `Tracker.formattedValue` now only shows the 2-decimal-when-fractional
+  rule for currency units; a non-currency unit always rounds to a whole
+  number.
+- **Widget/complication "choose a tracker" picker showed "Tracker: Tracker"
+  instead of the real selection, and could get stuck on "Loading" then
+  revert with nothing selectable** —
+  [`SelectTrackerIntent.swift`](../src/WiggleRoomWidgets/SelectTrackerIntent.swift)
+  (and the [`WiggleRoomComplication` copy](../src/WiggleRoomComplication/SelectTrackerIntent.swift))'s
+  `entities(for:)` — the call that resolves an *already-selected* tracker's
+  real name — was using `WidgetDataStore.fetchAllTrackers()`'s short ~2-4s
+  wait, meant to protect WidgetKit's own timeline-render budget, not the
+  interactive configuration UI's own much longer budget. Now shares
+  `fetchAllTrackersForConfiguration()` with `suggestedEntities()`.
+  Separately, [`WidgetDataStore.swift`](../src/WiggleRoomShared/WidgetDataStore.swift)'s
+  `fetchAllTrackersForConfiguration()` used to let a single transient fetch
+  error partway through its 25s polling window abort the whole call and
+  discard whatever had already been found — now only the very first fetch
+  is fatal; a mid-poll failure is treated as "nothing new this round." Also
+  widened the "a tracker is already visible" case from a 10s wait to the
+  same generous 25s as the cold-start case, since a genuinely *new*
+  tracker's first CloudKit sync doesn't know or care whether other
+  trackers already existed. **Not independently confirmed against a real
+  device this session** (no simulator access) — if a just-created tracker
+  still doesn't appear promptly after these fixes, it may be a real
+  CloudKit propagation delay outside the app's control rather than a
+  remaining code bug; worth checking device logs (see decision #25's
+  `log stream` technique) before assuming otherwise.
+
+### Not touched this session (known gaps)
+
+- [`MenuBarStatusView.swift`](../src/WiggleRoom/Views/MenuBarStatusView.swift)
+  (macOS menu bar item) still reads `PaceStatus.label(for:)` directly, so
+  it picks up the increasing-tracker wording change above for free, but
+  wasn't separately reviewed/laid out against it.
+- Per-widget/complication zoom-level configuration (§4.5/§8.1's long-open
+  item) — still not built; unrelated to this session's scheduling changes.
+- No Starling/Tesla provider work — still just manual entry, per every
+  prior session's scope note.
+- Two changes landed the same day **outside** this session, directly in
+  `project.pbxproj`/`Info.plist`/a new `xcshareddata/xcodecloud/` folder —
+  removing visionOS/Mac Catalyst from the project's supported platforms and
+  device families, and adding Xcode Cloud configuration. Neither is
+  elaborated on in this file beyond this note, since neither came from an
+  agent session with context to record.
+
+### Verifying this session's changes
+
+No `xcodebuild`/simulator access in this environment at all (a change from
+every prior session recorded above) — verification was `swiftc -parse`
+(syntax only) on every changed file, plus careful reading and cross-checking
+of call sites. New/updated unit tests were **written** for the new logic —
+`TrackerUpdateSchedulingTests` (new), and additions to `TrackerPaceTests`
+(the grace-zone fix, the increasing-tracker sign/wording flip) and
+`TrackerTests` (`isCompleted`, the periodRemainingText minutes branch, the
+non-currency decimal fix) — but **not run**; there is no way to invoke
+`xcodebuild test` from here. Nothing in this session was verified live in a
+simulator or on device either — the chart's curve rendering, the ring
+overlap/gap visuals, the pull-to-refresh gesture, the completed-state UI,
+and the widget picker fixes all need a real build to confirm. Build in
+Xcode and run the test suite before trusting any of this further; if
+anything doesn't compile or behave as described, that's expected until
+someone with real Xcode access does that pass.

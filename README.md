@@ -31,14 +31,15 @@ Rough shape of what's implemented vs. still to come:
 - [x] Manual entry provider
 - [ ] Tesla provider (not started — deliberately out of scope so far)
 - [x] SwiftData + CloudKit sync
-- [x] iOS dashboard & rings visual
-- [x] Widgets (Home Screen, Lock Screen — configurable per tracker)
-- [x] macOS UI (sidebar, menu bar item)
+- [x] iOS dashboard & rings visual, incl. a completed-tracker presentation
+- [x] Widgets (Home Screen incl. extra-large, Lock Screen — configurable per tracker)
+- [x] macOS UI (sidebar, menu bar item, Dock badge)
 - [x] watchOS companion app (embedded in the iOS app)
-- [ ] watchOS complication (companion app only so far — see progress notes)
+- [x] watchOS complication
 - [x] Siri/Shortcuts (log a reading, check a tracker's status)
 - [ ] Live Activities (deliberately skipped — see progress notes for why)
-- [ ] §4.6 zoom levels (This year/This month/This week sub-periods)
+- [x] §4.5 zoom levels (This year/This month/This week sub-periods) — on the dashboard; not yet per-widget
+- [ ] visionOS / Mac Catalyst (deliberately removed — iOS and macOS only, see progress notes)
 
 ## Requirements
 
@@ -65,7 +66,8 @@ Rough shape of what's implemented vs. still to come:
 ## Project structure
 
 ```
-ringet/
+wiggle-room/
+├── CLAUDE.md                  — instructions for an AI agent working in this repo
 ├── docs/
 │   ├── wiggleroom-build-spec.md — the build spec (source of truth)
 │   └── progress-notes.md      — what's actually been built, decisions, gaps
@@ -74,11 +76,13 @@ ringet/
 ├── src/                       — Xcode project & app source
 │   ├── WiggleRoom.xcodeproj
 │   ├── WiggleRoom/                — the iOS/iPadOS/macOS app + Shortcuts intents
-│   ├── WiggleRoomShared/          — model/pace layer + RingsView, shared by
-│   │                             every target below (no App Group — each
-│   │                             target syncs independently via CloudKit)
+│   ├── WiggleRoomShared/          — model/pace/scheduling layer + RingsView,
+│   │                             shared by every target below (no App Group —
+│   │                             each target syncs independently via CloudKit)
 │   ├── WiggleRoomWidgets/         — WidgetKit extension (Home Screen, Lock Screen)
 │   ├── WiggleRoomWatch/           — watchOS companion app
+│   ├── WiggleRoomComplication/    — watchOS complication (WidgetKit extension,
+│   │                             embedded inside WiggleRoomWatch)
 │   ├── WiggleRoomTests/
 │   └── WiggleRoomUITests/
 └── README.md
