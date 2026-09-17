@@ -37,13 +37,13 @@ enum BackgroundRefreshScheduler {
     static func scheduleNext() {
         let request = BGAppRefreshTaskRequest(identifier: taskIdentifier)
         request.earliestBeginDate = Date(timeIntervalSinceNow: minimumInterval)
-        do {
-            try BGTaskScheduler.shared.submit(request)
-        } catch {
-            // Expected (and harmless) in the Simulator or a build without
-            // the Background App Refresh capability actually granted by the
-            // user — not fatal either way.
-        }
+        // `submit(_:)` is deprecated (iOS 27) in favor of this
+        // completion-handler form — the error (if any) is still expected
+        // and harmless in the Simulator or without the Background App
+        // Refresh capability actually granted, so it's ignored either way.
+        // An explicit (rather than `nil`) closure here works whether the
+        // parameter turns out to be optional or not.
+        BGTaskScheduler.shared.submitTaskRequest(request) { _ in }
     }
 
     private static func handle(_ task: BGAppRefreshTask, container: ModelContainer) {

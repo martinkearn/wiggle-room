@@ -1,13 +1,17 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Starling connected-source implementation** — Starling is
-now a real, code-level `SourceProvider` (Keychain-backed token storage,
-`StarlingAPIClient`, the 30s-foreground/5-minute-background refresh
-cadence with a Low Power Mode backoff and a client-side daily rate-limit
-budget, a real Add Source token-entry flow, and a live account-target
-picker in Add Tracker) — but **entirely unverified by any compiler**, since
-this environment had no Swift toolchain at all; read that entry's
+after **2026-09-17 Starling implementation: first real Xcode feedback** —
+the user's own Xcode caught a deprecated `BGTaskScheduler.submit` call and
+two default-main-actor-isolation errors in the Starling code below, both
+fixed (see that entry). Before that, **2026-09-17 Starling connected-source
+implementation** — Starling is now a real, code-level `SourceProvider`
+(Keychain-backed token storage, `StarlingAPIClient`, the
+30s-foreground/5-minute-background refresh cadence with a Low Power Mode
+backoff and a client-side daily rate-limit budget, a real Add Source
+token-entry flow, and a live account-target picker in Add Tracker) — but
+**still not fully verified by a compiler**, since this environment has
+never had a Swift toolchain at all; read that entry's
 "Verifying this session's changes" before trusting any of it. That session
 followed three same-day docs-only planning sessions further below (**2026-09-17
 Low Power Mode backoff decision**, **Starling rate-limit research
@@ -1194,3 +1198,61 @@ test files above, then manually connect a real Starling personal access
 token and confirm the account picker, balance fetch, pull-to-refresh, and
 30s live-updating tick all actually work end to end before trusting any
 of this as done.
+
+## 2026-09-17 Starling implementation: first real Xcode feedback
+
+The user opened the branch in actual Xcode after the implementation above
+and reported real compiler warnings — the first genuine build-tool signal
+this whole Starling effort has had, since every prior session in this
+chain had no Swift toolchain at all. Two real issues, both fixed here:
+
+- **`BGTaskScheduler.shared.submit(_:)` is deprecated as of iOS 27** in
+  favor of `submitTaskRequest(_:completionHandler:)` (or an async
+  `submitTask` variant). `BackgroundRefreshScheduler.scheduleNext()`
+  (`src/WiggleRoom/Background/BackgroundRefreshScheduler.swift`) now calls
+  the completion-handler form, still discarding any error the same way the
+  old `try?`-style call did — a submission failure (Simulator, capability
+  not granted) is expected and non-fatal either way. Confirms this
+  project targets a genuinely new-enough SDK (iOS 27) that `submit` had
+  already been deprecated by the time this was written from a toolchain-less
+  environment with no way to know that.
+- **Default main-actor isolation broke `StarlingProvider.init`'s default
+  argument values.** This project apparently has Swift's "default actor
+  isolation = MainActor" setting enabled (a real, current Xcode feature —
+  every declaration in the module is MainActor-isolated unless marked
+  `nonisolated`). Under that setting, a function's *default argument
+  expressions* are evaluated in the caller's (non-isolated) context, not
+  the callee's — so `tokenStore: SecureTokenStore = KeychainTokenStore()`
+  and `budget: StarlingRequestBudget = StarlingProvider.sharedBudget` as
+  default *argument* values were both invalid, even though the
+  initializer they belonged to is itself `@MainActor`. Fixed by defaulting
+  both to `nil` and resolving them inside the initializer's body instead
+  (which *is* MainActor-isolated, since that's where `self` gets built) —
+  see `StarlingProvider.init` in `StarlingProvider.swift`. Also marked
+  `KeychainTokenStore` and `InMemoryTokenStore`
+  (`Security/SecureTokenStore.swift`) explicitly `nonisolated`, since
+  neither has any real reason to be main-actor-confined (plain synchronous
+  Keychain/in-memory calls) and leaving them to the module's implicit
+  default risked the same class of issue resurfacing elsewhere, or worse,
+  breaking their conformance to `SecureTokenStore`'s synchronous
+  (non-`async`) protocol requirements if the compiler ever treated them as
+  actor-isolated.
+
+**Not independently re-verified** — still no Swift toolchain in this
+environment. These fixes address exactly the diagnostics reported (a
+screenshot of Xcode's issue navigator showing the deprecation warning and
+two isolation errors, repeated identically across the WiggleRoom,
+WiggleRoomWatch, WiggleRoomComplication, and WiggleRoomWidgets targets
+since `StarlingProvider.swift` is shared), reasoned through carefully, but
+the next real Xcode build is what actually confirms them clean. If
+`StarlingProvider.swift` still shows isolation warnings after this, the
+module's default-isolation setting may work differently than assumed here
+(e.g. it could be per-target rather than whole-module, or `nonisolated` on
+a class might need to additionally propagate to individual members) —
+worth checking the target's Swift Language Version / "Default Actor
+Isolation" build setting directly rather than guessing further blind.
+
+### Verifying this session's changes
+
+Not verified by a compiler — see above. Reasoned fixes only, based on the
+exact diagnostic text reported from a real Xcode session.
