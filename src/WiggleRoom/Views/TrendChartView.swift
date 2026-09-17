@@ -177,14 +177,6 @@ struct TrendChartView: View {
         return isAheadOfPace(value: latestReading.value, at: latestReading.date) ? WiggleRoomColors.good : WiggleRoomColors.bad
     }
 
-    /// A subtle marker carrying the latest logged balance all the way to the
-    /// window's end, so the actual-data series visually spans the tracker's
-    /// full duration even with sparse readings.
-    private var liveEndPoint: (date: Date, value: Decimal)? {
-        guard let latestReading, now < window.end else { return nil }
-        return (window.end, latestReading.value)
-    }
-
     /// Whether a given logged value, at the date it was logged, was ahead of
     /// pace — reuses the exact same direction-aware calculation as the rest
     /// of the app (`TrackerPace.isAheadOfPace`) rather than re-deriving
@@ -301,15 +293,6 @@ struct TrendChartView: View {
                     y: .value("Now", liveNowPoint.value)
                 )
                 .foregroundStyle(liveContinuationColor)
-                .symbolSize(24)
-            }
-
-            if let liveEndPoint {
-                PointMark(
-                    x: .value("Date", liveEndPoint.date),
-                    y: .value("End", liveEndPoint.value)
-                )
-                .foregroundStyle(.secondary.opacity(0.35))
                 .symbolSize(24)
             }
 
