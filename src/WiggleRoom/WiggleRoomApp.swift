@@ -14,6 +14,9 @@ struct WiggleRoomApp: App {
     @State private var store: TrackerStore
     @State private var deepLinkRouter = DeepLinkRouter()
     @State private var appCommands = AppCommands()
+    #if os(iOS)
+    @Environment(\.scenePhase) private var scenePhase
+    #endif
 
     init() {
         let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
@@ -52,6 +55,11 @@ struct WiggleRoomApp: App {
 
         #if os(iOS)
         WiggleRoomFont.installNavigationBarAppearance()
+        // §5.3's 5-minute background refresh for Starling (and any future
+        // auto-fetch provider) — registering the handler must happen here,
+        // before the app finishes launching, not from anywhere later.
+        BackgroundRefreshScheduler.register(container: modelContainer)
+        BackgroundRefreshScheduler.scheduleNext()
         #endif
     }
 
@@ -65,6 +73,17 @@ struct WiggleRoomApp: App {
                 .onOpenURL { url in
                     deepLinkRouter.handle(url)
                 }
+                #if os(iOS)
+                .onChange(of: scenePhase) { _, newPhase in
+                    // A fired/expired background task doesn't reschedule
+                    // itself, and only one request can be pending at a time
+                    // — re-request on every backgrounding, which also
+                    // covers the very first background after launch.
+                    if newPhase == .background {
+                        BackgroundRefreshScheduler.scheduleNext()
+                    }
+                }
+                #endif
         }
         .modelContainer(modelContainer)
         #if os(macOS)

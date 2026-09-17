@@ -18,15 +18,16 @@ private enum SourceOption: Hashable {
 /// Settings → Connected Sources (§5.2), or "Add New Source…", a shortcut
 /// into the same add-a-source flow Settings uses (`AddSourceView`) — handy
 /// mid-way through creating a tracker rather than backing out to Settings
-/// first. Starling/Tesla aren't implemented yet, so the added-sources list
-/// is currently always empty and Manual Entry is the only real option.
+/// first. Only Starling is implemented as a real provider so far (§5.3);
+/// Tesla (§5.4) isn't built yet.
 ///
 /// Manual Entry is a fixed, single choice, not something the user can add
 /// more of — each tracker that uses it simply gets its own dedicated manual
 /// reading log (its `sourceTargetId` is just its own id), created
 /// automatically on save. No further picking is needed for it. A real
 /// connected source with multiple targets (e.g. several Starling accounts)
-/// will need a follow-up "which one" picker once such a provider exists.
+/// gets a follow-up "which account" picker instead — see
+/// `targetPickerSection`.
 struct AddTrackerView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.modelContext) private var modelContext
@@ -49,11 +50,30 @@ struct AddTrackerView: View {
     /// default — most trackers just care about the day — in which case
     /// `startDate`/`endDate` are normalized to midnight.
     @State private var includesTime = false
-    @State private var startingValueText = "0"
+    @State private var startingValueText = ""
     @State private var totalAllowanceText = ""
 
     @State private var sourceSelection: SourceOption?
     @State private var isShowingAddSource = false
+
+    /// The picked-target step (§5.2) for a real, non-manual source — e.g.
+    /// which Starling account this tracker should read from. Manual Entry
+    /// needs none of this (each manual tracker gets its own dedicated log,
+    /// per the type doc comment above).
+    @State private var availableTargets: [SourceTarget] = []
+    @State private var selectedTargetId: String?
+    @State private var isLoadingTargets = false
+    @State private var targetLoadErrorMessage: String?
+    @State private var isPrefillingStartingValue = false
+
+    /// The bound account's display name, resolved read-only when editing an
+    /// existing tracker on a real (non-manual) source — `Tracker` only
+    /// stores `sourceTargetId` (a bare id like a Starling `accountUid`), not
+    /// a human-readable label, so this is fetched live the same way the
+    /// target picker fetches its list. `nil` while loading or for a manual
+    /// tracker (which has nothing to resolve).
+    @State private var resolvedAccountName: String?
+    @State private var isResolvingAccountName = false
 
     /// §5.5 — a lightweight local-notification reminder to log a new
     /// reading, on a user-set cadence in minutes. `nil` means no reminder.
@@ -106,9 +126,18 @@ struct AddTrackerView: View {
                     LabeledContent("Starting value") {
                         unitValueField(text: $startingValueText, field: .startingValue)
                     }
-                    Text(startingValueHint)
+                    if isPrefillingStartingValue {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                            Text("Fetching live balance…")
+                        }
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    } else {
+                        Text(startingValueHint)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
                     LabeledContent("Total budget") {
                         unitValueField(text: $totalAllowanceText, field: .totalAllowance)
@@ -157,11 +186,24 @@ struct AddTrackerView: View {
                     } footer: {
                         Text("Manual Entry means you'll log this tracker's readings yourself. Otherwise, pick a source you've added in Settings → Connected Sources.")
                     }
+
+                    if !isManualEntrySelected {
+                        targetPickerSection
+                    }
                 } else {
                     Section {
                         LabeledContent("Source", value: existingTracker?.connectedSource?.displayName ?? "Manual Entry")
+                        if existingTracker?.isManualEntry == false {
+                            if isResolvingAccountName {
+                                LabeledContent("Account") {
+                                    ProgressView()
+                                }
+                            } else {
+                                LabeledContent("Account", value: resolvedAccountName ?? existingTracker?.sourceTargetId ?? "Unknown")
+                            }
+                        }
                     } footer: {
-                        Text("A tracker's source can't be changed after it's created.")
+                        Text("A tracker's source and account can't be changed after it's created.")
                     }
                 }
 
@@ -217,6 +259,7 @@ struct AddTrackerView: View {
                     totalAllowanceText = existingTracker.totalAllowance.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                     sourceSelection = .source(existingTracker.connectedSource?.id ?? store.manualEntrySource.id)
                     reminderCadenceMinutes = existingTracker.reminderCadenceMinutes
+                    await resolveAccountNameIfNeeded(for: existingTracker)
                 } else if sourceSelection == nil {
                     sourceSelection = .source(store.manualEntrySource.id)
                 }
@@ -224,7 +267,115 @@ struct AddTrackerView: View {
             .navigationDestination(isPresented: $isShowingAddSource) {
                 AddSourceView()
             }
+            .task(id: selectedSourceId) {
+                await loadAvailableTargetsIfNeeded()
+            }
+            .task(id: selectedTargetId) {
+                await prefillStartingValueIfNeeded()
+            }
         }
+    }
+
+    /// Which account/target within the selected real source this tracker
+    /// should read from — e.g. one of the user's Starling accounts. Fetched
+    /// live (not cached) whenever the selected source changes, since it's a
+    /// real network call.
+    private var targetPickerSection: some View {
+        Section {
+            if isLoadingTargets {
+                HStack {
+                    ProgressView()
+                    Text("Loading accounts…")
+                        .foregroundStyle(.secondary)
+                }
+            } else if let targetLoadErrorMessage {
+                Text(targetLoadErrorMessage)
+                    .foregroundStyle(WiggleRoomColors.error)
+            } else if availableTargets.isEmpty {
+                Text("No accounts found for this source.")
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker("Account", selection: $selectedTargetId) {
+                    Text("Choose one").tag(nil as String?)
+                    ForEach(availableTargets) { target in
+                        Text(target.displayName).tag(target.id as String?)
+                    }
+                }
+            }
+        } header: {
+            Text("Account")
+        } footer: {
+            Text("Which account within this source this tracker reads its balance from.")
+        }
+    }
+
+    private func loadAvailableTargetsIfNeeded() async {
+        selectedTargetId = nil
+        availableTargets = []
+        targetLoadErrorMessage = nil
+        // Editing an existing tracker never shows `targetPickerSection` (its
+        // source can't change) — skip the network call entirely rather than
+        // spending a Starling request on nothing.
+        guard existingTracker == nil, !isManualEntrySelected,
+              let selectedSourceId, let source = resolveSource(withId: selectedSourceId)
+        else {
+            return
+        }
+        isLoadingTargets = true
+        defer { isLoadingTargets = false }
+        do {
+            availableTargets = try await store.listAvailableTargets(for: source)
+        } catch {
+            targetLoadErrorMessage = "Couldn't load accounts for this source — try again."
+        }
+    }
+
+    /// Read-only resolution of a bound account's display name when editing
+    /// an existing tracker on a real (non-manual) source — `Tracker` only
+    /// stores `sourceTargetId` (a bare id like a Starling `accountUid`), not
+    /// a human-readable label, so this fetches the source's current
+    /// account list (same call the target picker makes for a new tracker)
+    /// and finds the matching one. Never lets the user change anything —
+    /// this only fills in the "Account" row for display. Falls back to the
+    /// raw id if the fetch fails or the account is no longer listed (e.g.
+    /// renamed/closed at Starling) rather than leaving the row blank.
+    private func resolveAccountNameIfNeeded(for tracker: Tracker) async {
+        guard !tracker.isManualEntry,
+              let source = tracker.connectedSource,
+              let targetId = tracker.sourceTargetId
+        else { return }
+        isResolvingAccountName = true
+        defer { isResolvingAccountName = false }
+        guard let targets = try? await store.listAvailableTargets(for: source) else { return }
+        resolvedAccountName = targets.first(where: { $0.id == targetId })?.displayName
+    }
+
+    /// Prefills "Starting value" with the picked account's live balance
+    /// rather than leaving the user to guess/type today's real number —
+    /// only for a fresh tracker on a real (non-manual) source; skipped
+    /// entirely for manual entry (nothing to fetch) and when editing an
+    /// existing tracker (its source/target can't change). **Never
+    /// overwrites a value the user has already typed** — e.g. backdating a
+    /// tracker's start time to reflect a balance from earlier rather than
+    /// right now is a real, intentional use case, and silently replacing
+    /// that with "whatever the balance is at this exact second" would be
+    /// actively wrong, not just unhelpful. Silent on failure — the user can
+    /// still type a starting value by hand if the fetch fails.
+    private func prefillStartingValueIfNeeded() async {
+        guard existingTracker == nil, !isManualEntrySelected,
+              let selectedTargetId,
+              let selectedSourceId, let source = resolveSource(withId: selectedSourceId),
+              let target = availableTargets.first(where: { $0.id == selectedTargetId }),
+              startingValueText.trimmingCharacters(in: .whitespaces).isEmpty
+        else { return }
+        isPrefillingStartingValue = true
+        defer { isPrefillingStartingValue = false }
+        guard let value = try? await store.fetchCurrentValue(for: target, from: source) else { return }
+        // The user may have typed their own starting value (e.g. backdating
+        // the tracker's start to reflect a balance from earlier, not right
+        // now) while this fetch was in flight — never stomp on that.
+        guard startingValueText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        startingValueText = value.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
     }
 
     /// The only units a tracker can be created with — picking from a fixed
@@ -395,6 +546,7 @@ struct AddTrackerView: View {
             && Self.parseDecimal(startingValueText) != nil
             && Self.parseDecimal(totalAllowanceText) != nil
             && selectedSourceId != nil
+            && (isManualEntrySelected || selectedTargetId != nil)
     }
 
     private func save() {
@@ -437,21 +589,28 @@ struct AddTrackerView: View {
             return
         }
 
-        guard source.providerId == store.manualProvider.providerId else {
-            // No auto-fetch providers exist yet (§9); unreachable until
-            // Starling/Tesla land, since `addedSources` is always empty.
-            errorMessage = "This source isn't supported yet."
-            return
+        // A manual tracker owns its own dedicated log (its id doubles as its
+        // `sourceTargetId`); a real source's tracker points at whichever
+        // account the user picked in `targetPickerSection`.
+        let trackerId = UUID()
+        let resolvedTargetId: String
+        if source.providerId == store.manualProvider.providerId {
+            resolvedTargetId = trackerId.uuidString
+        } else {
+            guard let selectedTargetId else {
+                errorMessage = "Please choose an account for this source."
+                return
+            }
+            resolvedTargetId = selectedTargetId
         }
 
-        let trackerId = UUID()
         let tracker = Tracker(
             id: trackerId,
             name: trimmedName,
             unit: trimmedUnit,
             direction: direction,
             connectedSource: source,
-            sourceTargetId: trackerId.uuidString,
+            sourceTargetId: resolvedTargetId,
             startDate: startDate,
             endDate: endDate,
             startingValue: startingValue,

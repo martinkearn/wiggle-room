@@ -31,23 +31,6 @@ struct TrackerDetailView: View {
     @State private var isPresentingEditTracker = false
     @State private var isPresentingDeleteConfirmation = false
     @State private var isPresentingReadingHistory = false
-    /// The zoom-level lens (§4.5) the dashboard is currently scoped to —
-    /// re-scopes the rings, figures, and trend chart together. Only shown
-    /// as a picker when `tracker.availableZoomLevels` offers more than just
-    /// `.overall` (i.e. the tracker runs longer than a week — see
-    /// `Tracker.availableZoomLevels`). Defaults to `.thisWeek` whenever
-    /// that's on offer, set in `init` below rather than here so it's
-    /// correct on the very first render rather than flipping a beat after
-    /// appearing — "how am I doing lately" is a more useful first look than
-    /// the whole, possibly multi-year, period for a tracker long enough to
-    /// zoom at all.
-    @State private var zoomLevel: ZoomLevel
-
-    init(tracker: Tracker) {
-        self.tracker = tracker
-        let defaultZoom: ZoomLevel = tracker.availableZoomLevels.contains(.thisWeek) ? .thisWeek : .overall
-        _zoomLevel = State(initialValue: defaultZoom)
-    }
 
     /// Drives `now` forward on a schedule aligned to this tracker's own end
     /// date (see `AutoUpdateTicker`/`TrackerUpdateScheduling`) instead of a
@@ -66,6 +49,26 @@ struct TrackerDetailView: View {
     /// `checkForCompletionCelebration()`.
     @State private var isShowingCelebration = false
 
+    /// Set whenever a Starling (or future auto-fetch provider) refresh
+    /// fails — either from the pull-to-refresh gesture or the ticker's own
+    /// 30s background fetch — and shown as a distinct error line (§8.4)
+    /// rather than silently leaving the last-known figure looking current.
+    /// Cleared on the next successful refresh.
+    @State private var refreshErrorMessage: String?
+
+    /// Guards against overlapping fetches — the 30s ticker tick and a
+    /// manual pull-to-refresh could otherwise both be in flight at once for
+    /// the same tracker.
+    @State private var isRefreshingFromSource = false
+
+    /// The bound account's display name for a real, non-manual source —
+    /// `Tracker` only stores `sourceTargetId` (a bare id), not a
+    /// human-readable label, so this is resolved live once on appear
+    /// (`resolveAccountNameIfNeeded()`), not on every 30s tick, to avoid
+    /// spending a Starling request on something that never changes for a
+    /// given tracker. Falls back to the raw id if unresolved.
+    @State private var resolvedAccountName: String?
+
     private var now: Date { ticker.now }
 
     private var isCompleted: Bool {
@@ -73,7 +76,7 @@ struct TrackerDetailView: View {
     }
 
     private var pace: TrackerPace {
-        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now, zoomLevel: zoomLevel)
+        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
     }
 
     /// The tracker's pace pinned to its own end date, using the last reading
@@ -82,24 +85,6 @@ struct TrackerDetailView: View {
     private var finalPace: TrackerPace? {
         guard let latest = tracker.latestReading else { return nil }
         return tracker.pace(actualValue: latest.value, asOf: tracker.endDate)
-    }
-
-    private var availableZoomLevels: [ZoomLevel] {
-        tracker.availableZoomLevels
-    }
-
-    /// The zoomed window's own end — the days-remaining caption and the
-    /// trend chart's readings should both scope to the sub-period, not the
-    /// tracker's full period, once zoomed in.
-    private var zoomWindowEnd: Date {
-        tracker.subPeriod(for: zoomLevel, asOf: now)?.end ?? tracker.endDate
-    }
-
-    private var windowedReadingCount: Int {
-        guard let subPeriod = tracker.subPeriod(for: zoomLevel, asOf: now) else {
-            return tracker.sortedReadings.count
-        }
-        return tracker.sortedReadings.filter { $0.date >= subPeriod.start && $0.date <= subPeriod.end }.count
     }
 
     var body: some View {
@@ -119,6 +104,13 @@ struct TrackerDetailView: View {
     private var dashboardScrollView: some View {
         ScrollView {
             VStack(spacing: 28) {
+                if let sourceCaption {
+                    Text(sourceCaption)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 4)
+                }
+
                 // The whole screen's figures update on this cadence (Target
                 // Right Now, the ring, the difference) — not just one card —
                 // so the countdown lives up top rather than tucked under a
@@ -140,18 +132,14 @@ struct TrackerDetailView: View {
                         pullToUpdateHint
                         #endif
                     }
-                    .padding(.top, 4)
+                    .padding(.top, sourceCaption == nil ? 4 : 0)
                 }
 
                 if isCompleted {
                     CompletedBadge()
                 }
 
-                if availableZoomLevels.count > 1 && !isCompleted {
-                    zoomLevelPicker
-                }
-
-                RingsView(tracker: tracker, now: now, zoomLevel: zoomLevel)
+                RingsView(tracker: tracker, now: now)
                     .frame(width: 260, height: 260)
 
                 if isCompleted {
@@ -159,10 +147,16 @@ struct TrackerDetailView: View {
                 } else {
                     figuresRow
                     #if os(macOS)
-                    if tracker.isManualEntry {
-                        updateBalanceButton
-                    }
+                    updateBalanceButton
                     #endif
+                }
+
+                if let refreshErrorMessage {
+                    Text(refreshErrorMessage)
+                        .font(.caption)
+                        .foregroundStyle(WiggleRoomColors.error)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
 
                 Text(periodRemainingText)
@@ -175,8 +169,8 @@ struct TrackerDetailView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
-                } else if windowedReadingCount > 1 {
-                    TrendChartView(tracker: tracker, zoomLevel: zoomLevel, now: now)
+                } else if tracker.sortedReadings.count > 1 {
+                    TrendChartView(tracker: tracker, now: now)
                         .frame(height: 240)
                         .padding(.horizontal)
                 }
@@ -199,7 +193,7 @@ struct TrackerDetailView: View {
                     } label: {
                         Label("Edit Tracker", systemImage: "pencil")
                     }
-                    if tracker.isManualEntry {
+                    if !tracker.sortedReadings.isEmpty {
                         Button {
                             isPresentingReadingHistory = true
                         } label: {
@@ -241,6 +235,11 @@ struct TrackerDetailView: View {
         }
         .onAppear {
             let appearedAt = Date.now
+            // 30s while this detail screen is on-screen (§5.3's decided
+            // foreground poll cadence) — down from the 60s display-only
+            // default, since this ticker also drives a real Starling fetch
+            // on every tick now, not just a display recompute.
+            ticker.interval = 30
             ticker.endDatesProvider = { [tracker.endDate] }
             ticker.onUpdate = { date in
                 // The minute rollover is exactly when Target Right Now's
@@ -255,9 +254,18 @@ struct TrackerDetailView: View {
                 // Catches a tracker whose period ends while its dashboard
                 // happens to already be open, not just on a fresh appear.
                 checkForCompletionCelebration(asOf: date)
+                if !tracker.isManualEntry && !isCompleted {
+                    Task { await refreshFromSourceIfNeeded() }
+                }
             }
             ticker.start(now: appearedAt)
             checkForCompletionCelebration(asOf: appearedAt)
+            if !tracker.isManualEntry && !isCompleted {
+                Task { await refreshFromSourceIfNeeded() }
+            }
+            if !tracker.isManualEntry && resolvedAccountName == nil {
+                Task { await resolveAccountNameIfNeeded() }
+            }
         }
         // Keyed on the reading's own id, not its value — logging a reading
         // that happens to match the previous one is still a genuine update
@@ -343,23 +351,85 @@ struct TrackerDetailView: View {
 
     #if !os(macOS)
     /// The system pull-to-refresh gesture's action (`.refreshable` above) —
-    /// today the only "source" is manual entry, so this just opens the log
-    /// sheet, but the gesture itself is meant to be source-agnostic: once a
-    /// real auto-fetching connected source exists, the same pull-down
-    /// re-fetches from it instead, with no new gesture or control to learn.
-    /// A short pause before returning gives the refresh control a beat to
-    /// visibly settle before the sheet takes over, rather than the sheet
-    /// snapping up mid-pull.
+    /// for a manual tracker this opens the log sheet; for a real
+    /// auto-fetching connected source (Starling) it re-fetches instead, with
+    /// no new gesture or control to learn. A short pause before opening the
+    /// log sheet gives the refresh control a beat to visibly settle before
+    /// the sheet takes over, rather than the sheet snapping up mid-pull.
     private func handleUpdateGesture() async {
         guard !isCompleted else { return }
         guard tracker.isManualEntry else {
-            // No auto-fetching provider exists yet (§9) — nothing to
-            // refresh from until one does.
+            await refreshFromSourceIfNeeded(force: true)
             return
         }
         try? await Task.sleep(for: .milliseconds(300))
         isPresentingLogReading = true
     }
+    #endif
+
+    /// Fetches a fresh value from the tracker's connected source and logs it
+    /// (§5.3) — called from the 30s ticker tick and from a manual
+    /// pull-to-refresh/macOS button alike. `force` skips the
+    /// already-in-flight guard, since a user's own manual pull should always
+    /// go through even if a background tick happens to be mid-fetch.
+    private func refreshFromSourceIfNeeded(force: Bool = false) async {
+        guard !tracker.isManualEntry, !isCompleted else { return }
+        guard force || !isRefreshingFromSource else { return }
+        isRefreshingFromSource = true
+        defer { isRefreshingFromSource = false }
+        do {
+            try await store.refreshFromSource(tracker)
+            refreshErrorMessage = nil
+        } catch {
+            refreshErrorMessage = Self.errorMessage(for: error)
+        }
+    }
+
+    /// Read-only resolution of the bound account's display name — fetches
+    /// the source's current account list (the same call the target picker
+    /// makes) and finds the one matching `tracker.sourceTargetId`. Never
+    /// re-fetched on a tick, only once per appearance (guarded by the
+    /// `resolvedAccountName == nil` check at the call site) — a tracker's
+    /// bound account never changes after creation (§7.1), so there's
+    /// nothing to keep polling for here. Falls back to the raw id (still
+    /// shown via `sourceCaption`) if the fetch fails or the account is no
+    /// longer listed.
+    private func resolveAccountNameIfNeeded() async {
+        guard let source = tracker.connectedSource, let targetId = tracker.sourceTargetId,
+              let provider = store.provider(for: tracker)
+        else { return }
+        guard let targets = try? await provider.listAvailableTargets(for: source) else { return }
+        resolvedAccountName = targets.first(where: { $0.id == targetId })?.displayName
+    }
+
+    /// "My Starling Account · Personal" — shown for a real, non-manual
+    /// source so it's clear at a glance which connection/account this
+    /// tracker's figures actually come from, without needing to open Edit
+    /// Tracker. `nil` for a manual tracker (nothing to name).
+    private var sourceCaption: String? {
+        guard !tracker.isManualEntry, let source = tracker.connectedSource else { return nil }
+        let account = resolvedAccountName ?? tracker.sourceTargetId ?? ""
+        return account.isEmpty ? source.displayName : "\(source.displayName) \u{00B7} \(account)"
+    }
+
+    /// A short, distinct-from-stale-data error line (§8.4) — never leaves a
+    /// failed refresh looking like a current, successful one.
+    private static func errorMessage(for error: Error) -> String {
+        switch error {
+        case StarlingProviderError.notConnected:
+            return "Not connected — reconnect this source in Settings."
+        case StarlingAPIError.invalidToken:
+            return "Connection expired — reconnect this source in Settings."
+        case StarlingAPIError.rateLimited, StarlingAPIError.budgetExceeded:
+            return "Refresh paused — rate limit reached, try again shortly."
+        case StarlingAPIError.network:
+            return "Couldn't reach Starling — check your connection."
+        default:
+            return "Couldn't refresh — will try again shortly."
+        }
+    }
+
+    #if !os(macOS)
 
     /// A persistent affordance for the pull-to-refresh gesture — unlike a
     /// button, `.refreshable`'s own control only appears once a pull is
@@ -376,21 +446,31 @@ struct TrackerDetailView: View {
     #else
     /// macOS has no pull-to-refresh gesture, so it keeps an explicit button
     /// instead — moved out from inside the Current Balance card so both
-    /// figure cards share identical visual weight.
+    /// figure cards share identical visual weight. For a manual tracker
+    /// this opens the log sheet; for an auto-fetch source (Starling) it
+    /// re-fetches directly, same as iOS's pull-to-refresh.
     private var updateBalanceButton: some View {
         Button {
-            isPresentingLogReading = true
+            if tracker.isManualEntry {
+                isPresentingLogReading = true
+            } else {
+                Task { await refreshFromSourceIfNeeded(force: true) }
+            }
         } label: {
-            Label("Update Current Balance", systemImage: "plus.circle.fill")
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
+            Label(
+                tracker.isManualEntry ? "Update Current Balance" : "Refresh",
+                systemImage: tracker.isManualEntry ? "plus.circle.fill" : "arrow.clockwise"
+            )
+            .font(.subheadline.weight(.semibold))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.capsule)
         .controlSize(.large)
         .tint(WiggleRoomColors.brand)
         .padding(.horizontal)
+        .disabled(isRefreshingFromSource && !tracker.isManualEntry)
     }
     #endif
 
@@ -467,23 +547,7 @@ struct TrackerDetailView: View {
     }
 
     private var periodRemainingText: String {
-        tracker.periodRemainingText(asOf: now, until: zoomWindowEnd)
-    }
-
-    /// Segmented zoom-level control (§4.5, §7.1) sitting above the rings —
-    /// re-scopes the whole dashboard (rings, figures, chart) to the selected
-    /// sub-period. Only shown when the tracker's own length actually offers
-    /// more than `.overall` (see `Tracker.availableZoomLevels`), and not
-    /// once completed — zooming into a sub-period of a finished tracker
-    /// doesn't apply once there's only a final summary to show.
-    private var zoomLevelPicker: some View {
-        Picker("Zoom", selection: $zoomLevel) {
-            ForEach(availableZoomLevels) { level in
-                Text(level.label).tag(level)
-            }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal)
+        tracker.periodRemainingText(asOf: now)
     }
 }
 

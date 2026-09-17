@@ -1,13 +1,86 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after a same-day follow-up (see **2026-09-17 App Group migration** at the
-very end) that moved the app/widgets/watch/complication/Shortcuts onto a
-shared App Group container — the real fix for widget staleness, after the
-scheduling-interval tightening in the session before it turned out to be
-only a partial mitigation. Before that: a long same-day session (see
-**2026-09-17 chart/scheduling/completed-state overhaul**) that redesigned
-the trend chart and
+after **2026-09-17 Surface the bound account read-only, in two places** —
+confirmed a tracker's connected source/account is already fully locked
+after creation (only the initializer ever sets those fields), then made
+the binding visible rather than editable: a read-only "Account" row in
+Edit Tracker, and a small source/account caption on the Tracker Detail
+dashboard, both resolved once and never on the 30s refresh tick. Before
+that, **2026-09-17 Fix Starting-value auto-fill clobbering manual entry**
+— a Starling tracker backdated to reflect an earlier balance (£639) had
+its starting value silently overwritten with the balance *at save time*
+(£615) once the user picked the Starling account, because the auto-fill
+feature from two sessions ago overwrote unconditionally rather than only
+filling a blank field; fixed to never touch a field the user has already
+typed into, and `startingValueText`'s pre-filled `"0"` default (which
+turned typing "639" into "6390") is now an empty string like every other
+numeric field. Before that, **2026-09-17 Connected Source management +
+token storage moved off Keychain** — real multi-device testing surfaced a
+Starling source that
+synced (via CloudKit) but showed "Not connected" on a second device,
+because its token lived in the Keychain, a separate sync system (iCloud
+Keychain) with its own per-device toggle and its own lag. Per the user's
+explicit direction ("everything should use the same sync system"), the
+token now lives directly on `ConnectedSource.credentialToken`, synced by
+the same CloudKit path as everything else — no more Keychain dependency
+anywhere in the app. Settings → Connected Sources also gained real
+reconnect (re-enter a token in place) and remove (blocked while any
+tracker still uses that source) actions, which is also the practical fix
+for "there's no way to edit sources." Before that, **2026-09-17 Fix Swift
+type-checker crash in ReadingHistoryView** — the first real build attempt
+on this branch failed outright ("Failed to produce diagnostic for
+expression") from a ternary mixing a function reference and `nil` at an
+`.onDelete(perform:)` call site, a known Swift compiler crash trigger;
+fixed by extracting it into an explicitly-typed computed property. Before
+that, **2026-09-17 Starling reading dedup +
+Update History for real sources** — `TrackerStore.refreshFromSource` now
+skips logging a reading when the fetched value hasn't changed (was
+flooding the trend chart with overlapping same-value points every 30s
+tick, reading as "no dots" — they were there, just too dense to tell
+apart), and "Update History" is
+now visible (read-only) for any tracker with readings, not just manual
+ones. Before that, **2026-09-17 Zoom levels removed** — §4.5's whole feature (the
+`ZoomLevel` type, the picker, sub-period scoping everywhere it touched:
+`Tracker`, `TrackerPace`, `RingsView`, `TrendChartView`,
+`TrackerDetailView`) was pulled out of the app entirely, cleanly rather
+than hidden/disabled, after real-device testing showed its default "This
+Week" scoping producing wrong-looking headline dashboard figures with no
+on-screen indication they were scoped. Every tracker's dashboard/chart/
+widget always shows its real, whole-period figures now — build-spec.md
+§4.5 is rewritten to record the original idea for a future redesign rather
+than deleted outright. Before that, **2026-09-17 Starling real-device
+testing: findings and a fix** — the user connected a real Starling account
+and tested end to end, surfacing three real findings (an inner-ring
+opacity-fade bug for small settled values, the zoom-scoping issue just
+described, and the app's intentional linear-pace model producing a nonzero
+under/over-budget figure from minute one even with zero spending — the
+last one isn't a bug) plus a shipped fix (Starting value now auto-fills
+from the picked account's live balance). Before that, **2026-09-17 Starling
+implementation: first real Xcode feedback** — the user's own Xcode caught a
+deprecated `BGTaskScheduler.submit` call and two default-main-actor-isolation
+errors in the Starling code below, both fixed (see that entry) — merged
+alongside the separately-developed **2026-09-17 App Group migration**
+landed on this same branch in the
+meantime, which moved the app/widgets/watch/complication/Shortcuts onto a
+shared App Group container as the real fix for widget staleness (the
+scheduling-interval tightening from earlier that day turned out to be only
+a partial mitigation). Before the Xcode-feedback fixes, **2026-09-17
+Starling connected-source implementation** — Starling is now a real,
+code-level `SourceProvider` (Keychain-backed token storage,
+`StarlingAPIClient`, the 30s-foreground/5-minute-background refresh
+cadence with a Low Power Mode backoff and a client-side daily rate-limit
+budget, a real Add Source token-entry flow, and a live account-target
+picker in Add Tracker) — but **still not fully verified by a compiler**,
+since neither environment that touched it has had a Swift toolchain at
+all; read that entry's "Verifying this session's changes" before trusting
+any of it. That session followed three same-day docs-only planning
+sessions further below (**2026-09-17 Low Power Mode backoff decision**,
+**Starling rate-limit research follow-up**, and **Starling refresh-cadence
+planning**) that made the decisions the implementation followed — no code
+changed in any of those three. Before all of that, a long same-day session
+(see **2026-09-17
+chart/scheduling/completed-state overhaul**) redesigned the trend chart and
 ring visuals, replaced three separately-coded ~60s refresh timers with one
 shared end-aligned scheduler, added a first-class completed-tracker state,
 moved to pull-to-refresh on iOS, and fixed several real bugs (a pace-status
@@ -980,3 +1053,787 @@ architecture change previously declined earlier in the day.
   after adding the App Groups capability to all four targets** — that's the
   verification this change actually rests on, not anything run from this
   session.
+
+## 2026-09-17 Starling refresh-cadence planning (no code changed)
+
+Docs-only session, prompted by the user asking to confirm build-readiness for
+the Starling integration and to set a specific refresh cadence, before any
+implementation. No Swift files were touched.
+
+**What was checked**: an audit of the repo confirmed there is still no
+Starling code at all — no HTTP client, no auth flow, no models for
+Starling accounts/balances (`AddSourceView.swift` remains an explicit
+"Coming Soon" stub, matching every prior session's scope note). It also
+confirmed what "the existing refresh mechanism" actually is:
+`AutoUpdateTicker` (`src/WiggleRoomShared/State/AutoUpdateTicker.swift`) plus
+`TrackerUpdateScheduling` (`src/WiggleRoomShared/Models/TrackerUpdateScheduling.swift`)
+is a **display-recompute** scheduler (currently a 60s in-app tick,
+900s/60s widget reload), not a network poller — there is no periodic data
+fetch anywhere in the app yet. Pull-to-refresh (`TrackerDetailView.swift`'s
+`.refreshable`, wired to `handleUpdateGesture()`) exists and works for
+manual-entry trackers, but its auto-fetch-source branch is a documented
+no-op pending a real provider. No `BGTaskScheduler`/`BGAppRefreshTask`
+usage exists anywhere, and the background-fetch `Info.plist`/entitlement
+config hasn't been confirmed either way.
+
+**Decision recorded** (see build-spec.md §5.3, §12): when built, Starling
+(and, per the user's request, every source generally) should poll every
+**30 seconds while the app is open**, by retuning and extending the
+existing `AutoUpdateTicker`/`TrackerUpdateScheduling` mechanism to actually
+trigger a fetch on tick rather than only a display recompute — not a new,
+separate polling mechanism. Manual refresh should reuse the existing
+pull-to-refresh gesture rather than adding a new button. Background refresh
+should run every **5 minutes**, which needs `BGTaskScheduler` set up from
+scratch (nothing currently configured). This replaces the build spec's
+previous "15–30 minute widget background refresh, not continuous polling"
+line — that line is now out of date and has been rewritten.
+
+**Known gap called out explicitly, not resolved**: Starling's actual API
+rate limits are still unresearched (build-spec.md §12 flagged this before
+today too). A 30-second foreground poll is a meaningfully more aggressive
+cadence than the old spec language, so this needs confirming against
+current Starling developer docs before implementation starts, especially
+given §4.4's requirement to share one fetch across multiple trackers
+pointed at the same connected source. Also still missing and now spelled
+out in §12: a Keychain read/write wrapper (only the schema field exists),
+any HTTP client/retry scaffolding, and confirmation of the background-fetch
+entitlement/`Info.plist` state.
+
+### Verifying this session's changes
+
+No code changed — this was a docs-only planning session. Nothing to build
+or run; the build-spec.md and this file are the only diffs.
+
+## 2026-09-17 Starling rate-limit research follow-up (no code changed)
+
+Same-day follow-up to the session above, answering the open rate-limit
+question it deliberately left unresolved. Still no code changed.
+
+**Research**: `developer.starlingbank.com` was unreachable directly (egress
+blocked in this environment), so the numbers below are cross-verified via
+the Home Assistant Starling integration's own incident report
+([home-assistant/core#73225](https://github.com/home-assistant/core/issues/73225))
+plus independent web search confirmation, not fetched from Starling's own
+docs — **re-confirm at build time**. Personal access tokens are limited to
+**5 requests/second and 1000 requests/day** (Starling tightened this in
+2022 specifically because third-party integrations, including Home
+Assistant's, were over-polling); a breach returns HTTP 429 with a
+`Retry-After` header. 5 req/s is trivial to stay under at a 30s cadence;
+**1000/day is the real constraint** a naive implementation could hit in a
+few hours if each 30s tick makes more than one API call (accounts list +
+balance + spaces, per §5.3, is three).
+
+**Decision refined** (see build-spec.md §5.3 for the full mitigations
+list): the 30s cadence stands, but scoped to **whichever tracker detail
+screen is actually on-screen** (`TrackerDetailView` /
+`WatchTrackerDetailView` / macOS's detail pane), not the whole app —
+confirmed against the existing code, `AutoUpdateTicker` is already
+`@State`-owned per-view (`TrackerDetailView.swift:56`,
+`WatchTrackerDetailView.swift:18`, `MacRootView.swift:24`,
+`TrackerListView.swift:35` each hold their own instance), so this is a
+natural fit rather than a new mechanism — the list view's own ticker
+should stay display-only and not gain a fetch. Required mitigations before
+this cadence is safe to ship, not optional cleanup: cache the accounts
+list instead of re-fetching it every tick (one request per tick, not
+three), share one fetch across multiple trackers on the same connected
+source (already required by §4.4), track a rolling 24h request count
+client-side and back off before hitting the cap, and always honor
+`Retry-After` on 429. None of this is built yet — still no Starling
+provider code exists at all (see the session above).
+
+### Verifying this session's changes
+
+No code changed — research and a spec refinement only.
+
+## 2026-09-17 Low Power Mode backoff decision (no code changed)
+
+Same-day follow-up, closing out a question the user raised about whether
+the refresh cadence should back off under Low Power Mode, Sleep Focus, or
+StandBy. No code changed.
+
+**Decision** (see build-spec.md §5.3): back off the foreground 30s
+detail-screen poll (widen to roughly 60–120s, exact figure left to tune at
+build time) whenever `ProcessInfo.processInfo.isLowPowerModeEnabled` is
+true, observed live via `NSProcessInfoPowerStateDidChange`. Foreground-only
+— the 5-minute `BGAppRefreshTask` background path needs no app-side change,
+since iOS already deprioritizes background task scheduling itself under
+Low Power Mode/low battery.
+
+Sleep Focus and StandBy were both considered and explicitly **not**
+adopted as backoff signals: Sleep Focus has no public API to detect
+specifically (`INFocusStatusCenter`'s `focusStatus.isFocused` only reports
+that *some* Focus is active — Sleep, Work, and Do Not Disturb are
+indistinguishable — and needs a user authorization prompt to use at all,
+which isn't worth it for what it buys); StandBy isn't a distinct
+app-observable state at all — it's a display mode while locked/charging,
+and is already covered by the existing foreground-vs-background split (the
+30s poll only runs while a detail screen is genuinely on-screen).
+
+### Verifying this session's changes
+
+No code changed — a scoped decision recorded in the spec only.
+
+## 2026-09-17 Starling connected-source implementation
+
+Implements the Starling integration itself, following the four planning
+sessions immediately above this one. **Critical caveat up front**: this
+environment had no Swift toolchain at all — not even `swiftc`, which prior
+sessions at least had for a syntax-only check. Every file below was
+verified only by careful manual re-reading (checking actor isolation,
+Decimal literal precision, Swift pattern-matching over `Error`, and a
+second pass specifically hunting for the kind of mistake a compiler would
+catch), never compiled, never run, never tested in a simulator or on
+device. Treat this as a strong first draft, not confirmed-working code —
+build in Xcode and run the test suite before trusting it further.
+
+**New files** (all under `src/WiggleRoomShared/` unless noted):
+
+- `Security/SecureTokenStore.swift` — `SecureTokenStore` protocol,
+  `KeychainTokenStore` (real Keychain, `kSecAttrSynchronizable` set per
+  §11), `InMemoryTokenStore` (previews/tests — `KeychainTokenStore` itself
+  isn't unit-tested here, since a plain XCTest run doesn't reliably have
+  real Keychain access without a signed, entitled test bundle).
+- `Providers/StarlingRequestBudget.swift` — an `actor` tracking a rolling
+  24h request count against the researched 5/req/s, 1000/req/day limits
+  (§5.3/§12), refusing new requests as the daily count approaches the
+  limit and recording a cool-down on a real 429's `Retry-After`. Shared
+  app-wide via `StarlingProvider.sharedBudget` (in-memory, resets on
+  relaunch — a known simplification, see build-spec.md §12).
+- `Providers/StarlingAPIClient.swift` — direct `URLSession`-based client
+  for `GET /api/v2/accounts` and `GET /api/v2/accounts/{uid}/balance` only
+  — the Spaces/savings-goal endpoint was never implemented, since its
+  shape was never confirmed against current Starling docs (still an open
+  item). Maps 401/403 → invalid token, 429 → rate-limited (+ records the
+  budget cool-down), other non-2xx → a generic HTTP error, decode failures
+  → a decoding error.
+- `Providers/StarlingProvider.swift` — the actual `SourceProvider`
+  conformance. Each instance is bound to one `ConnectedSource` at init
+  (resolves its token from Keychain via `credentialKeychainKey`);
+  `listAvailableTargets(for:)` takes its own connection argument instead
+  so it also works against a draft, not-yet-persisted connection during
+  Add Source setup. Starling has no write scopes, so
+  `logManualReading(target:value:date:)` always throws
+  `manualLoggingNotSupported`.
+- `src/WiggleRoom/Background/BackgroundRefreshScheduler.swift` (iOS-only,
+  deliberately placed in the app's own folder rather than the shared one
+  compiled into every extension target, since `BGTaskScheduler` is
+  app-only) — registers a `BGAppRefreshTask` handler
+  (`martinkearn.WiggleRoom.starlingRefresh`), requests the next run on
+  launch and on every backgrounding, and on fire loops every non-manual,
+  non-completed tracker through `TrackerStore.refreshFromSource`.
+
+**Changed files**:
+
+- `TrackerStore.swift` — now `@MainActor`-isolated (needed since
+  `refreshFromSource(_:)` is a genuine async network call, and every other
+  method here already touches `ModelContext` directly). Every existing
+  call site was already effectively on the main actor (App `init`s,
+  `@MainActor`-marked Intent code, `#Preview` blocks), so this shouldn't
+  change behavior, only make the isolation explicit. Added
+  `provider(for:)` (resolves the right `SourceProvider` for a tracker's
+  connected source — manual, Starling, or `nil` for anything else),
+  `listAvailableTargets(for:)` (same resolution, but from a bare
+  `ConnectedSource` before any tracker exists — used by the new target
+  picker), and `refreshFromSource(_:)` (fetches + logs a reading the same
+  shape as a manual one, so history/zoom levels don't care where a reading
+  came from).
+- `AutoUpdateTicker.swift` — added a settable `interval` (default 60,
+  unchanged for existing callers like `TrackerListView`; `TrackerDetailView`
+  and `WatchTrackerDetailView` now set 30 on appear) and an
+  `effectiveInterval` that triples it under
+  `ProcessInfo.isLowPowerModeEnabled` (the Low Power Mode backoff decided
+  two sessions ago).
+- `TrackerDetailView.swift` — the ticker now actually triggers
+  `store.refreshFromSource` on tick for a non-manual, non-completed
+  tracker (previously display-recompute only); `handleUpdateGesture()`
+  (the pull-to-refresh action) now really refreshes instead of no-op'ing
+  for an auto-fetch source; a new `refreshErrorMessage` state surfaces a
+  distinct error line (§8.4, `WiggleRoomColors.error`) on failure; the
+  macOS button (previously manual-only) now shows for every tracker type,
+  wording/icon switching between "Update Current Balance" and "Refresh".
+- `WatchTrackerDetailView.swift` — same 30s-tick-triggers-a-fetch wiring,
+  plus a new Refresh button alongside the existing manual-only Log button
+  (no error-state UI here yet — see the known gaps below).
+- `AddSourceView.swift` — was a "Coming Soon" stub; now a real form
+  (name + personal access token), validated by actually calling
+  `listAvailableTargets` before persisting anything — a rejected/expired
+  token is never silently stored as a working connection, and its
+  Keychain entry is deleted again if validation fails.
+- `AddTrackerView.swift` — previously hard-blocked saving with a real
+  (non-manual) source selected ("This source isn't supported yet"). Now
+  has a live target-picker section (`targetPickerSection`,
+  `loadAvailableTargetsIfNeeded()`) that fetches the selected source's
+  accounts via `store.listAvailableTargets(for:)` whenever the source
+  selection changes, skipped entirely when editing an existing tracker
+  (its source can't change) so as not to spend a Starling request on
+  nothing.
+- `WiggleRoomApp.swift` — registers/schedules `BackgroundRefreshScheduler`
+  in `init()` (iOS only), and reschedules on every `scenePhase` transition
+  to `.background`.
+- `Info.plist` — added `BGTaskSchedulerPermittedIdentifiers` with the
+  background task's identifier (`UIBackgroundModes`'s `fetch`/`processing`
+  entries already existed from an earlier session, confirmed still
+  present).
+
+**New tests** (`src/WiggleRoomTests/`): `StarlingRequestBudgetTests`
+(threshold/cool-down/24h-aging behavior, using a settable `TestClock`
+reference type rather than capturing a mutable `var` in the actor's
+`now` closure — the latter wouldn't satisfy `@Sendable` under strict
+concurrency), `StarlingAPIClientTests` (a `StubURLProtocol`-backed
+`URLSession` — no real network — covering account/balance decoding,
+401→invalidToken, 429→rateLimited-with-cooldown, and the daily budget
+refusing a call before it's even made), `StarlingProviderTests` (the
+`notConnected`/`manualLoggingNotSupported` paths, using
+`InMemoryTokenStore` — never real Keychain), `SecureTokenStoreTests`
+(`InMemoryTokenStore` roundtrip only), and additions to
+`TrackerStoreTests` (`provider(for:)` resolution across manual/Starling/
+unknown provider ids, `refreshFromSource` no-op for manual and
+`notConnected` for an unconnected Starling tracker).
+
+**Known gaps, called out rather than silently left** (also in
+build-spec.md §5.3/§12): Spaces/savings-goal targets aren't supported
+(only top-level accounts); two trackers on the same Starling account still
+poll it independently rather than sharing one fetch (§5.3's mitigation 2
+from two sessions ago); the request budget is in-memory only and resets on
+relaunch; there's no way to remove/disconnect a Starling source from
+Settings once added; the watch app has no on-screen error state for a
+failed refresh (iOS/macOS do).
+
+### Verifying this session's changes
+
+**Not verified in any real sense.** No Swift toolchain of any kind was
+available — no `swiftc`, no `xcodebuild`, no simulator. Every file was
+written carefully and re-read for common mistakes (actor-isolation
+mismatches, a `Decimal` literal that would round-trip through `Double` and
+silently fail an equality test, `switch`-over-`Error` pattern syntax,
+whether every new file's target membership would actually resolve via the
+project's synchronized-folder groups), but none of that is a substitute
+for an actual build. The next session with real Xcode access should, in
+order: build every target (`WiggleRoom` iOS/macOS/watchOS, widgets,
+complication), run the full test suite including the five new/extended
+test files above, then manually connect a real Starling personal access
+token and confirm the account picker, balance fetch, pull-to-refresh, and
+30s live-updating tick all actually work end to end before trusting any
+of this as done.
+
+## 2026-09-17 Starling implementation: first real Xcode feedback
+
+The user opened the branch in actual Xcode after the implementation above
+and reported real compiler warnings — the first genuine build-tool signal
+this whole Starling effort has had, since every prior session in this
+chain had no Swift toolchain at all. Two real issues, both fixed here:
+
+- **`BGTaskScheduler.shared.submit(_:)` is deprecated as of iOS 27** in
+  favor of `submitTaskRequest(_:completionHandler:)` (or an async
+  `submitTask` variant). `BackgroundRefreshScheduler.scheduleNext()`
+  (`src/WiggleRoom/Background/BackgroundRefreshScheduler.swift`) now calls
+  the completion-handler form, still discarding any error the same way the
+  old `try?`-style call did — a submission failure (Simulator, capability
+  not granted) is expected and non-fatal either way. Confirms this
+  project targets a genuinely new-enough SDK (iOS 27) that `submit` had
+  already been deprecated by the time this was written from a toolchain-less
+  environment with no way to know that.
+- **Default main-actor isolation broke `StarlingProvider.init`'s default
+  argument values.** This project apparently has Swift's "default actor
+  isolation = MainActor" setting enabled (a real, current Xcode feature —
+  every declaration in the module is MainActor-isolated unless marked
+  `nonisolated`). Under that setting, a function's *default argument
+  expressions* are evaluated in the caller's (non-isolated) context, not
+  the callee's — so `tokenStore: SecureTokenStore = KeychainTokenStore()`
+  and `budget: StarlingRequestBudget = StarlingProvider.sharedBudget` as
+  default *argument* values were both invalid, even though the
+  initializer they belonged to is itself `@MainActor`. Fixed by defaulting
+  both to `nil` and resolving them inside the initializer's body instead
+  (which *is* MainActor-isolated, since that's where `self` gets built) —
+  see `StarlingProvider.init` in `StarlingProvider.swift`. Also marked
+  `KeychainTokenStore` and `InMemoryTokenStore`
+  (`Security/SecureTokenStore.swift`) explicitly `nonisolated`, since
+  neither has any real reason to be main-actor-confined (plain synchronous
+  Keychain/in-memory calls) and leaving them to the module's implicit
+  default risked the same class of issue resurfacing elsewhere, or worse,
+  breaking their conformance to `SecureTokenStore`'s synchronous
+  (non-`async`) protocol requirements if the compiler ever treated them as
+  actor-isolated.
+
+**Not independently re-verified** — still no Swift toolchain in this
+environment. These fixes address exactly the diagnostics reported (a
+screenshot of Xcode's issue navigator showing the deprecation warning and
+two isolation errors, repeated identically across the WiggleRoom,
+WiggleRoomWatch, WiggleRoomComplication, and WiggleRoomWidgets targets
+since `StarlingProvider.swift` is shared), reasoned through carefully, but
+the next real Xcode build is what actually confirms them clean. If
+`StarlingProvider.swift` still shows isolation warnings after this, the
+module's default-isolation setting may work differently than assumed here
+(e.g. it could be per-target rather than whole-module, or `nonisolated` on
+a class might need to additionally propagate to individual members) —
+worth checking the target's Swift Language Version / "Default Actor
+Isolation" build setting directly rather than guessing further blind.
+
+### Verifying this session's changes
+
+Not verified by a compiler — see above. Reasoned fixes only, based on the
+exact diagnostic text reported from a real Xcode session.
+
+## 2026-09-17 Starling real-device testing: findings and a fix
+
+The user connected a real Starling account and tested end to end, catching
+three distinct issues worth separating clearly:
+
+1. **The inner ring looked empty on a freshly-added tracker.** Traced to
+   real numbers (self-reported: starting value and total budget both
+   £639, nothing spent since creation): with essentially nothing consumed
+   yet, the inner ring's fraction is genuinely tiny, and
+   `RingsView.progressOpacity` fades any fraction below its
+   `dotFadeThreshold` (3.5%) proportionally — a fade meant only to mask a
+   transient animation artifact during the drain/refill "recycle"
+   animation, but which (per its own doc comment's stated intent) ends up
+   applying permanently to any small **settled** value too, not just
+   mid-transition ones. Not fixed this pass — flagged as a real, pre-existing
+   defect (not Starling-specific; would reproduce identically for any
+   fresh manual tracker) since fixing it means touching carefully-tuned
+   animation code without being asked to.
+2. **"X left in this budget" showed a fraction of the real total.**
+   Confirmed via `Tracker.availableZoomLevels`/`subPeriod(for:asOf:)`: any
+   tracker over 7 days defaults its dashboard to the "This Week" zoom
+   (`TrackerDetailView.init`'s `defaultZoom` logic), which scopes
+   `Target Right Now`/`Under Budget`/`remainingInAllowanceCaption` to a
+   **calendar-week-clamped sub-period's fractional allowance**
+   (`Tracker.pace(...zoomLevel:)`'s `subAllowance`), not the tracker's real
+   total. For an 8-day tracker, "This Week" clamps to just a few days,
+   producing a materially smaller number than the real budget with no
+   on-screen indication the figures are scoped rather than whole-tracker.
+   Also not Starling-specific — same math for a manual tracker of the same
+   length. Not fixed this pass either — it's a deliberate prior design
+   (zoom re-scopes "the whole dashboard," per `TrackerDetailView`'s own
+   doc comment) with real tradeoffs (short-tracker default threshold vs.
+   caption wording vs. leaving as-is), presented to the user as options
+   rather than picked unilaterally.
+3. **"Under Budget by £67.20" with zero actual spending — confirmed not a
+   bug, and now fully explained.** `TrackerPace.computePace`'s
+   `difference = expectedConsumedByNow - consumedSoFar` means the moment
+   *any* time elapses since the tracker's **period start**, a nonzero
+   figure appears even with zero real spending (§3.1's intentional linear
+   pace model) — that part was already understood. What wasn't yet pinned
+   down: the user's own math (£3.33/hour expected at their tracker's
+   size) didn't match a ~£68 swing within under an hour of *creating* the
+   tracker. Root cause: `hoursElapsed` is measured from `startDate`,
+   normalized to **midnight** when `includesTime` is off (the default) —
+   not from when the tracker was actually saved. Creating a tracker in
+   the evening with a start date of "today" already counts most of that
+   day as elapsed pace-wise. The user confirmed this directly: a follow-up
+   tracker created with explicit start/end times (`includesTime` on, so
+   `startDate` matches actual creation time) produced correct-looking
+   figures. **No code change needed or made** — working as designed once
+   the period-start-vs-creation-time distinction is understood.
+
+**Fixed this pass**: "Starting value" now auto-fills from the picked
+account's live Starling balance in Add Tracker, rather than requiring the
+user to type in today's real number blind. `TrackerStore` gained
+`fetchCurrentValue(for:from:)` (refactored alongside `provider(for:)` and
+`listAvailableTargets(for:)` to share one `resolvedProvider(for:)` helper
+rather than three copies of the same provider-id switch) and
+`AddTrackerView` now has a `.task(id: selectedTargetId)` that fetches and
+overwrites `startingValueText` whenever the user picks/changes an account,
+with a small "Fetching live balance…" indicator in place of the usual
+hint text while it's in flight. Deliberately overwrites rather than only
+filling when empty — picking an account is the user asking this field to
+reflect that account's real number — and only "Starting value," not
+"Total budget," per what was actually asked; the two remain independent
+decisions. Fails silently (the user can still type a value by hand) since
+a failed prefetch shouldn't block tracker creation.
+
+### Verifying this session's changes
+
+Not verified by a compiler, same caveat as every Starling-related entry
+above. The three findings above, though, **were** verified against a real
+device/Starling account by the user — those are confirmed real, not
+speculative.
+
+## 2026-09-17 Zoom levels removed
+
+Following finding #2 from the real-device testing session above (the
+default "This Week" zoom silently scoping headline dashboard figures to a
+calendar-week-clamped fraction of a tracker's real budget, with no visual
+indication), the user asked to remove zoom levels from the app entirely
+rather than patch the default threshold or caption wording as a stopgap —
+"not working well so need a re-think... not important just yet anyway."
+Removed cleanly, not disabled/hidden: no `ZoomLevel` type, no zoom picker,
+no sub-period scoping anywhere in the app. A tracker's dashboard, trend
+chart, and every widget/complication family now always show the tracker's
+real, whole-period figures — exactly the pre-zoom-levels behavior.
+
+**Files deleted**: `src/WiggleRoomShared/Models/ZoomLevel.swift`,
+`src/WiggleRoomTests/ZoomLevelTests.swift`.
+
+**Files changed**:
+- `Tracker.swift` — removed `actualValue(atOrBefore:)` (only had one
+  caller, the now-removed zoomed pace calculation), `availableZoomLevels`,
+  and `subPeriod(for:asOf:)`. `periodRemainingText(asOf:until:)` lost its
+  `until` parameter (every other caller already used the default) and
+  reverted to always measuring against the tracker's own `endDate`.
+- `TrackerPace.swift` — removed the zoomed `pace(actualValue:asOf:zoomLevel:)`
+  overload entirely. The previously-separate `computePace` static function
+  (kept apart specifically so the zoomed overload could reuse it against a
+  sub-period) had only one caller left once that overload was gone, so it's
+  now inlined directly into the plain `pace(actualValue:asOf:)` — one
+  function, not two, doing the exact same math as before for every
+  existing caller.
+- `RingsView.swift` — removed the `zoomLevel: ZoomLevel = .overall`
+  parameter; `pace` always computes against the tracker's real period now.
+- `TrendChartView.swift` — removed the `zoomLevel` parameter along with
+  the whole "window" abstraction it existed to support
+  (`windowStartingValue`, `windowAllowance`, `windowedReadings` are gone);
+  every call site now reads `tracker.startingValue`/`tracker.totalAllowance`/
+  `tracker.sortedReadings` directly, since the chart always covers the
+  tracker's real full period again.
+- `TrackerDetailView.swift` — removed the `@State private var zoomLevel`
+  property, the custom `init` that used to pick its default (the type now
+  relies on Swift's synthesized memberwise `init(tracker:)`, since `let
+  tracker: Tracker` is the only stored property left without a default
+  value), `availableZoomLevels`, `zoomWindowEnd`, `windowedReadingCount`
+  (now just `tracker.sortedReadings.count` inlined at its one call site),
+  the zoom picker section in `body`, and the `zoomLevelPicker` view itself.
+  `RingsView`/`TrendChartView` are called with no zoom argument;
+  `periodRemainingText` dropped its `until:` argument to match `Tracker`'s
+  simplified signature.
+- `ValueSnapshot.swift`, `TrackerPace.swift` (`finalPaceStatus` doc
+  comment), `TrackerStore.swift` (`refreshFromSource` doc comment) — doc
+  comments that referenced zoom levels as a reason for the timestamped-
+  snapshot history requirement or as a caveat, reworded to stand on their
+  own (the trend chart alone already justifies keeping reading history;
+  `finalPaceStatus`/`refreshFromSource` no longer need to disclaim
+  anything zoom-related).
+- `docs/wiggleroom-build-spec.md` — §4.5 rewritten from a feature
+  description into a "removed, needs a rethink" section explaining what
+  broke and why it was pulled rather than patched in place, keeping the
+  original design idea on record for whenever it's revisited; every other
+  cross-reference to zoom levels (§6, §7.1, §8.1, §9, §12) updated to
+  match current (zoom-free) behavior rather than left stale.
+- `README.md` — status checklist line for §4.5 changed from done to "built,
+  then removed pending a redesign."
+
+**Widgets/complication were never touched** — they never adopted zoom
+levels in the first place (confirmed by grep before starting this removal:
+zero references anywhere in `WiggleRoomWidgets`/`WiggleRoomComplication`),
+so §8.1's build-spec line about "zoom-level configuration not yet built
+for widgets" is now moot rather than resolved — there's no base feature
+left for a widget to configure a zoom level against.
+
+**No regressions intended**: every simplified function computes exactly
+the same result it did before for the `.overall` case (which was already
+the only case most trackers — anything a week or shorter — ever used),
+since removing the zoom branch just means that code path is gone, not that
+the surviving path's math changed. `TrackerPaceTests`/`TrackerTests`
+already only exercised the plain `pace(actualValue:asOf:)` overload and
+`periodRemainingText(asOf:)` with no `until:` argument, so neither needed
+updating — only `ZoomLevelTests.swift` (entirely zoom-specific) was
+deleted outright.
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every Starling/
+real-device-testing entry above (no Swift toolchain in this environment).
+Manually re-checked every changed file for leftover references (a repo-wide
+grep for `zoomLevel`/`ZoomLevel`/`subPeriod`/`availableZoomLevels`/
+`windowedReadings`/`windowStartingValue`/`windowAllowance`/
+`actualValue(atOrBefore` returns nothing after this change) and for
+structural correctness (brace matching, the synthesized memberwise init
+replacing the deleted custom one). Build in Xcode and run the test suite
+before trusting this further, same as everything else in this file's
+Starling-adjacent entries.
+
+## 2026-09-17 Starling reading dedup + Update History for real sources
+
+Two more findings from continued real-device testing on the Starling
+branch, both fixed:
+
+1. **`refreshFromSource` logged a new reading on every successful poll,
+   even when the value hadn't changed.** With the detail screen's 30s tick
+   (§5.3), this meant a Starling tracker accumulated a near-duplicate,
+   same-value reading every 30 seconds it was left open — flooding
+   `TrendChartView`'s point marks so densely that individual readings
+   became visually indistinguishable from the line connecting them (the
+   user's "why am I not seeing green dots" — the dots were being drawn,
+   just so densely overlapped they read as a solid line), and needlessly
+   bloating the synced reading history for no informational gain. Fixed in
+   `TrackerStore.refreshFromSource` (`src/WiggleRoomShared/State/TrackerStore.swift`):
+   a fetched value equal to `tracker.latestReading?.value` is treated as a
+   successful, no-op check rather than a new row — a poll that finds
+   nothing changed doesn't need its own reading. Not independently unit
+   tested (the guard's own logic is a one-line comparison, and testing it
+   end-to-end through `TrackerStore.refreshFromSource` would need
+   `provider(for:)` to accept an injectable fake provider, which it
+   currently doesn't — a bigger seam than this fix warranted); needs
+   manual verification against a real Starling account.
+2. **"Update History" was hidden entirely for a Starling tracker.**
+   Pre-existing, deliberate design (predates the Starling work) —
+   `ReadingHistoryView` was built to let a user edit/delete their own
+   manually-logged readings, gated behind `Tracker.isManualEntry` in
+   `TrackerDetailView`'s toolbar menu, on the reasoning that "a real
+   provider's history should reflect what it actually reported." That
+   reasoning still holds for *editing*, but with Starling readings now
+   genuinely accumulating, hiding the list entirely means there's no way
+   to just *see* a Starling tracker's history at all. Changed the toolbar
+   gate to `!tracker.sortedReadings.isEmpty` (any tracker with readings
+   gets the menu item, not just manual ones), and reworked
+   `ReadingHistoryView` (`src/WiggleRoom/Views/ReadingHistoryView.swift`)
+   so a manual tracker's rows stay tap-to-edit/swipe-or-context-menu-to-
+   delete exactly as before, while a real source's rows render as plain,
+   non-interactive text — same list, view-only. `EditButton`/`onDelete`
+   are now also gated on `tracker.isManualEntry`.
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every entry in this
+Starling-adjacent stretch (no Swift toolchain in this environment). Manually
+re-checked both changed files for consistent `isManualEntry` gating and
+correct `@ViewBuilder`/optional-closure syntax (`onDelete(perform:
+tracker.isManualEntry ? deleteReadings : nil)`). Needs a real build, the
+test suite, and ideally a real Starling account left open for a few
+minutes to confirm the dedup actually stops the reading flood and that
+Update History renders sensibly (read-only) for a Starling tracker.
+
+## 2026-09-17 Fix Swift type-checker crash in ReadingHistoryView
+
+First actual build attempt against a real device on this branch, and it
+failed outright: Xcode reported "Failed to produce diagnostic for
+expression; please submit a bug report" in `ReadingHistoryView.swift` —
+the Swift compiler giving up on type-checking an expression rather than
+producing a normal error, a known failure mode for certain expression
+shapes rather than a real semantic mistake.
+
+Prime suspect: `.onDelete(perform: tracker.isManualEntry ? deleteReadings
+: nil)`, added in the previous session — a ternary whose branches are a
+bare function reference and `nil` is a recognized trigger for this exact
+crash (the type checker has to simultaneously infer the ternary's result
+type, the optional-closure conversion, and the function-reference-to-
+closure conversion, and sometimes just fails to produce a diagnostic
+rather than resolving it or reporting a real error). Fixed by extracting
+it into its own explicitly-typed computed property (`private var
+deleteAction: ((IndexSet) -> Void)?`), so `.onDelete(perform:
+deleteAction)` at the call site is now trivial for the checker.
+
+While in there, also simplified `row(for:)`, which had a similar shape (a
+shared, untyped `let content = HStack { ... }` reused inside both branches
+of an `if tracker.isManualEntry { Button { ... } label: { content } } else
+{ content }`) — not confirmed as a second contributor to the crash, but
+the same general pattern, so split into two straightforward functions
+(`row(for:)` branching between a `Button` and plain content, `rowContent(for:)`
+building the actual `HStack` once with an explicit `some View` return
+type) as a precaution rather than leaving a second instance of a pattern
+already known to cause this class of failure.
+
+### Verifying this session's changes
+
+Not verified by a compiler in this environment (same standing caveat as
+every entry in this stretch) — this fix is a response to a real compiler
+failure the user reported from their own Xcode, targeting the specific,
+well-known trigger pattern, but hasn't been confirmed clean by a
+follow-up build. If Xcode still reports the same crash (or a new one) in
+this file after this change, the `row(for:)`/`rowContent(for:)` split
+wasn't the (or the only) cause, and the actual offending expression needs
+pinpointing directly from Xcode's own (admittedly unhelpful) diagnostic —
+worth trying to isolate by temporarily commenting out sections of the
+file to binary-search for the exact line, since Xcode's crash message
+doesn't reliably point at the real culprit's line number.
+
+## 2026-09-17 Connected Source management + token storage moved off Keychain
+
+Two related fixes from continued real-device, multi-device testing: the
+user ran the app on a second device and got "Not connected — reconnect
+this source in Settings" for their Starling tracker, then pointed out (1)
+there was no way to actually reconnect/manage a source from Settings at
+all, and (2) the token should travel between devices on the same Apple ID
+the same way everything else in the app does — "everything should use the
+same sync system, including sources."
+
+**Root cause of the cross-device failure**: `kSecAttrSynchronizable`
+Keychain items sync via **iCloud Keychain**, a genuinely separate sync
+system from the CloudKit private-database sync that carries every other
+piece of this app's data. It has its own per-device on/off toggle
+(Settings → [name] → iCloud → Passwords and Keychain) that most people
+never think to check, and even when on, it can lag CloudKit's near-real-time
+sync by a noticeable margin. So a `ConnectedSource` record could (and, per
+the user's report, did) arrive on a second device via CloudKit well before
+— or without ever — its Keychain-held token arriving via the separate
+iCloud Keychain path, leaving a source that looked connected but wasn't.
+
+**Fix, per the user's explicit direction**: moved the token off the
+Keychain entirely and onto `ConnectedSource.credentialToken` — a plain
+`String?` field on the same `@Model` record, synced via the exact same
+CloudKit mechanism as trackers, readings, and everything else. One sync
+system, not two. This is still within the security boundary build-spec.md
+§11 always allowed ("stored outside Keychain/CloudKit" was the actual
+line, not "Keychain only" — that stricter wording has been corrected)
+since it's still the user's own private CloudKit database under their own
+Apple ID, never transmitted anywhere but Starling and Apple's own sync
+infrastructure.
+
+**Files deleted**: `src/WiggleRoomShared/Security/SecureTokenStore.swift`
+(the `SecureTokenStore` protocol, `KeychainTokenStore`, `InMemoryTokenStore`
+— no longer needed once nothing reads/writes the Keychain) and
+`src/WiggleRoomTests/SecureTokenStoreTests.swift`.
+
+**Files changed**:
+- `ConnectedSource.swift` — `credentialKeychainKey: String?` renamed/
+  repurposed to `credentialToken: String?`, now holding the actual token
+  value directly rather than a Keychain lookup key.
+- `StarlingProvider.swift` — dropped the `tokenStore: SecureTokenStore`
+  dependency entirely; `makeClient(for:)` now reads
+  `connection.credentialToken` straight off the record. `init` simplified
+  to just `connection`/`budget` params.
+- `AddSourceView.swift` — dropped all Keychain calls; `connect()` now sets
+  `credentialToken` directly on the (draft, then real) `ConnectedSource`.
+  Also gained an **existing-source mode**: `AddSourceView(existingSource:)`
+  reconnects a source in place (same record, same `credentialToken` field,
+  so every tracker already pointed at it keeps working) instead of only
+  ever creating a new one — this is the practical fix for "no option to
+  edit sources," not just the sync-system change.
+- `ConnectedSourcesView.swift` — rows are now `NavigationLink`s into the
+  reconnect flow, plus swipe-to-remove. Removal is blocked while any
+  tracker still uses that source — `ConnectedSource`'s relationship to
+  `Tracker` has no cascade-delete rule (defaults to `.nullify`), so
+  deleting a source out from under active trackers would silently leave
+  them with a `nil` connection rather than cleanly failing; the blocked-
+  removal alert names the trackers still using it instead.
+- Test files (`StarlingProviderTests.swift`, `TrackerStoreTests.swift`) —
+  updated to construct `ConnectedSource` with `credentialToken` instead of
+  `credentialKeychainKey`, and `StarlingProvider`/`InMemoryTokenStore`
+  call sites simplified to match the new, Keychain-free constructor.
+
+**Docs**: build-spec.md §5.2 (table + prose), §5.3, §5.4, §11, and §12
+all rewritten to describe CloudKit-synced token storage and the
+reconnect/remove UI as the current, built behavior rather than a Keychain
+design with known gaps; README's status line updated to match.
+
+**Trade-off understood, not treated as free**: a Keychain entry gets
+OS-level encryption-at-rest and biometric/passcode-gated access by
+default; a plain SwiftData field synced through CloudKit relies on
+CloudKit's own private-database encryption and the device's standard
+Data Protection instead — a different, not strictly lesser, protection
+model, and a reasonable one for a personal single-user app already
+trusting CloudKit with every other piece of financial data it stores
+(balances, budgets). Not treated as a decision to revisit without being
+asked.
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every entry in this
+Starling-adjacent stretch (no Swift toolchain in this environment).
+Manually re-checked every changed file and ran a repo-wide grep for
+`credentialKeychainKey`/`SecureTokenStore`/`KeychainTokenStore`/
+`InMemoryTokenStore`/`tokenStore:`/`Keychain` to confirm nothing stale was
+left behind (three intentional doc-comment mentions remain, explaining
+*why* the design moved away from Keychain — not leftover references to
+code that no longer exists). Needs a real build, the test suite, and
+ideally the exact scenario that surfaced this — connecting Starling on one
+device, then opening the app on a second device signed into the same
+Apple ID — to confirm the source now shows connected there without any
+iCloud Keychain dependency.
+
+## 2026-09-17 Fix Starting-value auto-fill clobbering manual entry
+
+Real-device report: the user created a Starling tracker with its start
+time set to 40 minutes in the past, and manually typed the starting
+balance as what it genuinely was then (£639). After saving, the tracker's
+starting balance had become £615 — the account's balance *at save time*,
+not what was typed — and "Final target will be" showed a nonsensical
+-£23 (`projectedFinalValue = startingValue - totalAllowance`, now computed
+against the wrong starting value). Also reported: the "Starting value"
+field already contained "0" before typing, so entering "639" produced
+"6390" (the digits landed ahead of the existing "0" rather than replacing
+it).
+
+**Root cause of the first bug**: `AddTrackerView`'s "Starting value
+auto-fills from the live balance" feature (built two sessions ago, per
+explicit request) fetched the picked account's *current* balance and
+unconditionally overwrote `startingValueText` — including a value the
+user had already deliberately typed. The Budget section sits above the
+Source section in the form, so the realistic flow is: type a (possibly
+backdated) starting value first, then scroll down and pick the Starling
+account — at which point the prefill fired and silently replaced what was
+just typed. This directly explains 639 → 615: the live balance at the
+moment the account was picked (or shortly after, whenever the fetch
+resolved) simply overwrote the historical figure, with nothing on screen
+indicating the field had changed out from under the user.
+
+**Fixes**, both in `src/WiggleRoom/Views/AddTrackerView.swift`:
+1. `prefillStartingValueIfNeeded()` now checks `startingValueText.isEmpty`
+   before *and* after the async fetch (the second check guards the race
+   where the user types while the fetch is still in flight) and does
+   nothing if the field already has content — it only ever fills a truly
+   blank field, never overwrites. Doc comment rewritten to state this as
+   the actual contract, not "overwrites, since picking an account is what
+   the user asked for" (the previous, now-recognized-as-wrong reasoning).
+2. `startingValueText`'s `@State` default changed from the literal string
+   `"0"` to `""`. A `"0"` default isn't a placeholder — it's real content
+   already in the field — so typing "639" without first clearing it
+   produced "6390". `totalAllowanceText` never had this default and never
+   had this problem; `startingValueText` now matches it. The `TextField`'s
+   own `"0"` argument (a genuine grey placeholder, shown only when the
+   bound text is empty) was correct already and needed no change.
+
+Trade-off accepted for fix 1: after one successful auto-fill, switching to
+a *different* Starling account in the same form won't re-fill the field
+even though the user didn't type anything themselves (it's no longer
+empty). Deliberate — silently overwriting is the actively wrong behavior
+this fix exists to prevent, and it applies uniformly rather than trying to
+distinguish "auto-filled, safe to replace" from "user-typed, don't touch."
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every entry in this
+stretch (no Swift toolchain in this environment). The bug's mechanism was
+traced through the actual code (`prefillStartingValueIfNeeded`'s
+unconditional overwrite, `startingValueText`'s `"0"` default) rather than
+guessed at, and the fix directly addresses the traced mechanism, but
+hasn't been confirmed against a real build or the exact reported scenario
+(backdated start time + manual starting value + picking a Starling
+account) on a device.
+
+## 2026-09-17 Surface the bound account read-only, in two places
+
+Confirmed with the user that a tracker's connected source and account are
+already fully locked after creation — the only code that ever sets
+`Tracker.connectedSource`/`sourceTargetId` is the initializer itself, and
+`AddTrackerView`'s edit mode has never rendered an editable picker for
+either. Two follow-up asks from that conversation, both about *showing*
+that binding rather than changing it:
+
+1. **Edit Tracker** showed the source's display name as a read-only row
+   already, but never which specific account within it. Added an
+   "Account" row alongside it (`AddTrackerView.swift`) — resolved live via
+   `store.listAvailableTargets(for:)`, matched against the tracker's
+   stored `sourceTargetId`, with a loading spinner while in flight and a
+   fallback to the raw id if the fetch fails or the account's no longer
+   listed. New state: `resolvedAccountName`/`isResolvingAccountName`, a
+   `resolveAccountNameIfNeeded(for:)` async function, called once from the
+   existing `.task { }` that populates the edit form. Footer text updated
+   from "source can't be changed" to "source and account can't be
+   changed."
+2. **Tracker Detail dashboard** had no indication anywhere of which
+   source/account a tracker's live figures come from. Added a small
+   tertiary-style caption ("My Starling Account · Personal") above the
+   "Refreshes in Xs" countdown, shown only for a real (non-manual) source
+   (`TrackerDetailView.swift`). Same resolution approach as Edit Tracker
+   (`resolveAccountNameIfNeeded()`, `sourceCaption`), but deliberately
+   **not** tied to the 30s refresh tick — it resolves once per appearance
+   (guarded by `resolvedAccountName == nil`) since a tracker's bound
+   account never changes, and re-fetching the full account list every 30
+   seconds alongside the balance poll would burn extra Starling requests
+   for information that's already static.
+
+Neither change touches `Tracker.connectedSource`/`sourceTargetId` at all —
+both are pure display, confirming (not just preserving) the existing
+lock.
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every entry in this
+stretch. Both new resolution functions follow the exact pattern already
+used (and manually re-checked) by `AddTrackerView`'s target-picker
+prefill from earlier sessions, so the risk profile is similar; still
+needs a real build and a look at an actual Starling tracker's Edit screen
+and dashboard to confirm the caption/row render sensibly and don't
+crowd already-tight layouts (the watch app and small widget families
+were deliberately left untouched — no room for this there).

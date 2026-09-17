@@ -16,8 +16,16 @@ struct WatchTrackerDetailView: View {
 
     @State private var isPresentingLogReading = false
     @State private var ticker = AutoUpdateTicker()
+    @State private var isRefreshingFromSource = false
 
     private var now: Date { ticker.now }
+
+    private func refreshFromSourceIfNeeded() async {
+        guard !tracker.isManualEntry, !tracker.isCompleted(asOf: now), !isRefreshingFromSource else { return }
+        isRefreshingFromSource = true
+        defer { isRefreshingFromSource = false }
+        try? await store.refreshFromSource(tracker)
+    }
 
     var body: some View {
         ScrollView {
@@ -29,21 +37,38 @@ struct WatchTrackerDetailView: View {
                 RingsView(tracker: tracker, now: now, lineWidth: 8)
                     .frame(width: 120, height: 120)
 
-                if tracker.isManualEntry && !tracker.isCompleted(asOf: now) {
-                    Button {
-                        isPresentingLogReading = true
-                    } label: {
-                        Label("Log", systemImage: "plus.circle.fill")
+                if !tracker.isCompleted(asOf: now) {
+                    if tracker.isManualEntry {
+                        Button {
+                            isPresentingLogReading = true
+                        } label: {
+                            Label("Log", systemImage: "plus.circle.fill")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    } else {
+                        Button {
+                            Task { await refreshFromSourceIfNeeded() }
+                        } label: {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isRefreshingFromSource)
                     }
-                    .buttonStyle(.borderedProminent)
                 }
             }
             .padding(.vertical, 8)
         }
         .navigationTitle(tracker.name)
         .onAppear {
+            // 30s while this detail screen is on-screen (§5.3) — same
+            // cadence and mechanism as the phone/Mac dashboard.
+            ticker.interval = 30
             ticker.endDatesProvider = { [tracker.endDate] }
+            ticker.onUpdate = { _ in
+                Task { await refreshFromSourceIfNeeded() }
+            }
             ticker.start()
+            Task { await refreshFromSourceIfNeeded() }
         }
         .sheet(isPresented: $isPresentingLogReading) {
             WatchLogReadingView(tracker: tracker)

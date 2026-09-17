@@ -30,8 +30,24 @@ final class AutoUpdateTicker {
     /// Supplies the end date(s) to align to, re-read every time the ticker
     /// reschedules — so it stays correct if the tracker(s) being shown
     /// change while the ticker is running. Empty means "nothing to align
-    /// to," which falls back to a flat 60-second cadence.
+    /// to," which falls back to a flat cadence of `interval` seconds.
     var endDatesProvider: () -> [Date] = { [] }
+
+    /// The base cadence between updates, in seconds. Defaults to 60
+    /// (display-recompute only, the prior behavior) — a caller that also
+    /// fetches fresh data on every tick sets this to 30 (§5.3's decided
+    /// foreground poll cadence, currently only the tracker detail screens).
+    /// Widened automatically under Low Power Mode; see `effectiveInterval`.
+    var interval: TimeInterval = 60
+
+    /// `interval`, widened under Low Power Mode (§5.3's decided backoff) so
+    /// a network-fetching ticker polls less aggressively on a low-battery
+    /// device — display-only tickers (the default 60s interval, no fetch)
+    /// still widen too, which is harmless since they have no network cost
+    /// to save on, just a slightly less frequent display recompute.
+    private var effectiveInterval: TimeInterval {
+        ProcessInfo.processInfo.isLowPowerModeEnabled ? interval * 3 : interval
+    }
 
     /// Called every time `now` actually advances (not every second-poll) —
     /// the hook for side effects like a "just updated" flip animation or a
@@ -66,9 +82,9 @@ final class AutoUpdateTicker {
     private func reschedule(after date: Date) {
         let upcomingEndDates = endDatesProvider().filter { $0 > date }
         guard let nearestEnd = upcomingEndDates.min() else {
-            nextUpdateAt = date.addingTimeInterval(60)
+            nextUpdateAt = date.addingTimeInterval(effectiveInterval)
             return
         }
-        nextUpdateAt = TrackerUpdateScheduling.nextUpdateDate(after: date, until: nearestEnd)
+        nextUpdateAt = TrackerUpdateScheduling.nextUpdateDate(after: date, until: nearestEnd, interval: effectiveInterval)
     }
 }

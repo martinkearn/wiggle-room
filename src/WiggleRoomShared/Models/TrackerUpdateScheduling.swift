@@ -14,6 +14,8 @@ import Foundation
 /// source like Starling or Tesla — "when should we next poll?") can reuse
 /// directly.
 enum TrackerUpdateScheduling {
+    static let defaultWidgetFarInterval: TimeInterval = 300
+
     /// The next moment a display should refresh, walking backward from
     /// `endDate` in `interval`-second steps rather than forward from `now` —
     /// so ticks are anchored to *when the tracker ends*, and the very last
@@ -35,15 +37,11 @@ enum TrackerUpdateScheduling {
     /// budget-friendly cadence while the tracker still has plenty of time
     /// left, tightening to `interval` once inside the final hour so the last
     /// reload coincides with the tracker's own end — matching the in-app
-    /// experience instead of a flat "always an hour away" ceiling. `farInterval`
-    /// is deliberately as tight as WidgetKit's shared per-app reload budget
-    /// reasonably allows (5 minutes, not the original 15) — there's no App
-    /// Group here (see `WidgetDataStore`), so this periodic reload plus the
-    /// explicit `WidgetCenter.reloadAllTimelines()` triggers on every data
-    /// change are the only two ways a widget ever catches up with the app;
-    /// tightening this is the most impactful lever available without that
-    /// larger architecture change.
-    static func nextWidgetReloadDate(after now: Date, until endDate: Date, farInterval: TimeInterval = 300, nearInterval: TimeInterval = 60) -> Date {
+    /// experience instead of a flat "always an hour away" ceiling. App Group
+    /// storage keeps same-device app/widget data fresh; `farInterval` controls
+    /// the periodic reload policy, especially for cross-device CloudKit updates
+    /// and elapsed-time recomputes when no explicit reload was triggered.
+    static func nextWidgetReloadDate(after now: Date, until endDate: Date, farInterval: TimeInterval = defaultWidgetFarInterval, nearInterval: TimeInterval = 60) -> Date {
         let interval = endDate.timeIntervalSince(now) <= 3600 ? nearInterval : farInterval
         return nextUpdateDate(after: now, until: endDate, interval: interval)
     }

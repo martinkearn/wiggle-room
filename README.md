@@ -27,7 +27,7 @@ continuously-updated log of what's built, key decisions, and known gaps.
 Rough shape of what's implemented vs. still to come:
 
 - [x] Core Tracker model & pace/consumption calculations
-- [ ] Starling provider (not started — deliberately out of scope so far)
+- [~] Starling provider (implemented — accounts + balance, token stored on the synced ConnectedSource record (CloudKit, not Keychain), 30s foreground/5-minute background refresh, reconnect/remove in Settings — but unverified by any compiler; see progress-notes.md's 2026-09-17 entries before trusting it. Spaces/savings-goal targets not yet supported)
 - [x] Manual entry provider
 - [ ] Tesla provider (not started — deliberately out of scope so far)
 - [x] SwiftData + CloudKit sync
@@ -38,7 +38,7 @@ Rough shape of what's implemented vs. still to come:
 - [x] watchOS complication
 - [x] Siri/Shortcuts (log a reading, check a tracker's status)
 - [ ] Live Activities (deliberately skipped — see progress notes for why)
-- [x] §4.5 zoom levels (This year/This month/This week sub-periods) — on the dashboard; not yet per-widget
+- [ ] §4.5 zoom levels (This year/This month/This week sub-periods) — built, then removed pending a redesign; see progress-notes.md
 - [ ] visionOS / Mac Catalyst (deliberately removed — iOS and macOS only, see progress notes)
 
 ## Requirements

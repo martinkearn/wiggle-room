@@ -8,8 +8,8 @@ import SwiftData
 
 /// A single timestamped reading obtained from a provider, auto-fetched or
 /// manually logged. See spec §4.6 — history (not a single overwritten
-/// current value) is required so later zoom levels and trend charts can ask
-/// "what was the value at the start of this sub-period?".
+/// current value) is required so the trend chart (§3.5) can plot how a
+/// tracker's value actually moved over time.
 @Model
 final class ValueSnapshot {
     var id: UUID = UUID()

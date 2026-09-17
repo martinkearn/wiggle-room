@@ -21,5 +21,9 @@
 		<string>processing</string>
 		<string>fetch</string>
 	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>martinkearn.WiggleRoom.starlingRefresh</string>
+	</array>
 </dict>
 </plist>

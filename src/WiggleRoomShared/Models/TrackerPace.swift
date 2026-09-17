@@ -157,67 +157,6 @@ extension Tracker {
     /// period spanning a DST transition is not distorted by the local
     /// calendar day gaining or losing an hour.
     func pace(actualValue: Decimal, asOf: Date = Date()) -> TrackerPace {
-        Tracker.computePace(
-            startDate: startDate,
-            endDate: endDate,
-            startingValue: startingValue,
-            totalAllowance: totalAllowance,
-            direction: direction,
-            actualValue: actualValue,
-            asOf: asOf
-        )
-    }
-
-    /// Computes pace scoped to a zoom level's calendar-aligned sub-period
-    /// (§4.5) instead of the tracker's own full period — same shape of
-    /// result, just re-windowed. `.overall` (or a zoom level whose
-    /// sub-period is empty/undefined for this `asOf`) falls back to the
-    /// plain, full-period `pace(actualValue:asOf:)` above.
-    ///
-    /// The sub-period's allowance is derived from the tracker's own totals
-    /// (`subAllowance = totalAllowance × daysInSubPeriod / totalPeriodDays`),
-    /// and its local "starting value" is whatever this tracker's history
-    /// implies the value was at the sub-period's start
-    /// (`actualValue(atOrBefore:)`) — not independently configured.
-    func pace(actualValue: Decimal, asOf: Date = Date(), zoomLevel: ZoomLevel) -> TrackerPace {
-        guard let subPeriod = subPeriod(for: zoomLevel, asOf: asOf) else {
-            return pace(actualValue: actualValue, asOf: asOf)
-        }
-
-        let totalPeriodDays = endDate.timeIntervalSince(startDate) / 86400
-        guard totalPeriodDays > 0 else {
-            return pace(actualValue: actualValue, asOf: asOf)
-        }
-
-        let subPeriodDays = subPeriod.end.timeIntervalSince(subPeriod.start) / 86400
-        let subAllowance = totalAllowance * Decimal(subPeriodDays / totalPeriodDays)
-        let localStartingValue = self.actualValue(atOrBefore: subPeriod.start)
-
-        return Tracker.computePace(
-            startDate: subPeriod.start,
-            endDate: subPeriod.end,
-            startingValue: localStartingValue,
-            totalAllowance: subAllowance,
-            direction: direction,
-            actualValue: actualValue,
-            asOf: asOf
-        )
-    }
-
-    /// The shared pace calculation (§4.3), parameterized over an explicit
-    /// window/allowance/starting-value rather than always reading them
-    /// straight off `self` — this is what lets a zoom level (§4.5) reuse the
-    /// exact same math against a calendar-aligned sub-period instead of the
-    /// tracker's own full period.
-    private static func computePace(
-        startDate: Date,
-        endDate: Date,
-        startingValue: Decimal,
-        totalAllowance: Decimal,
-        direction: TrackerDirection,
-        actualValue: Decimal,
-        asOf: Date
-    ) -> TrackerPace {
         let periodHours = endDate.timeIntervalSince(startDate) / 3600
 
         let hoursElapsed: Double
@@ -272,12 +211,11 @@ extension Tracker {
 extension Tracker {
     /// The tracker's final, whole-period `PaceStatus` once its period has
     /// actually ended — `nil` before `endDate`, or if there's no reading yet
-    /// to judge it by. Deliberately evaluated against the tracker's own full
-    /// period (never a zoom level's sub-period, §4.5) and pinned to
-    /// `endDate` itself rather than whatever "now" is well after
-    /// completion, so the answer stays stable no matter how long after
-    /// closing the tracker is actually looked at. Used to decide whether a
-    /// tracker's completion deserves the celebration in `TrackerDetailView`.
+    /// to judge it by. Pinned to `endDate` itself rather than whatever "now"
+    /// is well after completion, so the answer stays stable no matter how
+    /// long after closing the tracker is actually looked at. Used to decide
+    /// whether a tracker's completion deserves the celebration in
+    /// `TrackerDetailView`.
     func finalPaceStatus(asOf now: Date) -> PaceStatus? {
         guard now >= endDate, let latest = latestReading else { return nil }
         return pace(actualValue: latest.value, asOf: endDate).status

@@ -8,11 +8,24 @@ import Observation
 import SwiftData
 import WidgetKit
 
+enum TrackerStoreError: Error, Equatable {
+    /// `source.providerId` didn't resolve to any known provider (manual or
+    /// Starling) — reachable only for a source with a provider id from a
+    /// future/unsupported provider.
+    case unresolvableProvider
+}
+
 /// App-wide actions and the fixed manual-entry source, backed by SwiftData
 /// (§6) rather than in-memory storage. Tracker/source lists themselves are
 /// read via `@Query` directly in views (the idiomatic, auto-updating
 /// SwiftData pattern) — this type holds only what a `@Query` can't express:
 /// the manual-entry singleton, and mutating actions.
+///
+/// `@MainActor`-isolated: `refreshFromSource(_:)` below is genuinely async
+/// (a network fetch), and every other method here touches `ModelContext`
+/// directly — pinning the whole type to the main actor is what keeps that
+/// safe rather than relying on callers to always already be there.
+@MainActor
 @Observable
 final class TrackerStore {
     private let modelContext: ModelContext
@@ -78,6 +91,78 @@ final class TrackerStore {
         modelContext.delete(reading)
         try? modelContext.save()
         reloadWidgets()
+    }
+
+    /// The provider that owns `tracker`'s connected source, or `nil` for a
+    /// manual tracker or one whose source doesn't resolve to a known
+    /// provider. A fresh `StarlingProvider` instance is handed back on each
+    /// call (cheap — it just reads `credentialToken` straight off the
+    /// `ConnectedSource` record and shares the app-wide rate-limit budget,
+    /// see `StarlingProvider.sharedBudget`), so this is safe to call as
+    /// often as needed rather than something callers need to cache
+    /// themselves.
+    func provider(for tracker: Tracker) -> SourceProvider? {
+        guard let source = tracker.connectedSource else { return nil }
+        return resolvedProvider(for: source)
+    }
+
+    /// Lists the pickable targets (Starling accounts, etc.) within `source`
+    /// — used by `AddTrackerView`'s target picker once a real (non-manual)
+    /// source is selected, before any `Tracker` exists to resolve a
+    /// provider from via `provider(for:)`.
+    func listAvailableTargets(for source: ConnectedSource) async throws -> [SourceTarget] {
+        guard let provider = resolvedProvider(for: source) else { return [] }
+        return try await provider.listAvailableTargets(for: source)
+    }
+
+    /// Fetches `target`'s current value directly from `source`'s provider —
+    /// used by `AddTrackerView` to prefill "Starting value" with the live
+    /// balance once the user picks a Starling account (§5.3), before any
+    /// `Tracker` exists yet to resolve a provider from via `provider(for:)`.
+    func fetchCurrentValue(for target: SourceTarget, from source: ConnectedSource) async throws -> Decimal {
+        guard let provider = resolvedProvider(for: source) else {
+            throw TrackerStoreError.unresolvableProvider
+        }
+        return try await provider.fetchCurrentValue(target: target)
+    }
+
+    private func resolvedProvider(for source: ConnectedSource) -> SourceProvider? {
+        switch source.providerId {
+        case manualProvider.providerId:
+            return manualProvider
+        case "starling":
+            return StarlingProvider(connection: source)
+        default:
+            return nil
+        }
+    }
+
+    /// Fetches a fresh value from `tracker`'s connected source (Starling,
+    /// and any future auto-fetch provider) and logs it as a new timestamped
+    /// reading (§6) — the same shape as a manual log, so trend-chart history
+    /// works identically regardless of where a reading came from. No-ops
+    /// for a manual-entry tracker (nothing to fetch) or one with no
+    /// resolvable provider/target.
+    ///
+    /// Only logs a new reading when the fetched value actually differs from
+    /// the latest one already on record — the 30s foreground poll (§5.3)
+    /// would otherwise write a near-duplicate, same-value reading on every
+    /// single tick regardless of whether anything changed, flooding the
+    /// trend chart with so many overlapping same-value points that
+    /// individual readings become visually indistinguishable from the line
+    /// connecting them, and needlessly bloating the synced reading history.
+    /// A poll that finds nothing changed still counts as a successful
+    /// refresh (clears any stale error state) — it just doesn't need its
+    /// own row.
+    func refreshFromSource(_ tracker: Tracker) async throws {
+        guard !tracker.isManualEntry,
+              let sourceTargetId = tracker.sourceTargetId,
+              let provider = provider(for: tracker)
+        else { return }
+        let target = SourceTarget(id: sourceTargetId, displayName: tracker.name)
+        let value = try await provider.fetchCurrentValue(target: target)
+        guard value != tracker.latestReading?.value else { return }
+        logReading(value: value, date: .now, for: tracker)
     }
 
     /// Every mutation flows through this store (the app, and Shortcuts/Siri

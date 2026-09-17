@@ -14,7 +14,18 @@ final class ConnectedSource {
     var id: UUID = UUID()
     var providerId: String = ""
     var displayName: String = ""
-    var credentialKeychainKey: String?
+
+    /// The provider's auth token (a Starling personal access token, a
+    /// future Tesla OAuth token, …), stored directly on this record rather
+    /// than in the Keychain — deliberately, so it syncs via the exact same
+    /// CloudKit private-database sync as every other piece of the user's
+    /// own data (§6, §11), instead of relying on iCloud Keychain, a
+    /// separate sync system with its own on/off toggle per device that can
+    /// lag CloudKit noticeably or never sync at all if a device hasn't
+    /// enabled it. Still scoped to the user's own private CloudKit
+    /// database under their own Apple ID — never transmitted anywhere but
+    /// Starling itself and Apple's own sync infrastructure.
+    var credentialToken: String?
 
     /// Every tracker currently pointed at this source. CloudKit requires
     /// every relationship to declare its inverse — this is the other side
@@ -27,11 +38,11 @@ final class ConnectedSource {
         id: UUID = UUID(),
         providerId: String,
         displayName: String,
-        credentialKeychainKey: String? = nil
+        credentialToken: String? = nil
     ) {
         self.id = id
         self.providerId = providerId
         self.displayName = displayName
-        self.credentialKeychainKey = credentialKeychainKey
+        self.credentialToken = credentialToken
     }
 }
