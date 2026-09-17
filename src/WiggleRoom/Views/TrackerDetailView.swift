@@ -27,8 +27,20 @@ struct TrackerDetailView: View {
     /// The zoom-level lens (§4.5) the dashboard is currently scoped to —
     /// re-scopes the rings, figures, and trend chart together. Only shown
     /// as a picker when `tracker.availableZoomLevels` offers more than just
-    /// `.overall`.
-    @State private var zoomLevel: ZoomLevel = .overall
+    /// `.overall` (i.e. the tracker runs longer than a week — see
+    /// `Tracker.availableZoomLevels`). Defaults to `.thisWeek` whenever
+    /// that's on offer, set in `init` below rather than here so it's
+    /// correct on the very first render rather than flipping a beat after
+    /// appearing — "how am I doing lately" is a more useful first look than
+    /// the whole, possibly multi-year, period for a tracker long enough to
+    /// zoom at all.
+    @State private var zoomLevel: ZoomLevel
+
+    init(tracker: Tracker) {
+        self.tracker = tracker
+        let defaultZoom: ZoomLevel = tracker.availableZoomLevels.contains(.thisWeek) ? .thisWeek : .overall
+        _zoomLevel = State(initialValue: defaultZoom)
+    }
 
     /// Drives `now` forward on a schedule aligned to this tracker's own end
     /// date (see `AutoUpdateTicker`/`TrackerUpdateScheduling`) instead of a
