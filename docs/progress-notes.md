@@ -1360,17 +1360,23 @@ three distinct issues worth separating clearly:
    doc comment) with real tradeoffs (short-tracker default threshold vs.
    caption wording vs. leaving as-is), presented to the user as options
    rather than picked unilaterally.
-3. **"Under Budget by £67.20" with zero actual spending.** Not a bug —
-   confirmed as the app's core, intentional pace model:
-   `TrackerPace.computePace`'s `difference = expectedConsumedByNow -
-   consumedSoFar`, so with `consumedSoFar == 0` the moment *any* time
-   elapses after creation, `difference` is simply `expectedConsumedByNow`
-   (total budget × elapsed-time fraction) — a small nonzero "ahead of
-   pace" figure appears immediately by design (§3.1: a steady linear pace
-   from second one, not "have I spent anything yet"). True for every
-   tracker, always has been. Presented to the user as a design question
-   (leave as-is / suppress the verdict until a real post-seed reading
-   exists / something else), not treated as something to silently patch.
+3. **"Under Budget by £67.20" with zero actual spending — confirmed not a
+   bug, and now fully explained.** `TrackerPace.computePace`'s
+   `difference = expectedConsumedByNow - consumedSoFar` means the moment
+   *any* time elapses since the tracker's **period start**, a nonzero
+   figure appears even with zero real spending (§3.1's intentional linear
+   pace model) — that part was already understood. What wasn't yet pinned
+   down: the user's own math (£3.33/hour expected at their tracker's
+   size) didn't match a ~£68 swing within under an hour of *creating* the
+   tracker. Root cause: `hoursElapsed` is measured from `startDate`,
+   normalized to **midnight** when `includesTime` is off (the default) —
+   not from when the tracker was actually saved. Creating a tracker in
+   the evening with a start date of "today" already counts most of that
+   day as elapsed pace-wise. The user confirmed this directly: a follow-up
+   tracker created with explicit start/end times (`includesTime` on, so
+   `startDate` matches actual creation time) produced correct-looking
+   figures. **No code change needed or made** — working as designed once
+   the period-start-vs-creation-time distinction is understood.
 
 **Fixed this pass**: "Starting value" now auto-fills from the picked
 account's live Starling balance in Add Tracker, rather than requiring the
