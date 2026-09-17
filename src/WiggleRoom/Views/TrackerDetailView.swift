@@ -119,24 +119,6 @@ struct TrackerDetailView: View {
     private var dashboardScrollView: some View {
         ScrollView {
             VStack(spacing: 28) {
-                // Two lines rather than one combined string — the system
-                // navigation subtitle this used to live in only ever gets a
-                // single line, and "date range · days remaining" together
-                // routinely overflowed that space (especially with a timed,
-                // not just dated, range) and got truncated. Living in the
-                // body instead, right under the title, gives each its own
-                // line with room to actually fit.
-                VStack(spacing: 2) {
-                    Text(periodRangeText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(periodRemainingText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .multilineTextAlignment(.center)
-                .padding(.top, 4)
-
                 // The whole screen's figures update on this cadence (Target
                 // Right Now, the ring, the difference) — not just one card —
                 // so the countdown lives up top rather than tucked under a
@@ -183,6 +165,10 @@ struct TrackerDetailView: View {
                     #endif
                 }
 
+                Text(periodRemainingText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 if tracker.latestReading == nil {
                     Text("No readings logged yet — log one to see your pace.")
                         .font(.footnote)
@@ -203,6 +189,7 @@ struct TrackerDetailView: View {
         }
         #endif
         .navigationTitle(tracker.name)
+        .navigationSubtitle(periodRangeText)
         .inlineNavigationBarIfAvailable()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -425,7 +412,7 @@ struct TrackerDetailView: View {
     /// sits at the very top of the screen rather than under a single figure.
     private var screenUpdateCaption: String? {
         guard now < tracker.endDate else { return nil }
-        return "Updates in \(ticker.secondsUntilNextUpdate)s"
+        return "Refreshes in \(ticker.secondsUntilNextUpdate)s"
     }
 
     private var remainingInAllowanceCaption: String? {
