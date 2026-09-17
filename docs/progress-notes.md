@@ -1,11 +1,17 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Starling reading dedup + Update History for real
-sources** — `TrackerStore.refreshFromSource` now skips logging a reading
-when the fetched value hasn't changed (was flooding the trend chart with
-overlapping same-value points every 30s tick, reading as "no dots" —
-they were there, just too dense to tell apart), and "Update History" is
+after **2026-09-17 Fix Swift type-checker crash in ReadingHistoryView** —
+the first real build attempt on this branch failed outright ("Failed to
+produce diagnostic for expression") from a ternary mixing a function
+reference and `nil` at an `.onDelete(perform:)` call site, a known Swift
+compiler crash trigger; fixed by extracting it into an explicitly-typed
+computed property. Before that, **2026-09-17 Starling reading dedup +
+Update History for real sources** — `TrackerStore.refreshFromSource` now
+skips logging a reading when the fetched value hasn't changed (was
+flooding the trend chart with overlapping same-value points every 30s
+tick, reading as "no dots" — they were there, just too dense to tell
+apart), and "Update History" is
 now visible (read-only) for any tracker with readings, not just manual
 ones. Before that, **2026-09-17 Zoom levels removed** — §4.5's whole feature (the
 `ZoomLevel` type, the picker, sub-period scoping everywhere it touched:
@@ -1559,3 +1565,47 @@ tracker.isManualEntry ? deleteReadings : nil)`). Needs a real build, the
 test suite, and ideally a real Starling account left open for a few
 minutes to confirm the dedup actually stops the reading flood and that
 Update History renders sensibly (read-only) for a Starling tracker.
+
+## 2026-09-17 Fix Swift type-checker crash in ReadingHistoryView
+
+First actual build attempt against a real device on this branch, and it
+failed outright: Xcode reported "Failed to produce diagnostic for
+expression; please submit a bug report" in `ReadingHistoryView.swift` —
+the Swift compiler giving up on type-checking an expression rather than
+producing a normal error, a known failure mode for certain expression
+shapes rather than a real semantic mistake.
+
+Prime suspect: `.onDelete(perform: tracker.isManualEntry ? deleteReadings
+: nil)`, added in the previous session — a ternary whose branches are a
+bare function reference and `nil` is a recognized trigger for this exact
+crash (the type checker has to simultaneously infer the ternary's result
+type, the optional-closure conversion, and the function-reference-to-
+closure conversion, and sometimes just fails to produce a diagnostic
+rather than resolving it or reporting a real error). Fixed by extracting
+it into its own explicitly-typed computed property (`private var
+deleteAction: ((IndexSet) -> Void)?`), so `.onDelete(perform:
+deleteAction)` at the call site is now trivial for the checker.
+
+While in there, also simplified `row(for:)`, which had a similar shape (a
+shared, untyped `let content = HStack { ... }` reused inside both branches
+of an `if tracker.isManualEntry { Button { ... } label: { content } } else
+{ content }`) — not confirmed as a second contributor to the crash, but
+the same general pattern, so split into two straightforward functions
+(`row(for:)` branching between a `Button` and plain content, `rowContent(for:)`
+building the actual `HStack` once with an explicit `some View` return
+type) as a precaution rather than leaving a second instance of a pattern
+already known to cause this class of failure.
+
+### Verifying this session's changes
+
+Not verified by a compiler in this environment (same standing caveat as
+every entry in this stretch) — this fix is a response to a real compiler
+failure the user reported from their own Xcode, targeting the specific,
+well-known trigger pattern, but hasn't been confirmed clean by a
+follow-up build. If Xcode still reports the same crash (or a new one) in
+this file after this change, the `row(for:)`/`rowContent(for:)` split
+wasn't the (or the only) cause, and the actual offending expression needs
+pinpointing directly from Xcode's own (admittedly unhelpful) diagnostic —
+worth trying to isolate by temporarily commenting out sections of the
+file to binary-search for the exact line, since Xcode's crash message
+doesn't reliably point at the real culprit's line number.

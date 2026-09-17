@@ -52,7 +52,7 @@ struct ReadingHistoryView: View {
                         }
                         #endif
                     }
-                    .onDelete(perform: tracker.isManualEntry ? deleteReadings : nil)
+                    .onDelete(perform: deleteAction)
                 }
             }
         }
@@ -77,7 +77,19 @@ struct ReadingHistoryView: View {
     /// it reported), so the row is plain text with no tap affordance.
     @ViewBuilder
     private func row(for reading: ValueSnapshot) -> some View {
-        let content = HStack {
+        if tracker.isManualEntry {
+            Button {
+                editingReading = reading
+            } label: {
+                rowContent(for: reading)
+            }
+        } else {
+            rowContent(for: reading)
+        }
+    }
+
+    private func rowContent(for reading: ValueSnapshot) -> some View {
+        HStack {
             Text(reading.date.formatted(date: .abbreviated, time: .shortened))
                 .foregroundStyle(.primary)
             Spacer()
@@ -85,16 +97,17 @@ struct ReadingHistoryView: View {
                 .foregroundStyle(.secondary)
                 .font(.wiggleNumber(.body))
         }
+    }
 
-        if tracker.isManualEntry {
-            Button {
-                editingReading = reading
-            } label: {
-                content
-            }
-        } else {
-            content
-        }
+    /// `nil` for a real auto-fetch source — no swipe-to-delete affordance at
+    /// all. Broken out as its own explicitly-typed property (rather than an
+    /// inline ternary at the `.onDelete(perform:)` call site) since a
+    /// ternary mixing a function reference and `nil` there is a known
+    /// trigger for a Swift type-checker crash ("Failed to produce
+    /// diagnostic for expression").
+    private var deleteAction: ((IndexSet) -> Void)? {
+        guard tracker.isManualEntry else { return nil }
+        return deleteReadings
     }
 
     private func deleteReadings(at offsets: IndexSet) {
