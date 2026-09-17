@@ -23,9 +23,14 @@ struct TrackerEntity: AppEntity {
 }
 
 struct TrackerEntityQuery: EntityQuery {
+    /// Resolves the tracker(s) a complication is *already* configured
+    /// with — see the matching comment in `WiggleRoomWidgets`' copy of this
+    /// type: this needs the same generous CloudKit wait as
+    /// `suggestedEntities()` below, not the short one meant for the
+    /// timeline provider's own render budget.
     @MainActor
     func entities(for identifiers: [TrackerEntity.ID]) async throws -> [TrackerEntity] {
-        try await WidgetDataStore.fetchAllTrackers()
+        try await WidgetDataStore.fetchAllTrackersForConfiguration()
             .filter { identifiers.contains($0.id) }
             .map { TrackerEntity(id: $0.id, name: $0.name) }
     }

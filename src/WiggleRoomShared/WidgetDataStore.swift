@@ -160,7 +160,17 @@ enum WidgetDataStore {
                 let timeRemaining = deadline.timeIntervalSinceNow
                 guard timeRemaining > 0 else { break }
                 await waitForNextCloudKitImport(timeout: min(timeRemaining, 3))
-                let latest = try fetchAllTrackersImmediately()
+                // A `try?` here rather than letting a mid-poll fetch error
+                // propagate — a single transient failure partway through
+                // this window used to abort the whole call and throw away
+                // whatever `best` already held (even the exact tracker the
+                // picker needed), surfacing as the picker giving up and
+                // reverting to no selection despite CloudKit having already
+                // delivered the data moments before. Only the very first
+                // fetch above still throws — a container that can't be
+                // opened at all is worth surfacing; one bad poll in the
+                // middle of an otherwise-working wait isn't.
+                guard let latest = try? fetchAllTrackersImmediately() else { continue }
                 if latest.count > best.count {
                     best = latest
                 }

@@ -21,9 +21,20 @@ struct TrackerEntity: AppEntity {
 }
 
 struct TrackerEntityQuery: EntityQuery {
+    /// Resolves the tracker(s) a widget is *already* configured with — the
+    /// call the system makes to show the current selection's real name
+    /// (both in the "Edit Widget" sheet and the widget gallery summary)
+    /// rather than the placeholder "Tracker" text. This needs the same
+    /// generous CloudKit wait as `suggestedEntities()` below, not the
+    /// short one `fetchAllTrackers()` gives the timeline provider — that
+    /// shorter wait exists to protect WidgetKit's own render budget, which
+    /// doesn't apply to this interactive, already-"Loading"-aware UI, and
+    /// using it here was resolving too fast, before CloudKit had actually
+    /// synced the tracker down to this extension's own local store, and
+    /// falling back to the unresolved placeholder instead.
     @MainActor
     func entities(for identifiers: [TrackerEntity.ID]) async throws -> [TrackerEntity] {
-        try await WidgetDataStore.fetchAllTrackers()
+        try await WidgetDataStore.fetchAllTrackersForConfiguration()
             .filter { identifiers.contains($0.id) }
             .map { TrackerEntity(id: $0.id, name: $0.name) }
     }
