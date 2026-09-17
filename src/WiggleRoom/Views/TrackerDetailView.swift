@@ -281,7 +281,7 @@ struct TrackerDetailView: View {
             }
 
             card(tint: WiggleRoomColors.paceRing) {
-                figureContent(title: "Target Right Now", value: pace.targetValueToday, caption: tracker.remainingAtEndCaption)
+                figureContent(title: "Target Right Now", value: pace.targetValueToday, caption: finalBalanceCaption)
             }
             // A little "just updated" flourish when a new reading lands —
             // a full turn rather than a half-flip so the card never rests
@@ -360,6 +360,15 @@ struct TrackerDetailView: View {
 
     private var remainingInAllowanceCaption: String? {
         pace.remainingInAllowanceCaption(for: tracker)
+    }
+
+    /// The small, subtle line under Target Right Now's own number — same
+    /// weight/position as Current Balance's "£X left in this budget" — but
+    /// stating the tracker's projected final balance instead: where the
+    /// number above is landing right now, this is where it's designed to
+    /// land by the very end of the period.
+    private var finalBalanceCaption: String {
+        "Final balance will be \(tracker.formattedValue(tracker.projectedFinalValue))"
     }
 
     private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {

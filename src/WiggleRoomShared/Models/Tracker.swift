@@ -202,6 +202,20 @@ extension Tracker {
         Tracker.projectedRemainder(direction: direction, startingValue: startingValue, totalAllowance: totalAllowance)
     }
 
+    /// The tracker's target balance at the very end of its period, assuming
+    /// the full allowance is used exactly on schedule — `startingValue`
+    /// moved by `totalAllowance` in whichever direction the tracker runs.
+    /// This is the same figure `pace(actualValue:asOf:)` would report as
+    /// `targetValueToday` if evaluated at `endDate` itself, exposed
+    /// directly since it depends only on the tracker's own configuration,
+    /// not on any particular reading or instant.
+    var projectedFinalValue: Decimal {
+        switch direction {
+        case .decreasing: startingValue - totalAllowance
+        case .increasing: startingValue + totalAllowance
+        }
+    }
+
     /// How much would be left over at the end of the tracker's period, worded
     /// for display — `nil` exactly when `projectedRemainder` is (i.e. the
     /// "spend it all" case needs no extra explanation). Shared by the
