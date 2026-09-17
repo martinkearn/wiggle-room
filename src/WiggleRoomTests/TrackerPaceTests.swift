@@ -84,12 +84,14 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.status, .good)
     }
 
-    func testStatus_behindByLessThanOnePercent_isGood() {
+    func testStatus_behindByAnyAmount_isAtLeastWarning() {
         let tracker = moneyTracker(totalAllowance: 3000)
         let halfway = date(2026, 1, 16)
-        // Expected consumed 1500; behind by 20 (~0.67% of 3000) stays green.
+        // Expected consumed 1500; behind by just 20 (~0.67% of 3000) — even
+        // a tiny shortfall must not read as green, since the actual figure
+        // is genuinely below the target figure shown right next to it.
         let pace = tracker.pace(actualValue: 1480, asOf: halfway)
-        XCTAssertEqual(pace.status, .good)
+        XCTAssertEqual(pace.status, .warning)
     }
 
     func testStatus_behindByOneToFivePercent_isWarning() {
@@ -200,13 +202,18 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.displayDifference(for: tracker), "-£60", "the early-warning band isn't a clean over/under yet, so it keeps the sign")
     }
 
-    func testDisplayDifference_nonBudgetTracker_alwaysShowsSignedValue() {
+    func testDisplayDifference_increasingTracker_signMirrorsDirection() {
         let tracker = mileageTracker()
-        let ahead = tracker.pace(actualValue: 11400, asOf: date(2026, 1, 16)) // 100 ahead
-        let behind = tracker.pace(actualValue: 11700, asOf: date(2026, 1, 16)) // 200 behind
+        // Under the target (fewer miles used than planned — good): shown
+        // with a minus sign.
+        let under = tracker.pace(actualValue: 11400, asOf: date(2026, 1, 16))
+        // Over the target (more miles used than planned — bad): shown
+        // without a minus sign, since a higher number is the "over" case
+        // for an increasing tracker, not the "ahead"/good one.
+        let over = tracker.pace(actualValue: 11700, asOf: date(2026, 1, 16))
 
-        XCTAssertEqual(ahead.displayDifference(for: tracker), "+100 mi")
-        XCTAssertEqual(behind.displayDifference(for: tracker), "-200 mi")
+        XCTAssertEqual(under.displayDifference(for: tracker), "-100 mi")
+        XCTAssertEqual(over.displayDifference(for: tracker), "+200 mi")
     }
 
     // MARK: - statusLine(for:) wording rules
@@ -231,11 +238,15 @@ final class TrackerPaceTests: XCTestCase {
 
     func testStatusLine_nonBudgetTracker_neverAppendsBy() {
         let tracker = mileageTracker()
-        let ahead = tracker.pace(actualValue: 11400, asOf: date(2026, 1, 16)) // 100 ahead
+        let ahead = tracker.pace(actualValue: 11400, asOf: date(2026, 1, 16)) // 100 ahead, .good
         let behind = tracker.pace(actualValue: 11700, asOf: date(2026, 1, 16)) // 200 behind (~6.7%, .bad)
 
         XCTAssertEqual(ahead.statusLine(for: tracker), "On Track")
-        XCTAssertEqual(behind.statusLine(for: tracker), "Needs Attention")
+        // An increasing tracker's bad/warning wording reads as "over
+        // budget" too, even though it isn't a currency `usesBudgetLanguage`
+        // tracker — a higher-than-planned number is genuinely "over"
+        // whatever cap the allowance represents, mileage included.
+        XCTAssertEqual(behind.statusLine(for: tracker), "Over Budget")
     }
 
     // MARK: - remainingInAllowanceCaption(for:)

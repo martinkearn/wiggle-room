@@ -45,24 +45,38 @@ struct TrackerPace: Equatable {
     }
 
     /// Traffic-light status (§3.2): on pace, drifting behind, or badly
-    /// behind. Amber is a genuine early-warning band — behind pace by
-    /// between 1% and 5% of the total allowance — not an exact "landed on
-    /// the target" match: ahead of pace, or behind by less than 1%, reads
-    /// as green; behind by more than 5% reads as red.
+    /// behind. Amber is a genuine early-warning band — behind pace by up to
+    /// 5% of the total allowance — not an exact "landed on the target"
+    /// match: ahead of pace, or exactly on it, reads as green; behind by
+    /// more than 5% reads as red. Unlike the amber/red split, there's no
+    /// grace zone before green turns amber — any shortfall at all, however
+    /// small a percentage of the total allowance, means the actual figure
+    /// has already slipped behind the target figure shown right next to
+    /// it, and showing that pair as "green"/"on track" would contradict
+    /// what's plainly printed on screen.
     var status: PaceStatus {
-        let percent = percentBehind
-        if percent > 5 { return .bad }
-        if percent >= 1 { return .warning }
-        return .good
+        guard difference < 0 else { return .good }
+        return percentBehind > 5 ? .bad : .warning
     }
 
     /// The at-a-glance difference figure, formatted for `tracker`. For a
     /// budget tracker that's genuinely over or under (not just at), this
     /// drops the +/- sign: the color and status word already say which
     /// direction, so a sign on top of that is redundant, not clarifying.
+    ///
+    /// For an increasing tracker, `difference` itself is negated first —
+    /// `difference` is "expected minus actual," so a positive `difference`
+    /// already reads naturally as a plus for a decreasing tracker (using
+    /// less than planned, a good thing), but for an increasing tracker a
+    /// positive `difference` means using *less* than planned too, which is
+    /// still the good case — the sign convention users actually expect,
+    /// though, mirrors direction: over the target (the bad case, a higher
+    /// actual number) shown without a minus, under it (the good case, a
+    /// lower actual number) shown with one.
     func displayDifference(for tracker: Tracker) -> String {
+        let orientedDifference = tracker.direction == .increasing ? -difference : difference
         guard tracker.usesBudgetLanguage, status != .warning else {
-            return tracker.formattedValue(difference, signed: true)
+            return tracker.formattedValue(orientedDifference, signed: true)
         }
         return tracker.formattedValue(abs(difference))
     }
@@ -112,14 +126,24 @@ enum PaceStatus {
 
     /// A decreasing tracker denominated in currency reads naturally as a
     /// budget ("under/over budget"), which draws a much clearer good/bad
-    /// line for money than the generic on-track language does. Every other
-    /// tracker shape (increasing, or non-currency units like mileage) keeps
-    /// the neutral wording.
+    /// line for money than the generic on-track language does. An
+    /// increasing tracker (regardless of unit — mileage included) reads
+    /// just as naturally as a budget once it's over: a higher number than
+    /// planned literally *is* going over whatever cap the allowance
+    /// represents, so the warning/bad wording matches the decreasing
+    /// budget case even though `usesBudgetLanguage` itself only covers
+    /// decreasing currency trackers. Only a non-currency decreasing
+    /// tracker keeps the neutral "on track"/"needs attention" wording.
     func label(for tracker: Tracker) -> String {
         switch self {
-        case .good: return tracker.usesBudgetLanguage ? "Under Budget" : "On Track"
-        case .warning: return tracker.usesBudgetLanguage ? "Just Over Budget" : "Slightly Behind"
-        case .bad: return tracker.usesBudgetLanguage ? "Over Budget" : "Needs Attention"
+        case .good:
+            return tracker.usesBudgetLanguage ? "Under Budget" : "On Track"
+        case .warning:
+            if tracker.usesBudgetLanguage { return "Just Over Budget" }
+            return tracker.direction == .increasing ? "Slightly Over Budget" : "Slightly Behind"
+        case .bad:
+            if tracker.usesBudgetLanguage { return "Over Budget" }
+            return tracker.direction == .increasing ? "Over Budget" : "Needs Attention"
         }
     }
 }
