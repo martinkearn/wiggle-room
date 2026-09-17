@@ -98,14 +98,19 @@ struct RingsView: View {
         return min(max((ratio as NSDecimalNumber).doubleValue, 0), 1)
     }
 
-    /// The gap between the outer and inner ring, scaled to `lineWidth`
-    /// rather than a flat constant — a flat gap (previously `lineWidth +
-    /// 10`, then `lineWidth`) is proportional at every size this view is
-    /// used at, but Apple's own Fitness rings sit much closer together than
-    /// that — a very thin sliver of a gap, not a whole ring-width of space.
-    /// Scaling to a small fraction of `lineWidth` instead keeps that same
-    /// tight, nested look regardless of size.
-    private var ringGap: CGFloat { lineWidth * 0.15 }
+    /// How far the inner ring is inset from the outer one (applied as
+    /// `.padding`, which shrinks the inner ring's *radius* by this amount).
+    /// Each ring's stroke extends `lineWidth / 2` to either side of its own
+    /// center-line radius, so the two rings' painted bands only actually
+    /// stay clear of each other once this inset exceeds a full `lineWidth`
+    /// — anything less and the inner ring's outer edge is drawn underneath
+    /// the outer ring's band, not next to it. `bandGap` below is the real,
+    /// visible gap between the two bands once that's accounted for: a thin
+    /// sliver proportional to `lineWidth`, matching how close together
+    /// Apple's own Fitness rings sit, rather than the flat `lineWidth` of
+    /// dead space a naive equal inset leaves behind.
+    private var bandGap: CGFloat { lineWidth * 0.12 }
+    private var ringGap: CGFloat { lineWidth + bandGap }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -269,15 +274,24 @@ struct RingsView: View {
     /// tip. The round line cap alone gives the same soft-tip look with no
     /// second, separately-animated element that can desync.
     /// A ring that's essentially closed gets a short extra arc laid on top
-    /// of its start, overlapping itself by this fraction — matching how
-    /// Apple's own Fitness rings visibly overlap their own starting point
-    /// once a ring closes, rather than the two round caps just meeting
-    /// edge-to-edge.
+    /// of its own start, overlapping itself by this fraction — matching how
+    /// Apple's own Fitness rings visibly lap their starting point once a
+    /// ring closes, rather than the two round caps just meeting edge-to-edge.
+    /// This is purely a per-ring, self-overlap effect — it has nothing to do
+    /// with (and shouldn't be confused with) the outer/inner ring's own
+    /// separation, which `ringGap`/`bandGap` above control.
     private let closureOverlapFraction = 0.025
+
+    /// Shown from just shy of 100% rather than only at an exact 1.0 —
+    /// Fitness's own rings reveal their closing overlap slightly before the
+    /// ring is mathematically complete, and waiting for an exact match here
+    /// would also risk never firing at all given `fraction`'s Decimal →
+    /// Double conversion.
+    private let closureThreshold = 0.98
 
     private func ring(fraction: Double, color: Color) -> some View {
         let opacity = progressOpacity(for: fraction)
-        let isClosed = fraction >= 0.999
+        let isClosed = fraction >= closureThreshold
         return ZStack {
             Circle()
                 .stroke(color.opacity(0.18), lineWidth: lineWidth)
