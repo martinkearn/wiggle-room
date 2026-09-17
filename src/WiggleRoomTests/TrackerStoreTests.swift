@@ -107,4 +107,102 @@ final class TrackerStoreTests: XCTestCase {
 
         XCTAssertTrue(targets.isEmpty)
     }
+
+    func testProvider_forManualTracker_returnsManualProvider() {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let store = TrackerStore(modelContext: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id, name: "Test", unit: "£", direction: .decreasing,
+            connectedSource: store.manualEntrySource, sourceTargetId: id.uuidString,
+            startDate: Date(), endDate: Date().addingTimeInterval(3600),
+            startingValue: 100, totalAllowance: 100
+        )
+
+        let provider = store.provider(for: tracker)
+
+        XCTAssertTrue(provider === store.manualProvider)
+    }
+
+    func testProvider_forStarlingTracker_returnsStarlingProvider() {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let starlingSource = ConnectedSource(providerId: "starling", displayName: "My Starling")
+        context.insert(starlingSource)
+        let store = TrackerStore(modelContext: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id, name: "Test", unit: "£", direction: .decreasing,
+            connectedSource: starlingSource, sourceTargetId: "abc-123",
+            startDate: Date(), endDate: Date().addingTimeInterval(3600),
+            startingValue: 100, totalAllowance: 100
+        )
+
+        let provider = store.provider(for: tracker)
+
+        XCTAssertTrue(provider is StarlingProvider)
+    }
+
+    func testProvider_forUnknownProviderId_returnsNil() {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let unknownSource = ConnectedSource(providerId: "tesla", displayName: "My Tesla")
+        context.insert(unknownSource)
+        let store = TrackerStore(modelContext: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id, name: "Test", unit: "mi", direction: .increasing,
+            connectedSource: unknownSource, sourceTargetId: "vehicle-1",
+            startDate: Date(), endDate: Date().addingTimeInterval(3600),
+            startingValue: 100, totalAllowance: 100
+        )
+
+        XCTAssertNil(store.provider(for: tracker))
+    }
+
+    func testRefreshFromSource_manualTracker_noOps() async throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let store = TrackerStore(modelContext: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id, name: "Test", unit: "£", direction: .decreasing,
+            connectedSource: store.manualEntrySource, sourceTargetId: id.uuidString,
+            startDate: Date(), endDate: Date().addingTimeInterval(3600),
+            startingValue: 100, totalAllowance: 100
+        )
+        store.addTracker(tracker)
+
+        try await store.refreshFromSource(tracker)
+
+        XCTAssertTrue(tracker.sortedReadings.isEmpty, "a manual tracker has nothing to fetch")
+    }
+
+    func testRefreshFromSource_starlingTrackerWithNoStoredToken_throwsNotConnected() async {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        // No credentialKeychainKey — mirrors a source that was never
+        // actually connected (or whose Keychain entry has gone missing).
+        let starlingSource = ConnectedSource(providerId: "starling", displayName: "My Starling")
+        context.insert(starlingSource)
+        let store = TrackerStore(modelContext: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id, name: "Test", unit: "£", direction: .decreasing,
+            connectedSource: starlingSource, sourceTargetId: "abc-123",
+            startDate: Date(), endDate: Date().addingTimeInterval(3600),
+            startingValue: 100, totalAllowance: 100
+        )
+        store.addTracker(tracker)
+
+        do {
+            try await store.refreshFromSource(tracker)
+            XCTFail("expected notConnected")
+        } catch StarlingProviderError.notConnected {
+            // expected
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
 }

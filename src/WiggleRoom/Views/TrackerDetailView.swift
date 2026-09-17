@@ -66,6 +66,18 @@ struct TrackerDetailView: View {
     /// `checkForCompletionCelebration()`.
     @State private var isShowingCelebration = false
 
+    /// Set whenever a Starling (or future auto-fetch provider) refresh
+    /// fails — either from the pull-to-refresh gesture or the ticker's own
+    /// 30s background fetch — and shown as a distinct error line (§8.4)
+    /// rather than silently leaving the last-known figure looking current.
+    /// Cleared on the next successful refresh.
+    @State private var refreshErrorMessage: String?
+
+    /// Guards against overlapping fetches — the 30s ticker tick and a
+    /// manual pull-to-refresh could otherwise both be in flight at once for
+    /// the same tracker.
+    @State private var isRefreshingFromSource = false
+
     private var now: Date { ticker.now }
 
     private var isCompleted: Bool {
@@ -159,10 +171,16 @@ struct TrackerDetailView: View {
                 } else {
                     figuresRow
                     #if os(macOS)
-                    if tracker.isManualEntry {
-                        updateBalanceButton
-                    }
+                    updateBalanceButton
                     #endif
+                }
+
+                if let refreshErrorMessage {
+                    Text(refreshErrorMessage)
+                        .font(.caption)
+                        .foregroundStyle(WiggleRoomColors.error)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
 
                 Text(periodRemainingText)
@@ -241,6 +259,11 @@ struct TrackerDetailView: View {
         }
         .onAppear {
             let appearedAt = Date.now
+            // 30s while this detail screen is on-screen (§5.3's decided
+            // foreground poll cadence) — down from the 60s display-only
+            // default, since this ticker also drives a real Starling fetch
+            // on every tick now, not just a display recompute.
+            ticker.interval = 30
             ticker.endDatesProvider = { [tracker.endDate] }
             ticker.onUpdate = { date in
                 // The minute rollover is exactly when Target Right Now's
@@ -255,9 +278,15 @@ struct TrackerDetailView: View {
                 // Catches a tracker whose period ends while its dashboard
                 // happens to already be open, not just on a fresh appear.
                 checkForCompletionCelebration(asOf: date)
+                if !tracker.isManualEntry && !isCompleted {
+                    Task { await refreshFromSourceIfNeeded() }
+                }
             }
             ticker.start(now: appearedAt)
             checkForCompletionCelebration(asOf: appearedAt)
+            if !tracker.isManualEntry && !isCompleted {
+                Task { await refreshFromSourceIfNeeded() }
+            }
         }
         // Keyed on the reading's own id, not its value — logging a reading
         // that happens to match the previous one is still a genuine update
@@ -343,23 +372,58 @@ struct TrackerDetailView: View {
 
     #if !os(macOS)
     /// The system pull-to-refresh gesture's action (`.refreshable` above) —
-    /// today the only "source" is manual entry, so this just opens the log
-    /// sheet, but the gesture itself is meant to be source-agnostic: once a
-    /// real auto-fetching connected source exists, the same pull-down
-    /// re-fetches from it instead, with no new gesture or control to learn.
-    /// A short pause before returning gives the refresh control a beat to
-    /// visibly settle before the sheet takes over, rather than the sheet
-    /// snapping up mid-pull.
+    /// for a manual tracker this opens the log sheet; for a real
+    /// auto-fetching connected source (Starling) it re-fetches instead, with
+    /// no new gesture or control to learn. A short pause before opening the
+    /// log sheet gives the refresh control a beat to visibly settle before
+    /// the sheet takes over, rather than the sheet snapping up mid-pull.
     private func handleUpdateGesture() async {
         guard !isCompleted else { return }
         guard tracker.isManualEntry else {
-            // No auto-fetching provider exists yet (§9) — nothing to
-            // refresh from until one does.
+            await refreshFromSourceIfNeeded(force: true)
             return
         }
         try? await Task.sleep(for: .milliseconds(300))
         isPresentingLogReading = true
     }
+    #endif
+
+    /// Fetches a fresh value from the tracker's connected source and logs it
+    /// (§5.3) — called from the 30s ticker tick and from a manual
+    /// pull-to-refresh/macOS button alike. `force` skips the
+    /// already-in-flight guard, since a user's own manual pull should always
+    /// go through even if a background tick happens to be mid-fetch.
+    private func refreshFromSourceIfNeeded(force: Bool = false) async {
+        guard !tracker.isManualEntry, !isCompleted else { return }
+        guard force || !isRefreshingFromSource else { return }
+        isRefreshingFromSource = true
+        defer { isRefreshingFromSource = false }
+        do {
+            try await store.refreshFromSource(tracker)
+            refreshErrorMessage = nil
+        } catch {
+            refreshErrorMessage = Self.errorMessage(for: error)
+        }
+    }
+
+    /// A short, distinct-from-stale-data error line (§8.4) — never leaves a
+    /// failed refresh looking like a current, successful one.
+    private static func errorMessage(for error: Error) -> String {
+        switch error {
+        case StarlingProviderError.notConnected:
+            return "Not connected — reconnect this source in Settings."
+        case StarlingAPIError.invalidToken:
+            return "Connection expired — reconnect this source in Settings."
+        case StarlingAPIError.rateLimited, StarlingAPIError.budgetExceeded:
+            return "Refresh paused — rate limit reached, try again shortly."
+        case StarlingAPIError.network:
+            return "Couldn't reach Starling — check your connection."
+        default:
+            return "Couldn't refresh — will try again shortly."
+        }
+    }
+
+    #if !os(macOS)
 
     /// A persistent affordance for the pull-to-refresh gesture — unlike a
     /// button, `.refreshable`'s own control only appears once a pull is
@@ -376,21 +440,31 @@ struct TrackerDetailView: View {
     #else
     /// macOS has no pull-to-refresh gesture, so it keeps an explicit button
     /// instead — moved out from inside the Current Balance card so both
-    /// figure cards share identical visual weight.
+    /// figure cards share identical visual weight. For a manual tracker
+    /// this opens the log sheet; for an auto-fetch source (Starling) it
+    /// re-fetches directly, same as iOS's pull-to-refresh.
     private var updateBalanceButton: some View {
         Button {
-            isPresentingLogReading = true
+            if tracker.isManualEntry {
+                isPresentingLogReading = true
+            } else {
+                Task { await refreshFromSourceIfNeeded(force: true) }
+            }
         } label: {
-            Label("Update Current Balance", systemImage: "plus.circle.fill")
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
+            Label(
+                tracker.isManualEntry ? "Update Current Balance" : "Refresh",
+                systemImage: tracker.isManualEntry ? "plus.circle.fill" : "arrow.clockwise"
+            )
+            .font(.subheadline.weight(.semibold))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.capsule)
         .controlSize(.large)
         .tint(WiggleRoomColors.brand)
         .padding(.horizontal)
+        .disabled(isRefreshingFromSource && !tracker.isManualEntry)
     }
     #endif
 

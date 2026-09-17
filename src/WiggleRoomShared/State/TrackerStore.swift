@@ -13,6 +13,12 @@ import WidgetKit
 /// read via `@Query` directly in views (the idiomatic, auto-updating
 /// SwiftData pattern) — this type holds only what a `@Query` can't express:
 /// the manual-entry singleton, and mutating actions.
+///
+/// `@MainActor`-isolated: `refreshFromSource(_:)` below is genuinely async
+/// (a network fetch), and every other method here touches `ModelContext`
+/// directly — pinning the whole type to the main actor is what keeps that
+/// safe rather than relying on callers to always already be there.
+@MainActor
 @Observable
 final class TrackerStore {
     private let modelContext: ModelContext
@@ -78,6 +84,58 @@ final class TrackerStore {
         modelContext.delete(reading)
         try? modelContext.save()
         reloadWidgets()
+    }
+
+    /// The provider that owns `tracker`'s connected source, or `nil` for a
+    /// manual tracker or one whose source doesn't resolve to a known
+    /// provider. A fresh `StarlingProvider` instance is handed back on each
+    /// call (cheap — it just wraps a Keychain lookup and shares the app-wide
+    /// rate-limit budget, see `StarlingProvider.sharedBudget`), so this is
+    /// safe to call as often as needed rather than something callers need
+    /// to cache themselves.
+    func provider(for tracker: Tracker) -> SourceProvider? {
+        guard let source = tracker.connectedSource else { return nil }
+        switch source.providerId {
+        case manualProvider.providerId:
+            return manualProvider
+        case "starling":
+            return StarlingProvider(connection: source)
+        default:
+            return nil
+        }
+    }
+
+    /// Lists the pickable targets (Starling accounts, etc.) within `source`
+    /// — used by `AddTrackerView`'s target picker once a real (non-manual)
+    /// source is selected, before any `Tracker` exists to resolve a
+    /// provider from via `provider(for:)`.
+    func listAvailableTargets(for source: ConnectedSource) async throws -> [SourceTarget] {
+        let provider: SourceProvider
+        switch source.providerId {
+        case manualProvider.providerId:
+            provider = manualProvider
+        case "starling":
+            provider = StarlingProvider(connection: source)
+        default:
+            return []
+        }
+        return try await provider.listAvailableTargets(for: source)
+    }
+
+    /// Fetches a fresh value from `tracker`'s connected source (Starling,
+    /// and any future auto-fetch provider) and logs it as a new timestamped
+    /// reading (§6) — the same shape as a manual log, so history/zoom
+    /// levels work identically regardless of where a reading came from.
+    /// No-ops for a manual-entry tracker (nothing to fetch) or one with no
+    /// resolvable provider/target.
+    func refreshFromSource(_ tracker: Tracker) async throws {
+        guard !tracker.isManualEntry,
+              let sourceTargetId = tracker.sourceTargetId,
+              let provider = provider(for: tracker)
+        else { return }
+        let target = SourceTarget(id: sourceTargetId, displayName: tracker.name)
+        let value = try await provider.fetchCurrentValue(target: target)
+        logReading(value: value, date: .now, for: tracker)
     }
 
     /// Every mutation flows through this store (the app, and Shortcuts/Siri

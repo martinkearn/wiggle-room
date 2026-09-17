@@ -1,17 +1,20 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after a docs-only planning pair of sessions (see **2026-09-17 Starling
-rate-limit research follow-up**, and **2026-09-17 Starling refresh-cadence
-planning** just before it) that recorded refresh-cadence decisions for the
-still-unbuilt Starling integration — 30s poll while a tracker detail
-screen is on-screen (reusing the existing per-view `AutoUpdateTicker`),
-pull-to-refresh for manual, 5-minute background refresh, researched
-personal-access-token rate limits (5 req/s, 1000 req/day) and the
-mitigations needed to stay under the daily cap — plus the concrete gaps
-still blocking implementation. No code changed in either session.
-Before that, a long same-day session (see **2026-09-17 chart/scheduling/
-completed-state overhaul**) redesigned the trend chart and
+after **2026-09-17 Starling connected-source implementation** — Starling is
+now a real, code-level `SourceProvider` (Keychain-backed token storage,
+`StarlingAPIClient`, the 30s-foreground/5-minute-background refresh
+cadence with a Low Power Mode backoff and a client-side daily rate-limit
+budget, a real Add Source token-entry flow, and a live account-target
+picker in Add Tracker) — but **entirely unverified by any compiler**, since
+this environment had no Swift toolchain at all; read that entry's
+"Verifying this session's changes" before trusting any of it. That session
+followed three same-day docs-only planning sessions further below (**2026-09-17
+Low Power Mode backoff decision**, **Starling rate-limit research
+follow-up**, and **Starling refresh-cadence planning**) that made the
+decisions this implementation followed — no code changed in any of those
+three. Before all of that, a long same-day session (see **2026-09-17
+chart/scheduling/completed-state overhaul**) redesigned the trend chart and
 ring visuals, replaced three separately-coded ~60s refresh timers with one
 shared end-aligned scheduler, added a first-class completed-tracker state,
 moved to pull-to-refresh on iOS, and fixed several real bugs (a pace-status
@@ -1048,3 +1051,146 @@ and is already covered by the existing foreground-vs-background split (the
 ### Verifying this session's changes
 
 No code changed — a scoped decision recorded in the spec only.
+
+## 2026-09-17 Starling connected-source implementation
+
+Implements the Starling integration itself, following the four planning
+sessions immediately above this one. **Critical caveat up front**: this
+environment had no Swift toolchain at all — not even `swiftc`, which prior
+sessions at least had for a syntax-only check. Every file below was
+verified only by careful manual re-reading (checking actor isolation,
+Decimal literal precision, Swift pattern-matching over `Error`, and a
+second pass specifically hunting for the kind of mistake a compiler would
+catch), never compiled, never run, never tested in a simulator or on
+device. Treat this as a strong first draft, not confirmed-working code —
+build in Xcode and run the test suite before trusting it further.
+
+**New files** (all under `src/WiggleRoomShared/` unless noted):
+
+- `Security/SecureTokenStore.swift` — `SecureTokenStore` protocol,
+  `KeychainTokenStore` (real Keychain, `kSecAttrSynchronizable` set per
+  §11), `InMemoryTokenStore` (previews/tests — `KeychainTokenStore` itself
+  isn't unit-tested here, since a plain XCTest run doesn't reliably have
+  real Keychain access without a signed, entitled test bundle).
+- `Providers/StarlingRequestBudget.swift` — an `actor` tracking a rolling
+  24h request count against the researched 5/req/s, 1000/req/day limits
+  (§5.3/§12), refusing new requests as the daily count approaches the
+  limit and recording a cool-down on a real 429's `Retry-After`. Shared
+  app-wide via `StarlingProvider.sharedBudget` (in-memory, resets on
+  relaunch — a known simplification, see build-spec.md §12).
+- `Providers/StarlingAPIClient.swift` — direct `URLSession`-based client
+  for `GET /api/v2/accounts` and `GET /api/v2/accounts/{uid}/balance` only
+  — the Spaces/savings-goal endpoint was never implemented, since its
+  shape was never confirmed against current Starling docs (still an open
+  item). Maps 401/403 → invalid token, 429 → rate-limited (+ records the
+  budget cool-down), other non-2xx → a generic HTTP error, decode failures
+  → a decoding error.
+- `Providers/StarlingProvider.swift` — the actual `SourceProvider`
+  conformance. Each instance is bound to one `ConnectedSource` at init
+  (resolves its token from Keychain via `credentialKeychainKey`);
+  `listAvailableTargets(for:)` takes its own connection argument instead
+  so it also works against a draft, not-yet-persisted connection during
+  Add Source setup. Starling has no write scopes, so
+  `logManualReading(target:value:date:)` always throws
+  `manualLoggingNotSupported`.
+- `src/WiggleRoom/Background/BackgroundRefreshScheduler.swift` (iOS-only,
+  deliberately placed in the app's own folder rather than the shared one
+  compiled into every extension target, since `BGTaskScheduler` is
+  app-only) — registers a `BGAppRefreshTask` handler
+  (`martinkearn.WiggleRoom.starlingRefresh`), requests the next run on
+  launch and on every backgrounding, and on fire loops every non-manual,
+  non-completed tracker through `TrackerStore.refreshFromSource`.
+
+**Changed files**:
+
+- `TrackerStore.swift` — now `@MainActor`-isolated (needed since
+  `refreshFromSource(_:)` is a genuine async network call, and every other
+  method here already touches `ModelContext` directly). Every existing
+  call site was already effectively on the main actor (App `init`s,
+  `@MainActor`-marked Intent code, `#Preview` blocks), so this shouldn't
+  change behavior, only make the isolation explicit. Added
+  `provider(for:)` (resolves the right `SourceProvider` for a tracker's
+  connected source — manual, Starling, or `nil` for anything else),
+  `listAvailableTargets(for:)` (same resolution, but from a bare
+  `ConnectedSource` before any tracker exists — used by the new target
+  picker), and `refreshFromSource(_:)` (fetches + logs a reading the same
+  shape as a manual one, so history/zoom levels don't care where a reading
+  came from).
+- `AutoUpdateTicker.swift` — added a settable `interval` (default 60,
+  unchanged for existing callers like `TrackerListView`; `TrackerDetailView`
+  and `WatchTrackerDetailView` now set 30 on appear) and an
+  `effectiveInterval` that triples it under
+  `ProcessInfo.isLowPowerModeEnabled` (the Low Power Mode backoff decided
+  two sessions ago).
+- `TrackerDetailView.swift` — the ticker now actually triggers
+  `store.refreshFromSource` on tick for a non-manual, non-completed
+  tracker (previously display-recompute only); `handleUpdateGesture()`
+  (the pull-to-refresh action) now really refreshes instead of no-op'ing
+  for an auto-fetch source; a new `refreshErrorMessage` state surfaces a
+  distinct error line (§8.4, `WiggleRoomColors.error`) on failure; the
+  macOS button (previously manual-only) now shows for every tracker type,
+  wording/icon switching between "Update Current Balance" and "Refresh".
+- `WatchTrackerDetailView.swift` — same 30s-tick-triggers-a-fetch wiring,
+  plus a new Refresh button alongside the existing manual-only Log button
+  (no error-state UI here yet — see the known gaps below).
+- `AddSourceView.swift` — was a "Coming Soon" stub; now a real form
+  (name + personal access token), validated by actually calling
+  `listAvailableTargets` before persisting anything — a rejected/expired
+  token is never silently stored as a working connection, and its
+  Keychain entry is deleted again if validation fails.
+- `AddTrackerView.swift` — previously hard-blocked saving with a real
+  (non-manual) source selected ("This source isn't supported yet"). Now
+  has a live target-picker section (`targetPickerSection`,
+  `loadAvailableTargetsIfNeeded()`) that fetches the selected source's
+  accounts via `store.listAvailableTargets(for:)` whenever the source
+  selection changes, skipped entirely when editing an existing tracker
+  (its source can't change) so as not to spend a Starling request on
+  nothing.
+- `WiggleRoomApp.swift` — registers/schedules `BackgroundRefreshScheduler`
+  in `init()` (iOS only), and reschedules on every `scenePhase` transition
+  to `.background`.
+- `Info.plist` — added `BGTaskSchedulerPermittedIdentifiers` with the
+  background task's identifier (`UIBackgroundModes`'s `fetch`/`processing`
+  entries already existed from an earlier session, confirmed still
+  present).
+
+**New tests** (`src/WiggleRoomTests/`): `StarlingRequestBudgetTests`
+(threshold/cool-down/24h-aging behavior, using a settable `TestClock`
+reference type rather than capturing a mutable `var` in the actor's
+`now` closure — the latter wouldn't satisfy `@Sendable` under strict
+concurrency), `StarlingAPIClientTests` (a `StubURLProtocol`-backed
+`URLSession` — no real network — covering account/balance decoding,
+401→invalidToken, 429→rateLimited-with-cooldown, and the daily budget
+refusing a call before it's even made), `StarlingProviderTests` (the
+`notConnected`/`manualLoggingNotSupported` paths, using
+`InMemoryTokenStore` — never real Keychain), `SecureTokenStoreTests`
+(`InMemoryTokenStore` roundtrip only), and additions to
+`TrackerStoreTests` (`provider(for:)` resolution across manual/Starling/
+unknown provider ids, `refreshFromSource` no-op for manual and
+`notConnected` for an unconnected Starling tracker).
+
+**Known gaps, called out rather than silently left** (also in
+build-spec.md §5.3/§12): Spaces/savings-goal targets aren't supported
+(only top-level accounts); two trackers on the same Starling account still
+poll it independently rather than sharing one fetch (§5.3's mitigation 2
+from two sessions ago); the request budget is in-memory only and resets on
+relaunch; there's no way to remove/disconnect a Starling source from
+Settings once added; the watch app has no on-screen error state for a
+failed refresh (iOS/macOS do).
+
+### Verifying this session's changes
+
+**Not verified in any real sense.** No Swift toolchain of any kind was
+available — no `swiftc`, no `xcodebuild`, no simulator. Every file was
+written carefully and re-read for common mistakes (actor-isolation
+mismatches, a `Decimal` literal that would round-trip through `Double` and
+silently fail an equality test, `switch`-over-`Error` pattern syntax,
+whether every new file's target membership would actually resolve via the
+project's synchronized-folder groups), but none of that is a substitute
+for an actual build. The next session with real Xcode access should, in
+order: build every target (`WiggleRoom` iOS/macOS/watchOS, widgets,
+complication), run the full test suite including the five new/extended
+test files above, then manually connect a real Starling personal access
+token and confirm the account picker, balance fetch, pull-to-refresh, and
+30s live-updating tick all actually work end to end before trusting any
+of this as done.
