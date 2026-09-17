@@ -1,8 +1,17 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Connected Source management + token storage moved off
-Keychain** — real multi-device testing surfaced a Starling source that
+after **2026-09-17 Fix Starting-value auto-fill clobbering manual entry**
+— a Starling tracker backdated to reflect an earlier balance (£639) had
+its starting value silently overwritten with the balance *at save time*
+(£615) once the user picked the Starling account, because the auto-fill
+feature from two sessions ago overwrote unconditionally rather than only
+filling a blank field; fixed to never touch a field the user has already
+typed into, and `startingValueText`'s pre-filled `"0"` default (which
+turned typing "639" into "6390") is now an empty string like every other
+numeric field. Before that, **2026-09-17 Connected Source management +
+token storage moved off Keychain** — real multi-device testing surfaced a
+Starling source that
 synced (via CloudKit) but showed "Not connected" on a second device,
 because its token lived in the Keychain, a separate sync system (iCloud
 Keychain) with its own per-device toggle and its own lag. Per the user's
@@ -1715,3 +1724,63 @@ ideally the exact scenario that surfaced this — connecting Starling on one
 device, then opening the app on a second device signed into the same
 Apple ID — to confirm the source now shows connected there without any
 iCloud Keychain dependency.
+
+## 2026-09-17 Fix Starting-value auto-fill clobbering manual entry
+
+Real-device report: the user created a Starling tracker with its start
+time set to 40 minutes in the past, and manually typed the starting
+balance as what it genuinely was then (£639). After saving, the tracker's
+starting balance had become £615 — the account's balance *at save time*,
+not what was typed — and "Final target will be" showed a nonsensical
+-£23 (`projectedFinalValue = startingValue - totalAllowance`, now computed
+against the wrong starting value). Also reported: the "Starting value"
+field already contained "0" before typing, so entering "639" produced
+"6390" (the digits landed ahead of the existing "0" rather than replacing
+it).
+
+**Root cause of the first bug**: `AddTrackerView`'s "Starting value
+auto-fills from the live balance" feature (built two sessions ago, per
+explicit request) fetched the picked account's *current* balance and
+unconditionally overwrote `startingValueText` — including a value the
+user had already deliberately typed. The Budget section sits above the
+Source section in the form, so the realistic flow is: type a (possibly
+backdated) starting value first, then scroll down and pick the Starling
+account — at which point the prefill fired and silently replaced what was
+just typed. This directly explains 639 → 615: the live balance at the
+moment the account was picked (or shortly after, whenever the fetch
+resolved) simply overwrote the historical figure, with nothing on screen
+indicating the field had changed out from under the user.
+
+**Fixes**, both in `src/WiggleRoom/Views/AddTrackerView.swift`:
+1. `prefillStartingValueIfNeeded()` now checks `startingValueText.isEmpty`
+   before *and* after the async fetch (the second check guards the race
+   where the user types while the fetch is still in flight) and does
+   nothing if the field already has content — it only ever fills a truly
+   blank field, never overwrites. Doc comment rewritten to state this as
+   the actual contract, not "overwrites, since picking an account is what
+   the user asked for" (the previous, now-recognized-as-wrong reasoning).
+2. `startingValueText`'s `@State` default changed from the literal string
+   `"0"` to `""`. A `"0"` default isn't a placeholder — it's real content
+   already in the field — so typing "639" without first clearing it
+   produced "6390". `totalAllowanceText` never had this default and never
+   had this problem; `startingValueText` now matches it. The `TextField`'s
+   own `"0"` argument (a genuine grey placeholder, shown only when the
+   bound text is empty) was correct already and needed no change.
+
+Trade-off accepted for fix 1: after one successful auto-fill, switching to
+a *different* Starling account in the same form won't re-fill the field
+even though the user didn't type anything themselves (it's no longer
+empty). Deliberate — silently overwriting is the actively wrong behavior
+this fix exists to prevent, and it applies uniformly rather than trying to
+distinguish "auto-filled, safe to replace" from "user-typed, don't touch."
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every entry in this
+stretch (no Swift toolchain in this environment). The bug's mechanism was
+traced through the actual code (`prefillStartingValueIfNeeded`'s
+unconditional overwrite, `startingValueText`'s `"0"` default) rather than
+guessed at, and the fix directly addresses the traced mechanism, but
+hasn't been confirmed against a real build or the exact reported scenario
+(backdated start time + manual starting value + picking a Starling
+account) on a device.

@@ -50,7 +50,7 @@ struct AddTrackerView: View {
     /// default — most trackers just care about the day — in which case
     /// `startDate`/`endDate` are normalized to midnight.
     @State private var includesTime = false
-    @State private var startingValueText = "0"
+    @State private var startingValueText = ""
     @State private var totalAllowanceText = ""
 
     @State private var sourceSelection: SourceOption?
@@ -315,19 +315,27 @@ struct AddTrackerView: View {
     /// rather than leaving the user to guess/type today's real number —
     /// only for a fresh tracker on a real (non-manual) source; skipped
     /// entirely for manual entry (nothing to fetch) and when editing an
-    /// existing tracker (its source/target can't change). Overwrites
-    /// whatever was already typed there, since picking an account is what
-    /// the user just asked this field to reflect. Silent on failure — the
-    /// user can still type a starting value by hand if the fetch fails.
+    /// existing tracker (its source/target can't change). **Never
+    /// overwrites a value the user has already typed** — e.g. backdating a
+    /// tracker's start time to reflect a balance from earlier rather than
+    /// right now is a real, intentional use case, and silently replacing
+    /// that with "whatever the balance is at this exact second" would be
+    /// actively wrong, not just unhelpful. Silent on failure — the user can
+    /// still type a starting value by hand if the fetch fails.
     private func prefillStartingValueIfNeeded() async {
         guard existingTracker == nil, !isManualEntrySelected,
               let selectedTargetId,
               let selectedSourceId, let source = resolveSource(withId: selectedSourceId),
-              let target = availableTargets.first(where: { $0.id == selectedTargetId })
+              let target = availableTargets.first(where: { $0.id == selectedTargetId }),
+              startingValueText.trimmingCharacters(in: .whitespaces).isEmpty
         else { return }
         isPrefillingStartingValue = true
         defer { isPrefillingStartingValue = false }
         guard let value = try? await store.fetchCurrentValue(for: target, from: source) else { return }
+        // The user may have typed their own starting value (e.g. backdating
+        // the tracker's start to reflect a balance from earlier, not right
+        // now) while this fetch was in flight — never stomp on that.
+        guard startingValueText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         startingValueText = value.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
     }
 
