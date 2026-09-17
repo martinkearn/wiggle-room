@@ -56,10 +56,10 @@ struct AddTrackerView: View {
     @State private var isShowingAddSource = false
 
     /// §5.5 — a lightweight local-notification reminder to log a new
-    /// reading, on a user-set cadence. `nil` means no reminder. Only offered
-    /// for a manual-entry tracker (see `isManualEntrySelected`) — a real
-    /// provider's readings arrive on their own.
-    @State private var reminderCadenceDays: Int?
+    /// reading, on a user-set cadence in minutes. `nil` means no reminder.
+    /// Only offered for a manual-entry tracker (see `isManualEntrySelected`)
+    /// — a real provider's readings arrive on their own.
+    @State private var reminderCadenceMinutes: Int?
 
     @State private var errorMessage: String?
 
@@ -167,12 +167,14 @@ struct AddTrackerView: View {
 
                 if isManualEntrySelected {
                     Section {
-                        Picker("Reminder", selection: $reminderCadenceDays) {
+                        Picker("Reminder", selection: $reminderCadenceMinutes) {
                             Text("None").tag(nil as Int?)
-                            Text("Daily").tag(1 as Int?)
-                            Text("Weekly").tag(7 as Int?)
-                            Text("Every 2 Weeks").tag(14 as Int?)
-                            Text("Monthly").tag(30 as Int?)
+                            Text("Every Minute").tag(1 as Int?)
+                            Text("Hourly").tag(60 as Int?)
+                            Text("Daily").tag(1440 as Int?)
+                            Text("Weekly").tag(10080 as Int?)
+                            Text("Every 2 Weeks").tag(20160 as Int?)
+                            Text("Monthly").tag(43200 as Int?)
                         }
                     } header: {
                         Text("Reminder")
@@ -214,7 +216,7 @@ struct AddTrackerView: View {
                     startingValueText = existingTracker.startingValue.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                     totalAllowanceText = existingTracker.totalAllowance.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                     sourceSelection = .source(existingTracker.connectedSource?.id ?? store.manualEntrySource.id)
-                    reminderCadenceDays = existingTracker.reminderCadenceDays
+                    reminderCadenceMinutes = existingTracker.reminderCadenceMinutes
                 } else if sourceSelection == nil {
                     sourceSelection = .source(store.manualEntrySource.id)
                 }
@@ -380,7 +382,7 @@ struct AddTrackerView: View {
         else { return nil }
         let displayUnit = unit.isEmpty ? "units" : unit
         if remainder > 0 {
-            return "\(Tracker.formattedValue(remainder, unit: displayUnit)) will remain at the end of the tracker."
+            return "\(Tracker.formattedValue(remainder, unit: displayUnit)) should remain at the end of the tracker."
         } else {
             return "This budget exceeds the starting value by \(Tracker.formattedValue(abs(remainder), unit: displayUnit))."
         }
@@ -422,7 +424,7 @@ struct AddTrackerView: View {
             existingTracker.endDate = endDate
             existingTracker.startingValue = startingValue
             existingTracker.totalAllowance = totalAllowance
-            existingTracker.reminderCadenceDays = reminderCadenceDays
+            existingTracker.reminderCadenceMinutes = reminderCadenceMinutes
             store.saveChanges(reminderTracker: existingTracker)
             dismiss()
             return
@@ -454,7 +456,7 @@ struct AddTrackerView: View {
             endDate: endDate,
             startingValue: startingValue,
             totalAllowance: totalAllowance,
-            reminderCadenceDays: reminderCadenceDays
+            reminderCadenceMinutes: reminderCadenceMinutes
         )
         store.addTracker(tracker)
         // Seed the reading history with the starting value itself, dated at
