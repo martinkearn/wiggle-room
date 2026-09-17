@@ -40,6 +40,12 @@ enum WidgetDataStore {
     @MainActor
     private static var cachedContainer: ModelContainer?
 
+    /// Once at least one tracker has appeared, two no-growth import polls is
+    /// "settled enough": one could be a quiet import notification, while two
+    /// avoids spending the full picker deadline on an already-warm App Group
+    /// store.
+    private static let stablePollsBeforeSettled = 2
+
     @MainActor
     static func makeContainer() throws -> ModelContainer {
         if let cachedContainer { return cachedContainer }
@@ -227,7 +233,7 @@ enum WidgetDataStore {
                     consecutiveStablePolls = 0
                 } else if !best.isEmpty {
                     consecutiveStablePolls += 1
-                    if consecutiveStablePolls >= 2 { break }
+                    if consecutiveStablePolls >= stablePollsBeforeSettled { break }
                 }
             }
             return best
