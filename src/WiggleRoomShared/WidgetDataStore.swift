@@ -86,24 +86,30 @@ enum WidgetDataStore {
     /// one-time cold-start cost per extension process — once
     /// `cachedContainer` above is warm, later calls return immediately.
     ///
-    /// When trackers *are* already present, this still gives CloudKit a
+    /// When trackers *are* already present, this still gives CloudKit one
     /// short, bounded chance to deliver a fresher import before returning.
     /// `TrackerStore` calls `WidgetCenter.reloadAllTimelines()` the instant
     /// a reading is logged in the main app, which makes WidgetKit re-invoke
     /// this immediately — almost always well before that change has
     /// actually round-tripped through CloudKit into this extension's own
-    /// separate local store (see the type doc above: no App Group, CloudKit
-    /// sync is the only channel). Without this, a value *update* to a
-    /// tracker the widget already knows about was invisible until the
-    /// store's own periodic refresh or the next unrelated reload, since
-    /// only the true-empty case above ever waited at all. Polls up to three
-    /// times (~6s total) rather than one single 2s attempt — a wider net
-    /// for actually catching the freshly-synced change on this triggered
-    /// reload, rather than falling back to whatever the *next* scheduled
-    /// reload happens to be. Still much shorter than
-    /// `fetchAllTrackersForConfiguration()`'s — this runs inside WidgetKit's
-    /// own timeline-generation budget, not behind an interactive "Loading"
-    /// sheet, so it can't afford to be as generous.
+    /// separate local store. Without this, a value *update* to a tracker
+    /// the widget already knows about was invisible until the store's own
+    /// periodic refresh or the next unrelated reload, since only the
+    /// true-empty case above ever waited at all.
+    ///
+    /// **Deliberately a single ~2s wait, not several** — a real regression
+    /// was found in practice from widening this to three (~6s total): the
+    /// system only gives a widget's live render a few seconds (~3, per
+    /// device logs) to actually produce content before it gives up and
+    /// leaves the widget on its last/placeholder state. A widget with no
+    /// prior cached render for its exact configuration (e.g. right after
+    /// picking a tracker for the first time) hit that slow path on every
+    /// single attempt and never finished in time — a persistently blank
+    /// widget, not just occasional staleness. This is much shorter than
+    /// `fetchAllTrackersForConfiguration()`'s wait for exactly that reason —
+    /// this runs inside WidgetKit's own timeline-generation budget, not
+    /// behind an interactive "Loading" sheet, so it can't afford to be
+    /// generous at all.
     @MainActor
     static func fetchAllTrackers() async throws -> [Tracker] {
         do {
@@ -128,14 +134,12 @@ enum WidgetDataStore {
                     }
                 }
             } else {
-                for _ in 1...3 {
-                    await waitForNextCloudKitImport(timeout: 2)
-                    // Same `try?` reasoning as above — a single transient
-                    // error on any of these three polls must not blank out
-                    // an otherwise-successful result.
-                    if let latest = try? fetchAllTrackersImmediately() {
-                        trackers = latest
-                    }
+                await waitForNextCloudKitImport(timeout: 2)
+                // `try?` rather than `try` — see the empty-branch comment
+                // above; a transient error here must fall back to the
+                // already-known-good `trackers` rather than throwing.
+                if let latest = try? fetchAllTrackersImmediately() {
+                    trackers = latest
                 }
             }
             return trackers
