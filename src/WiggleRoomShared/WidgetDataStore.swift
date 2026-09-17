@@ -43,7 +43,10 @@ enum WidgetDataStore {
     /// Once at least one tracker has appeared, two no-growth import polls is
     /// "settled enough": one could be a quiet import notification, while two
     /// avoids spending the full picker deadline on an already-warm App Group
-    /// store.
+    /// store. This is intentionally count-based: this longer wait is for the
+    /// interactive configuration picker discovering rows, while timeline
+    /// freshness for value changes is handled by `fetchAllTrackers()`'s shorter
+    /// update wait and explicit widget reload triggers.
     private static let stablePollsBeforeSettled = 2
 
     @MainActor
