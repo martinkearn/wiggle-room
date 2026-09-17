@@ -5,14 +5,16 @@
 
 import SwiftUI
 import SwiftData
-import Combine
 
 /// Tracker detail / dashboard (§7.1): the two-ring visual as the primary
 /// visual (with the difference-from-target as its centerpiece — that's the
 /// key number, per §3.2), current value, live target, days remaining, an
-/// "Update Current Value" button (manual sources only — no auto-fetch
-/// providers exist yet, so no refresh button), and a trend chart once at
-/// least one reading exists.
+/// "Update Current Balance" button (manual, not-yet-completed trackers
+/// only — no auto-fetch providers exist yet, so no refresh button), and a
+/// trend chart once at least one reading exists. Once the tracker's period
+/// has actually ended, the dashboard switches into a completed presentation
+/// (see `isCompleted`) — the live projection and update controls no longer
+/// apply, so they're replaced with a final summary instead.
 struct TrackerDetailView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -22,19 +24,17 @@ struct TrackerDetailView: View {
     @State private var isPresentingEditTracker = false
     @State private var isPresentingDeleteConfirmation = false
     @State private var isPresentingReadingHistory = false
-    @State private var now = Date.now
     /// The zoom-level lens (§4.5) the dashboard is currently scoped to —
     /// re-scopes the rings, figures, and trend chart together. Only shown
     /// as a picker when `tracker.availableZoomLevels` offers more than just
     /// `.overall`.
     @State private var zoomLevel: ZoomLevel = .overall
-    // Set from `.onAppear`, not here: a default value initializes whenever
-    // SwiftUI happens to construct this struct, which can be well before
-    // the screen actually becomes visible (e.g. NavigationLink destinations
-    // are sometimes built ahead of the tap) — that made the countdown start
-    // already expired.
-    @State private var nextUpdateAt = Date.now
-    @State private var secondsUntilUpdate = 60
+
+    /// Drives `now` forward on a schedule aligned to this tracker's own end
+    /// date (see `AutoUpdateTicker`/`TrackerUpdateScheduling`) instead of a
+    /// flat 60-second cadence — the last automatic update before the
+    /// tracker completes always lands exactly on `tracker.endDate`.
+    @State private var ticker = AutoUpdateTicker()
 
     /// Ever-incrementing rather than a toggled `Bool` — each increment
     /// always spins a fresh full turn forward from wherever the last one
@@ -47,13 +47,22 @@ struct TrackerDetailView: View {
     /// `checkForCompletionCelebration()`.
     @State private var isShowingCelebration = false
 
-    /// Ticks once a second, both for the visible countdown and to roll the
-    /// live pace/target figures over once a minute (see the `onReceive`
-    /// below for why that rollover isn't a separate, longer-period timer).
-    private let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private var now: Date { ticker.now }
+
+    private var isCompleted: Bool {
+        tracker.isCompleted(asOf: now)
+    }
 
     private var pace: TrackerPace {
         tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now, zoomLevel: zoomLevel)
+    }
+
+    /// The tracker's pace pinned to its own end date, using the last reading
+    /// actually logged — the stable, final figure shown once completed,
+    /// rather than the ever-moving live `pace` above.
+    private var finalPace: TrackerPace? {
+        guard let latest = tracker.latestReading else { return nil }
+        return tracker.pace(actualValue: latest.value, asOf: tracker.endDate)
     }
 
     private var availableZoomLevels: [ZoomLevel] {
@@ -102,18 +111,34 @@ struct TrackerDetailView: View {
                         .padding(.top, 4)
                 }
 
-                if availableZoomLevels.count > 1 {
+                if isCompleted {
+                    CompletedBadge()
+                }
+
+                if availableZoomLevels.count > 1 && !isCompleted {
                     zoomLevelPicker
                 }
 
                 RingsView(tracker: tracker, now: now, zoomLevel: zoomLevel)
                     .frame(width: 260, height: 260)
 
-                figuresRow
+                if isCompleted {
+                    completedSummary
+                } else {
+                    figuresRow
+                    if tracker.isManualEntry {
+                        updateBalanceButton
+                    }
+                }
 
-                Text(periodRemainingText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 2) {
+                    Text(periodRangeText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(periodRemainingText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
                 if tracker.latestReading == nil {
                     Text("No readings logged yet — log one to see your pace.")
@@ -181,26 +206,8 @@ struct TrackerDetailView: View {
         }
         .onAppear {
             let appearedAt = Date.now
-            now = appearedAt
-            nextUpdateAt = appearedAt.addingTimeInterval(60)
-            secondsUntilUpdate = 60
-            checkForCompletionCelebration(asOf: appearedAt)
-        }
-        .onReceive(secondTimer) { date in
-            // Folded the minute rollover into this same 1-second tick rather
-            // than relying on a separate 60-second `Timer.publish` — a
-            // `let`-stored timer publisher gets recreated fresh every time
-            // this view's body re-evaluates, which happens on every second's
-            // tick here; a 1-second timer only ever needs to survive ~1s
-            // between those recreations, but a 60-second one never gets a
-            // full uninterrupted minute to actually fire, so it silently
-            // never rolls over — the countdown reaches 0 and just sits
-            // there. Comparing against `nextUpdateAt` directly instead
-            // means rollover no longer depends on any timer surviving longer
-            // than the interval it's already proven to survive.
-            if date >= nextUpdateAt {
-                now = date
-                nextUpdateAt = date.addingTimeInterval(60)
+            ticker.endDatesProvider = { [tracker.endDate] }
+            ticker.onUpdate = { date in
                 // The minute rollover is exactly when Target Right Now's
                 // value actually moves (it's a live function of `now`), so
                 // the card's flip should register here too — previously the
@@ -214,7 +221,8 @@ struct TrackerDetailView: View {
                 // happens to already be open, not just on a fresh appear.
                 checkForCompletionCelebration(asOf: date)
             }
-            secondsUntilUpdate = max(0, Int(nextUpdateAt.timeIntervalSince(date).rounded()))
+            ticker.start(now: appearedAt)
+            checkForCompletionCelebration(asOf: appearedAt)
         }
         // Keyed on the reading's own id, not its value — logging a reading
         // that happens to match the previous one is still a genuine update
@@ -251,25 +259,13 @@ struct TrackerDetailView: View {
 
     /// Two visually separate cards, not one shared row — Current Balance
     /// and Target Right Now are different things updated in different ways
-    /// (one by logging a reading, one automatically by the clock), and the
-    /// "Update Current Value" button belongs specifically to the first one,
-    /// not to the pair of them together.
+    /// (one by logging a reading, one automatically by the clock) — but
+    /// otherwise identical in shape/weight, since the "Update Current
+    /// Balance" action now lives outside both of them (`updateBalanceButton`).
     private var figuresRow: some View {
         HStack(alignment: .top, spacing: 12) {
             card(tint: pace.status.color) {
                 figureContent(title: tracker.currentValueLabel, value: pace.currentValue, caption: remainingInAllowanceCaption)
-                Button {
-                    isPresentingLogReading = true
-                } label: {
-                    Label("Update", systemImage: "plus.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .tint(WiggleRoomColors.brand)
             }
 
             card(tint: WiggleRoomColors.paceRing) {
@@ -285,6 +281,47 @@ struct TrackerDetailView: View {
                 perspective: 0.35
             )
         }
+        .padding(.horizontal)
+    }
+
+    /// Final-state replacement for `figuresRow` once the tracker has
+    /// completed — "Target Right Now" is a live projection that's no longer
+    /// meaningful, so it's replaced with the stable final figure and status
+    /// instead, pinned to `endDate` (see `finalPace`).
+    private var completedSummary: some View {
+        card(tint: (finalPace?.status ?? .warning).color) {
+            figureContent(
+                title: "Final \(tracker.currentValueLabel)",
+                value: finalPace?.currentValue ?? tracker.startingValue,
+                caption: finalSummaryCaption
+            )
+        }
+        .padding(.horizontal)
+    }
+
+    private var finalSummaryCaption: String? {
+        guard let finalPace else { return nil }
+        return "\(finalPace.statusLine(for: tracker)) \(finalPace.displayDifference(for: tracker))"
+    }
+
+    /// Moved out from inside the Current Balance card so both figure cards
+    /// share identical visual weight — this now sits as its own full-width
+    /// control beneath them, only for a manual, not-yet-completed tracker
+    /// (an auto-fetching source's readings arrive on their own, and a
+    /// completed tracker no longer accepts updates).
+    private var updateBalanceButton: some View {
+        Button {
+            isPresentingLogReading = true
+        } label: {
+            Label("Update Current Balance", systemImage: "plus.circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
+        .tint(WiggleRoomColors.brand)
         .padding(.horizontal)
     }
 
@@ -306,7 +343,7 @@ struct TrackerDetailView: View {
     /// sits at the very top of the screen rather than under a single figure.
     private var screenUpdateCaption: String? {
         guard now < tracker.endDate else { return nil }
-        return "Updates in \(secondsUntilUpdate)s"
+        return "Updates in \(ticker.secondsUntilNextUpdate)s"
     }
 
     private var remainingInAllowanceCaption: String? {
@@ -331,6 +368,18 @@ struct TrackerDetailView: View {
         .frame(maxWidth: .infinity)
     }
 
+    private static let periodRangeFormatter: Date.FormatStyle = .init()
+        .month(.abbreviated)
+        .day()
+        .hour()
+        .minute()
+
+    /// "12 Jan, 9:00 AM – 19 Jan, 9:00 AM" — the tracker's own bounds,
+    /// distinct from `periodRemainingText`'s live countdown below it.
+    private var periodRangeText: String {
+        "\(tracker.startDate.formatted(Self.periodRangeFormatter)) \u{2013} \(tracker.endDate.formatted(Self.periodRangeFormatter))"
+    }
+
     private var periodRemainingText: String {
         tracker.periodRemainingText(asOf: now, until: zoomWindowEnd)
     }
@@ -338,7 +387,9 @@ struct TrackerDetailView: View {
     /// Segmented zoom-level control (§4.5, §7.1) sitting above the rings —
     /// re-scopes the whole dashboard (rings, figures, chart) to the selected
     /// sub-period. Only shown when the tracker's own length actually offers
-    /// more than `.overall` (see `Tracker.availableZoomLevels`).
+    /// more than `.overall` (see `Tracker.availableZoomLevels`), and not
+    /// once completed — zooming into a sub-period of a finished tracker
+    /// doesn't apply once there's only a final summary to show.
     private var zoomLevelPicker: some View {
         Picker("Zoom", selection: $zoomLevel) {
             ForEach(availableZoomLevels) { level in

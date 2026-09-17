@@ -5,7 +5,6 @@
 
 import SwiftUI
 import SwiftData
-import Combine
 
 /// A tracker referenced by id in `TrackerListView`'s navigation path —
 /// distinct from pushing the `Tracker` model object itself, since a plain
@@ -26,12 +25,15 @@ struct TrackerListView: View {
     @State private var isPresentingSources = false
     @State private var navigationPath = NavigationPath()
 
-    // Mirrors TrackerDetailView's own minute timer (§7.1) — without this,
-    // a row's ring only ever redraws when its underlying data changes, so
-    // it would never show the same live-refresh re-cycle the dashboard
-    // does; every ring in the app should visibly tick on the same cadence.
-    @State private var now = Date.now
-    private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    // Mirrors TrackerDetailView's own ticker (§7.1) — without this, a row's
+    // ring only ever redraws when its underlying data changes, so it would
+    // never show the same live-refresh re-cycle the dashboard does; every
+    // ring in the app should visibly tick on the same schedule. Aligned to
+    // the *earliest* upcoming end date among all listed trackers, so a
+    // tracker close to completing still gets its final on-time tick even
+    // while sitting in a list alongside trackers with much later end dates.
+    @State private var ticker = AutoUpdateTicker()
+    private var now: Date { ticker.now }
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -83,10 +85,11 @@ struct TrackerListView: View {
             .sheet(isPresented: $isPresentingSources) {
                 ConnectedSourcesView()
             }
-            .onReceive(minuteTimer) { date in
-                now = date
+            .onAppear {
+                ticker.endDatesProvider = { trackers.map(\.endDate) }
+                ticker.start()
+                navigateToPendingDeepLinkIfAny()
             }
-            .onAppear { navigateToPendingDeepLinkIfAny() }
             .onChange(of: deepLinkRouter.pendingTrackerId) { _, _ in
                 navigateToPendingDeepLinkIfAny()
             }
@@ -144,10 +147,15 @@ private struct TrackerRow: View {
                 .frame(width: 46, height: 46)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(tracker.name)
-                    .font(WiggleRoomFont.headline(18, weight: 650))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(tracker.name)
+                        .font(WiggleRoomFont.headline(18, weight: 650))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if tracker.isCompleted(asOf: now) {
+                        CompletedBadge()
+                    }
+                }
                 if tracker.latestReading != nil {
                     Text("\(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))")
                         .font(.wiggleNumber(.subheadline))

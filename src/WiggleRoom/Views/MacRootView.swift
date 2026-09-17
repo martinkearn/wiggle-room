@@ -3,7 +3,6 @@
 //  WiggleRoom
 //
 
-import Combine
 import SwiftUI
 import SwiftData
 #if os(macOS)
@@ -21,6 +20,9 @@ struct MacRootView: View {
 
     @State private var selection: Tracker.ID?
     @State private var isPresentingAddTracker = false
+    #if os(macOS)
+    @State private var ticker = AutoUpdateTicker()
+    #endif
 
     var body: some View {
         NavigationSplitView {
@@ -78,24 +80,18 @@ struct MacRootView: View {
             PaceCrossingNotifier.shared.requestAuthorizationIfNeeded()
         }
         .onAppear {
+            ticker.endDatesProvider = { trackers.map(\.endDate) }
+            ticker.onUpdate = { _ in refreshPaceDrivenState() }
+            ticker.start()
             refreshPaceDrivenState()
         }
         .onChange(of: trackers) { _, _ in
-            refreshPaceDrivenState()
-        }
-        .onReceive(paceRefreshTimer) { _ in
             refreshPaceDrivenState()
         }
         #endif
     }
 
     #if os(macOS)
-    /// Ticks once a minute so the Dock badge and pace-crossing notifications
-    /// (§7.2) stay current purely from time passing, not just when tracker
-    /// data changes — the same cadence `TrackerDetailView` recomputes its
-    /// own figures at.
-    private let paceRefreshTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
-
     private func refreshPaceDrivenState() {
         PaceCrossingNotifier.shared.checkForCrossings(in: trackers)
         let anyBehindPace = trackers.contains { tracker in
@@ -119,7 +115,12 @@ private struct MacTrackerRow: View {
             RingsView(tracker: tracker, now: .now, lineWidth: 4, showsCenterContent: false)
                 .frame(width: 28, height: 28)
             VStack(alignment: .leading, spacing: 2) {
-                Text(tracker.name)
+                HStack(spacing: 6) {
+                    Text(tracker.name)
+                    if tracker.isCompleted() {
+                        CompletedBadge()
+                    }
+                }
                 if tracker.latestReading != nil {
                     Text("\(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))")
                         .font(.caption)

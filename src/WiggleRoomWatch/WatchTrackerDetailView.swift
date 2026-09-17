@@ -3,7 +3,6 @@
 //  WiggleRoomWatch
 //
 
-import Combine
 import SwiftUI
 
 /// The glanceable detail screen — reuses `RingsView` (identical to the
@@ -16,17 +15,21 @@ struct WatchTrackerDetailView: View {
     let tracker: Tracker
 
     @State private var isPresentingLogReading = false
-    @State private var now = Date.now
+    @State private var ticker = AutoUpdateTicker()
 
-    private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    private var now: Date { ticker.now }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
+                if tracker.isCompleted(asOf: now) {
+                    CompletedBadge()
+                }
+
                 RingsView(tracker: tracker, now: now, lineWidth: 8)
                     .frame(width: 120, height: 120)
 
-                if tracker.isManualEntry {
+                if tracker.isManualEntry && !tracker.isCompleted(asOf: now) {
                     Button {
                         isPresentingLogReading = true
                     } label: {
@@ -38,7 +41,10 @@ struct WatchTrackerDetailView: View {
             .padding(.vertical, 8)
         }
         .navigationTitle(tracker.name)
-        .onReceive(minuteTimer) { date in now = date }
+        .onAppear {
+            ticker.endDatesProvider = { [tracker.endDate] }
+            ticker.start()
+        }
         .sheet(isPresented: $isPresentingLogReading) {
             WatchLogReadingView(tracker: tracker)
         }
