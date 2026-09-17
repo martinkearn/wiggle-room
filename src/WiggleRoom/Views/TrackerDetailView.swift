@@ -178,7 +178,7 @@ struct TrackerDetailView: View {
                     } label: {
                         Label("Edit Tracker", systemImage: "pencil")
                     }
-                    if tracker.isManualEntry {
+                    if !tracker.sortedReadings.isEmpty {
                         Button {
                             isPresentingReadingHistory = true
                         } label: {

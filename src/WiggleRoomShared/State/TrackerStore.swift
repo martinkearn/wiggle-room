@@ -142,6 +142,17 @@ final class TrackerStore {
     /// works identically regardless of where a reading came from. No-ops
     /// for a manual-entry tracker (nothing to fetch) or one with no
     /// resolvable provider/target.
+    ///
+    /// Only logs a new reading when the fetched value actually differs from
+    /// the latest one already on record — the 30s foreground poll (§5.3)
+    /// would otherwise write a near-duplicate, same-value reading on every
+    /// single tick regardless of whether anything changed, flooding the
+    /// trend chart with so many overlapping same-value points that
+    /// individual readings become visually indistinguishable from the line
+    /// connecting them, and needlessly bloating the synced reading history.
+    /// A poll that finds nothing changed still counts as a successful
+    /// refresh (clears any stale error state) — it just doesn't need its
+    /// own row.
     func refreshFromSource(_ tracker: Tracker) async throws {
         guard !tracker.isManualEntry,
               let sourceTargetId = tracker.sourceTargetId,
@@ -149,6 +160,7 @@ final class TrackerStore {
         else { return }
         let target = SourceTarget(id: sourceTargetId, displayName: tracker.name)
         let value = try await provider.fetchCurrentValue(target: target)
+        guard value != tracker.latestReading?.value else { return }
         logReading(value: value, date: .now, for: tracker)
     }
 

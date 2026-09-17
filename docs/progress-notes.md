@@ -1,7 +1,13 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Zoom levels removed** — §4.5's whole feature (the
+after **2026-09-17 Starling reading dedup + Update History for real
+sources** — `TrackerStore.refreshFromSource` now skips logging a reading
+when the fetched value hasn't changed (was flooding the trend chart with
+overlapping same-value points every 30s tick, reading as "no dots" —
+they were there, just too dense to tell apart), and "Update History" is
+now visible (read-only) for any tracker with readings, not just manual
+ones. Before that, **2026-09-17 Zoom levels removed** — §4.5's whole feature (the
 `ZoomLevel` type, the picker, sub-period scoping everywhere it touched:
 `Tracker`, `TrackerPace`, `RingsView`, `TrendChartView`,
 `TrackerDetailView`) was pulled out of the app entirely, cleanly rather
@@ -1502,3 +1508,54 @@ structural correctness (brace matching, the synthesized memberwise init
 replacing the deleted custom one). Build in Xcode and run the test suite
 before trusting this further, same as everything else in this file's
 Starling-adjacent entries.
+
+## 2026-09-17 Starling reading dedup + Update History for real sources
+
+Two more findings from continued real-device testing on the Starling
+branch, both fixed:
+
+1. **`refreshFromSource` logged a new reading on every successful poll,
+   even when the value hadn't changed.** With the detail screen's 30s tick
+   (§5.3), this meant a Starling tracker accumulated a near-duplicate,
+   same-value reading every 30 seconds it was left open — flooding
+   `TrendChartView`'s point marks so densely that individual readings
+   became visually indistinguishable from the line connecting them (the
+   user's "why am I not seeing green dots" — the dots were being drawn,
+   just so densely overlapped they read as a solid line), and needlessly
+   bloating the synced reading history for no informational gain. Fixed in
+   `TrackerStore.refreshFromSource` (`src/WiggleRoomShared/State/TrackerStore.swift`):
+   a fetched value equal to `tracker.latestReading?.value` is treated as a
+   successful, no-op check rather than a new row — a poll that finds
+   nothing changed doesn't need its own reading. Not independently unit
+   tested (the guard's own logic is a one-line comparison, and testing it
+   end-to-end through `TrackerStore.refreshFromSource` would need
+   `provider(for:)` to accept an injectable fake provider, which it
+   currently doesn't — a bigger seam than this fix warranted); needs
+   manual verification against a real Starling account.
+2. **"Update History" was hidden entirely for a Starling tracker.**
+   Pre-existing, deliberate design (predates the Starling work) —
+   `ReadingHistoryView` was built to let a user edit/delete their own
+   manually-logged readings, gated behind `Tracker.isManualEntry` in
+   `TrackerDetailView`'s toolbar menu, on the reasoning that "a real
+   provider's history should reflect what it actually reported." That
+   reasoning still holds for *editing*, but with Starling readings now
+   genuinely accumulating, hiding the list entirely means there's no way
+   to just *see* a Starling tracker's history at all. Changed the toolbar
+   gate to `!tracker.sortedReadings.isEmpty` (any tracker with readings
+   gets the menu item, not just manual ones), and reworked
+   `ReadingHistoryView` (`src/WiggleRoom/Views/ReadingHistoryView.swift`)
+   so a manual tracker's rows stay tap-to-edit/swipe-or-context-menu-to-
+   delete exactly as before, while a real source's rows render as plain,
+   non-interactive text — same list, view-only. `EditButton`/`onDelete`
+   are now also gated on `tracker.isManualEntry`.
+
+### Verifying this session's changes
+
+Not verified by a compiler — same standing caveat as every entry in this
+Starling-adjacent stretch (no Swift toolchain in this environment). Manually
+re-checked both changed files for consistent `isManualEntry` gating and
+correct `@ViewBuilder`/optional-closure syntax (`onDelete(perform:
+tracker.isManualEntry ? deleteReadings : nil)`). Needs a real build, the
+test suite, and ideally a real Starling account left open for a few
+minutes to confirm the dedup actually stops the reading flood and that
+Update History renders sensibly (read-only) for a Starling tracker.
