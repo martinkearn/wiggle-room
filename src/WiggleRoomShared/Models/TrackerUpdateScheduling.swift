@@ -31,12 +31,19 @@ enum TrackerUpdateScheduling {
         return max(candidate, now.addingTimeInterval(0.001))
     }
 
-    /// The next reload moment for a widget/complication timeline: a longer,
+    /// The next reload moment for a widget/complication timeline: a
     /// budget-friendly cadence while the tracker still has plenty of time
     /// left, tightening to `interval` once inside the final hour so the last
     /// reload coincides with the tracker's own end — matching the in-app
-    /// experience instead of a flat "always an hour away" ceiling.
-    static func nextWidgetReloadDate(after now: Date, until endDate: Date, farInterval: TimeInterval = 900, nearInterval: TimeInterval = 60) -> Date {
+    /// experience instead of a flat "always an hour away" ceiling. `farInterval`
+    /// is deliberately as tight as WidgetKit's shared per-app reload budget
+    /// reasonably allows (5 minutes, not the original 15) — there's no App
+    /// Group here (see `WidgetDataStore`), so this periodic reload plus the
+    /// explicit `WidgetCenter.reloadAllTimelines()` triggers on every data
+    /// change are the only two ways a widget ever catches up with the app;
+    /// tightening this is the most impactful lever available without that
+    /// larger architecture change.
+    static func nextWidgetReloadDate(after now: Date, until endDate: Date, farInterval: TimeInterval = 300, nearInterval: TimeInterval = 60) -> Date {
         let interval = endDate.timeIntervalSince(now) <= 3600 ? nearInterval : farInterval
         return nextUpdateDate(after: now, until: endDate, interval: interval)
     }

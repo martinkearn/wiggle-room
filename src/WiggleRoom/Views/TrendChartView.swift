@@ -158,21 +158,23 @@ struct TrendChartView: View {
         return points
     }
 
-    /// A subtle marker carrying the latest logged balance forward to "now" —
-    /// keeps the chart feeling live even between readings, distinct from the
-    /// trend projection. `nil` once the tracker's period has ended, since the
-    /// last real reading already sits at that edge.
+    /// A marker carrying the latest logged balance forward to "now" — keeps
+    /// the chart feeling live even between readings, distinct from the
+    /// trend projection. `nil` once the tracker's period has ended, since
+    /// the last real reading already sits at that edge.
     private var liveNowPoint: (date: Date, value: Decimal)? {
         guard let latestReading, now < window.end else { return nil }
         return (min(now, window.end), latestReading.value)
     }
 
-    /// A subtle marker carrying the latest logged balance all the way to the
-    /// window's end, so the actual-data series visually spans the tracker's
-    /// full duration even with sparse readings.
-    private var liveEndPoint: (date: Date, value: Decimal)? {
-        guard let latestReading, now < window.end else { return nil }
-        return (window.end, latestReading.value)
+    /// The color of the most recent real segment/reading — reused for both
+    /// the dotted continuation from the last reading to `liveNowPoint` and
+    /// that point's own marker, so the "this is where things stood as of
+    /// your last update, carried forward to right now" link reads as one
+    /// continuous idea rather than an unconnected, unexplained dot.
+    private var liveContinuationColor: Color {
+        guard let latestReading else { return .secondary }
+        return isAheadOfPace(value: latestReading.value, at: latestReading.date) ? WiggleRoomColors.good : WiggleRoomColors.bad
     }
 
     /// Whether a given logged value, at the date it was logged, was ahead of
@@ -266,21 +268,31 @@ struct TrendChartView: View {
                 .foregroundStyle(isAheadOfPace(value: reading.value, at: reading.date) ? WiggleRoomColors.good : WiggleRoomColors.bad)
             }
 
-            if let liveNowPoint {
+            if let liveNowPoint, let latestReading {
+                // A dotted continuation from the last real reading up to
+                // "now" — without this, `liveNowPoint` below read as an
+                // unexplained floating dot rather than a clear "your last
+                // update, carried forward to this moment."
+                LineMark(
+                    x: .value("Date", latestReading.date),
+                    y: .value("Now", latestReading.value),
+                    series: .value("Series", "LiveContinuation")
+                )
+                .foregroundStyle(liveContinuationColor)
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 4]))
+                LineMark(
+                    x: .value("Date", liveNowPoint.date),
+                    y: .value("Now", liveNowPoint.value),
+                    series: .value("Series", "LiveContinuation")
+                )
+                .foregroundStyle(liveContinuationColor)
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 4]))
+
                 PointMark(
                     x: .value("Date", liveNowPoint.date),
                     y: .value("Now", liveNowPoint.value)
                 )
-                .foregroundStyle(.secondary.opacity(0.5))
-                .symbolSize(24)
-            }
-
-            if let liveEndPoint {
-                PointMark(
-                    x: .value("Date", liveEndPoint.date),
-                    y: .value("End", liveEndPoint.value)
-                )
-                .foregroundStyle(.secondary.opacity(0.35))
+                .foregroundStyle(liveContinuationColor)
                 .symbolSize(24)
             }
 
