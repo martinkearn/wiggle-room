@@ -194,7 +194,19 @@ enum WidgetDataStore {
             // generous window; a picker that occasionally waits a few
             // seconds longer when there's nothing new to find is a much
             // smaller cost than a tracker that can't be picked at all.
+            // Stops as soon as results look settled, rather than always
+            // burning the full 25s deadline regardless of how quickly data
+            // actually showed up — with the shared App Group container
+            // (see `AppGroup`), a same-device fetch is now usually
+            // instant, and this loop used to have no early-exit at all,
+            // so the picker waited the full 25 seconds on essentially
+            // every open even when nothing was ever going to change.
+            // Two consecutive no-growth polls (each up to 3s) once `best`
+            // is non-empty is judged "settled enough" — still leaves the
+            // full deadline available for the genuine cold-start case
+            // where nothing has appeared yet at all.
             let deadline = Date().addingTimeInterval(25)
+            var consecutiveStablePolls = 0
             while Date() < deadline {
                 let timeRemaining = deadline.timeIntervalSinceNow
                 guard timeRemaining > 0 else { break }
@@ -212,6 +224,10 @@ enum WidgetDataStore {
                 guard let latest = try? fetchAllTrackersImmediately() else { continue }
                 if latest.count > best.count {
                     best = latest
+                    consecutiveStablePolls = 0
+                } else if !best.isEmpty {
+                    consecutiveStablePolls += 1
+                    if consecutiveStablePolls >= 2 { break }
                 }
             }
             return best
