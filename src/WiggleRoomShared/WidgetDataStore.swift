@@ -144,14 +144,18 @@ enum WidgetDataStore {
     static func fetchAllTrackersForConfiguration() async throws -> [Tracker] {
         do {
             var best = try fetchAllTrackersImmediately()
-            // Nothing synced yet at all (e.g. this extension process's very
-            // first launch, or right after switching CloudKit containers) is
-            // the slow case that needs the full generous window; once at
-            // least one tracker is already visible, a newly-added one only
-            // needs a shorter grace period to catch up, so editing an
-            // already-configured widget doesn't sit on "Loading" for 25s
-            // when there's nothing new to find.
-            let deadline = Date().addingTimeInterval(best.isEmpty ? 25 : 10)
+            // Previously a shorter 10s window once *any* tracker was already
+            // visible, on the assumption a newly-added one only needs a
+            // brief grace period to catch up. In practice a brand new
+            // tracker's very first CloudKit sync (a genuinely new record,
+            // not an update to one already replicated here) can take just
+            // as long as the cold-start case below — reported as a
+            // just-created tracker simply never appearing in the widget's
+            // "choose a tracker" picker. Both cases now get the same
+            // generous window; a picker that occasionally waits a few
+            // seconds longer when there's nothing new to find is a much
+            // smaller cost than a tracker that can't be picked at all.
+            let deadline = Date().addingTimeInterval(25)
             while Date() < deadline {
                 let timeRemaining = deadline.timeIntervalSinceNow
                 guard timeRemaining > 0 else { break }
