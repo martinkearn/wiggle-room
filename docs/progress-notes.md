@@ -1,8 +1,13 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after a long same-day session (see **2026-09-17 chart/scheduling/
-completed-state overhaul** near the end) that redesigned the trend chart and
+after a docs-only planning session (see **2026-09-17 Starling
+refresh-cadence planning** at the end) that recorded refresh-cadence
+decisions for the still-unbuilt Starling integration (30s foreground poll
+reusing the existing scheduler, pull-to-refresh for manual, 5-minute
+background refresh) and the concrete gaps blocking it — no code changed.
+Before that, a long same-day session (see **2026-09-17 chart/scheduling/
+completed-state overhaul**) redesigned the trend chart and
 ring visuals, replaced three separately-coded ~60s refresh timers with one
 shared end-aligned scheduler, added a first-class completed-tracker state,
 moved to pull-to-refresh on iOS, and fixed several real bugs (a pace-status
@@ -920,3 +925,53 @@ and the widget picker fixes all need a real build to confirm. Build in
 Xcode and run the test suite before trusting any of this further; if
 anything doesn't compile or behave as described, that's expected until
 someone with real Xcode access does that pass.
+
+## 2026-09-17 Starling refresh-cadence planning (no code changed)
+
+Docs-only session, prompted by the user asking to confirm build-readiness for
+the Starling integration and to set a specific refresh cadence, before any
+implementation. No Swift files were touched.
+
+**What was checked**: an audit of the repo confirmed there is still no
+Starling code at all — no HTTP client, no auth flow, no models for
+Starling accounts/balances (`AddSourceView.swift` remains an explicit
+"Coming Soon" stub, matching every prior session's scope note). It also
+confirmed what "the existing refresh mechanism" actually is:
+`AutoUpdateTicker` (`src/WiggleRoomShared/State/AutoUpdateTicker.swift`) plus
+`TrackerUpdateScheduling` (`src/WiggleRoomShared/Models/TrackerUpdateScheduling.swift`)
+is a **display-recompute** scheduler (currently a 60s in-app tick,
+900s/60s widget reload), not a network poller — there is no periodic data
+fetch anywhere in the app yet. Pull-to-refresh (`TrackerDetailView.swift`'s
+`.refreshable`, wired to `handleUpdateGesture()`) exists and works for
+manual-entry trackers, but its auto-fetch-source branch is a documented
+no-op pending a real provider. No `BGTaskScheduler`/`BGAppRefreshTask`
+usage exists anywhere, and the background-fetch `Info.plist`/entitlement
+config hasn't been confirmed either way.
+
+**Decision recorded** (see build-spec.md §5.3, §12): when built, Starling
+(and, per the user's request, every source generally) should poll every
+**30 seconds while the app is open**, by retuning and extending the
+existing `AutoUpdateTicker`/`TrackerUpdateScheduling` mechanism to actually
+trigger a fetch on tick rather than only a display recompute — not a new,
+separate polling mechanism. Manual refresh should reuse the existing
+pull-to-refresh gesture rather than adding a new button. Background refresh
+should run every **5 minutes**, which needs `BGTaskScheduler` set up from
+scratch (nothing currently configured). This replaces the build spec's
+previous "15–30 minute widget background refresh, not continuous polling"
+line — that line is now out of date and has been rewritten.
+
+**Known gap called out explicitly, not resolved**: Starling's actual API
+rate limits are still unresearched (build-spec.md §12 flagged this before
+today too). A 30-second foreground poll is a meaningfully more aggressive
+cadence than the old spec language, so this needs confirming against
+current Starling developer docs before implementation starts, especially
+given §4.4's requirement to share one fetch across multiple trackers
+pointed at the same connected source. Also still missing and now spelled
+out in §12: a Keychain read/write wrapper (only the schema field exists),
+any HTTP client/retry scaffolding, and confirmation of the background-fetch
+entitlement/`Info.plist` state.
+
+### Verifying this session's changes
+
+No code changed — this was a docs-only planning session. Nothing to build
+or run; the build-spec.md and this file are the only diffs.
