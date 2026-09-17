@@ -100,12 +100,12 @@ struct RingsView: View {
 
     /// The gap between the outer and inner ring, scaled to `lineWidth`
     /// rather than a flat constant — a flat gap (previously `lineWidth +
-    /// 10`) is barely noticeable on the 260pt dashboard but swallows nearly
-    /// the whole inner ring at list-row/widget sizes (e.g. a 36pt row with
-    /// `lineWidth: 5` was left with a 30pt total inset, shrinking the inner
-    /// ring to an unreadable blob). Proportional to `lineWidth` keeps the
-    /// same visual relationship at every size this view is used at.
-    private var ringGap: CGFloat { lineWidth }
+    /// 10`, then `lineWidth`) is proportional at every size this view is
+    /// used at, but Apple's own Fitness rings sit much closer together than
+    /// that — a very thin sliver of a gap, not a whole ring-width of space.
+    /// Scaling to a small fraction of `lineWidth` instead keeps that same
+    /// tight, nested look regardless of size.
+    private var ringGap: CGFloat { lineWidth * 0.15 }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -268,8 +268,16 @@ struct RingsView: View {
     /// visibly drifted apart — a floating dot detached from the arc's actual
     /// tip. The round line cap alone gives the same soft-tip look with no
     /// second, separately-animated element that can desync.
+    /// A ring that's essentially closed gets a short extra arc laid on top
+    /// of its start, overlapping itself by this fraction — matching how
+    /// Apple's own Fitness rings visibly overlap their own starting point
+    /// once a ring closes, rather than the two round caps just meeting
+    /// edge-to-edge.
+    private let closureOverlapFraction = 0.025
+
     private func ring(fraction: Double, color: Color) -> some View {
         let opacity = progressOpacity(for: fraction)
+        let isClosed = fraction >= 0.999
         return ZStack {
             Circle()
                 .stroke(color.opacity(0.18), lineWidth: lineWidth)
@@ -277,6 +285,12 @@ struct RingsView: View {
                 .trim(from: 0, to: fraction)
                 .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .opacity(opacity)
+            if isClosed {
+                Circle()
+                    .trim(from: 0, to: closureOverlapFraction)
+                    .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .opacity(opacity)
+            }
         }
         .rotationEffect(.degrees(-90))
     }
