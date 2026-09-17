@@ -161,15 +161,6 @@ struct TrackerDetailView: View {
                     #endif
                 }
 
-                VStack(spacing: 2) {
-                    Text(periodRangeText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(periodRemainingText)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
                 if tracker.latestReading == nil {
                     Text("No readings logged yet — log one to see your pace.")
                         .font(.footnote)
@@ -190,6 +181,7 @@ struct TrackerDetailView: View {
         }
         #endif
         .navigationTitle(tracker.name)
+        .navigationSubtitle(dashboardSubtitle)
         .inlineNavigationBarIfAvailable()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -453,13 +445,22 @@ struct TrackerDetailView: View {
         .minute()
 
     /// "12 Jan, 9:00 AM – 19 Jan, 9:00 AM" — the tracker's own bounds,
-    /// distinct from `periodRemainingText`'s live countdown below it.
+    /// distinct from `periodRemainingText`'s live countdown alongside it.
     private var periodRangeText: String {
         "\(tracker.startDate.formatted(Self.periodRangeFormatter)) \u{2013} \(tracker.endDate.formatted(Self.periodRangeFormatter))"
     }
 
     private var periodRemainingText: String {
         tracker.periodRemainingText(asOf: now, until: zoomWindowEnd)
+    }
+
+    /// "12 Jan, 9:00 AM – 19 Jan, 9:00 AM · 3 days remaining" — the
+    /// tracker's own bounds and live countdown, combined into the
+    /// navigation bar's subtitle rather than sitting as their own row in
+    /// the scrollable content, so they read as context for the screen
+    /// (right under its title) rather than another dashboard figure.
+    private var dashboardSubtitle: String {
+        "\(periodRangeText) \u{00B7} \(periodRemainingText)"
     }
 
     /// Segmented zoom-level control (§4.5, §7.1) sitting above the rings —
