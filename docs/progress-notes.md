@@ -1,7 +1,31 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Foreground auto-refresh removed entirely — fully
+after **2026-09-18 Update History rendering blank on macOS** — reported
+right after the foreground auto-refresh removal below (real multi-device
+testing): the Starling tracker's Update History sheet showed nothing on
+macOS while iOS correctly listed its readings. Worked through by
+elimination rather than guessing at a sync gap first: `TrackerDetailView`'s
+"Update History" menu item is itself gated on `!tracker.sortedReadings
+.isEmpty`, so the fact the user could open this screen at all already
+proved macOS's local `tracker` had readings — ruling out "the readings
+never synced" as the explanation and pointing at the screen's own
+rendering instead. `ReadingHistoryView` had no explicit sizing anywhere,
+and its empty-state fallback (`WiggleEmptyState`) is pure `Spacer()`-driven
+with no intrinsic height of its own — a combination that, evidently, can
+render a macOS sheet's content area with nothing visibly showing rather
+than a clean empty state or a visible list. Fixed with an explicit
+`.frame(minWidth: 360, minHeight: 320)` on the screen and `.listStyle(.plain)`
+on the reading list (`TrackerListView`'s own list already used `.plain`
+elsewhere; `ReadingHistoryView`'s never had a style set at all). `xcodebuild
+build` succeeded on both `platform=macOS` and `generic/platform=iOS`.
+**Not yet visually re-verified** — this session has no macOS screen
+automation available (deliberately avoided after an earlier incident
+this same project, see the 2026-09-18 Settings-redesign entries below,
+where blind coordinate-based clicking mis-hit other apps), so this fix
+is code-reasoned rather than screenshot-confirmed; worth a look on a
+real rebuild to confirm the sheet now shows the readings.
+Before that, **2026-09-18 Foreground auto-refresh removed entirely — fully
 manual, always-refresh-on-open** — a direct, deliberate follow-up once
 real multi-device testing (the same session that verified sync end-to-end
 for manual trackers, Connected Sources, and a Starling tracker, all

@@ -55,8 +55,16 @@ struct ReadingHistoryView: View {
                     }
                     .onDelete(perform: deleteAction)
                 }
+                .listStyle(.plain)
             }
         }
+        // Explicit minimum size — this sheet has no other view establishing
+        // one (unlike, say, `SettingsRootView`'s fixed window size), and
+        // `WiggleEmptyState`'s Spacer-driven layout has no intrinsic height
+        // of its own to propose; on macOS specifically, a `Group`/`if-else`
+        // with no size hint at all can size a sheet down to something that
+        // renders its content invisibly small rather than visibly empty.
+        .frame(minWidth: 360, minHeight: 320)
         .navigationTitle("Update History")
         .inlineNavigationBarIfAvailable()
         .toolbar {
