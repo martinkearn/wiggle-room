@@ -1,11 +1,20 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Fix macOS build: `.listSectionSpacing` unavailable +
-`SourceProvider` not class-constrained** — see that entry below for the
-first session in this project's history with a real Xcode/simulator
-toolchain, so these fixes are actually build-verified, not just re-read.
-Before that, **2026-09-18 Move Delete Tracker out of the crowded "…" menu** — on
+after **2026-09-18 macOS Starling requests were silently blocked by App
+Sandbox (missing network entitlement)** — a real, previously-undiscovered
+bug found and fixed this session (not the earlier Keychain→CloudKit
+token-storage fix regressing), plus **2026-09-18 Settings screen looked
+broken; consolidated all macOS config into Settings** just before it (the
+macOS Settings window's Add/Reconnect Source flow switched from a broken
+`NavigationLink` push to the app's usual sheet pattern, and which tracker
+the menu bar shows moved from a submenu in the dropdown into a new
+Settings → General pane). Before those, **2026-09-18 Fix macOS build:
+`.listSectionSpacing` unavailable + `SourceProvider` not
+class-constrained** — see that entry below for the first session in this
+project's history with a real Xcode/simulator toolchain, so fixes from
+that point on are actually build-verified, not just re-read. Before that,
+**2026-09-18 Move Delete Tracker out of the crowded "…" menu** — on
 the dashboard's "…" menu, Edit Tracker and Delete Tracker (destructive) sat
 directly adjacent with no visual separation, a real mis-tap risk on iOS.
 Delete now lives in its own section at the bottom of the Edit Tracker
@@ -2126,3 +2135,139 @@ before left-aligning the label within it.
 succeeded. Not re-confirmed visually in a live menu bar — same
 Accessibility/Screen Recording permission gap as the previous two
 entries.
+
+## 2026-09-18 Settings screen looked broken; consolidated all macOS config into Settings
+
+User flagged a screenshot of Settings → Connected Sources → Reconnect
+looking broken: a cramped back-chevron-plus-"Reconnect" bar squeezed above
+the form, and the "Personal Access Token" label nearly touching the
+window's left edge. Separately asked for a broader macOS design/HIG pass,
+and mid-session added: every configurable thing in the macOS app should
+live in Settings — including which tracker the menu bar item shows,
+currently a "Show in Menu Bar" submenu buried inside the menu bar
+dropdown itself.
+
+**Root cause of the broken Reconnect screen**: `ConnectedSourcesView`
+(the Settings window's content) pushed `AddSourceView` via `NavigationLink`
+inside its own `NavigationStack` — the only place in the app still using
+push/back navigation for an add/edit flow. Everywhere else on macOS
+(`AddTrackerView` from `MacRootView`, `ReadingHistoryView` from
+`TrackerDetailView`) presents this kind of screen as a **sheet** wrapping
+a fresh `NavigationStack`, which is what gives those screens a clean
+title bar with Cancel/Save at the corners and no back button. A pushed
+destination inside the Settings scene's own stack instead rendered
+AppKit's real back/forward chrome crammed above the content, and (since
+`AddSourceView` doesn't self-wrap in a `NavigationStack`, relying on
+whatever presented it) inherited the Settings window's own narrow,
+List-driven natural width rather than getting a sensibly-sized sheet of
+its own — hence the squeezed label.
+
+**Fix 1 — Reconnect/Add Source layout**
+(`src/WiggleRoom/Views/ConnectedSourcesView.swift`): on macOS only, rows
+are now `Button`s that set `sourceToReconnect`/`isPresentingAddSource`,
+presented via `.sheet(item:)`/`.sheet(isPresented:)` wrapping
+`AddSourceView` in its own `NavigationStack` — exactly the established
+sheet pattern. iOS keeps the original `NavigationLink` push (normal,
+expected iOS Settings-style navigation — this was never broken there).
+Added `.frame(minWidth: 420, minHeight: ...)` to the Settings window and
+both sheets so the label column always has reasonable room regardless of
+content.
+
+**Fix 2 — configuration consolidated into Settings**: the macOS `Settings`
+scene (`WiggleRoomApp.swift`) is now a two-tab `TabView` — **General**
+(new `src/WiggleRoom/Views/GeneralSettingsView.swift`, a `Picker` for
+which tracker the menu bar shows, reusing the exact `@AppStorage`
+key/fallback logic `MenuBarStatusView` already had) and **Connected
+Sources** (the existing view, unchanged in content). The "Show in Menu
+Bar" `Menu` was removed from `MenuBarStatusView`'s dropdown entirely; a
+`SettingsLink` row ("Settings…") replaces it as the way to reach that
+picker now that it isn't in the dropdown itself — without it, closing the
+main window would leave no way back into Settings at all. `menuBarTrackerIDKey`
+(previously `private` in `MenuBarStatusView.swift`) is now internal so
+`GeneralSettingsView` can read/write the same `UserDefaults` key.
+
+**Not changed**: Add/Edit Tracker stays a sheet from the main window, not
+a Settings pane — it's per-tracker action, not app configuration, so it
+doesn't belong alongside General/Connected Sources.
+
+### Verifying this session's changes
+
+`xcodebuild -scheme WiggleRoom -destination 'platform=macOS' build` and
+`-destination 'generic/platform=iOS Simulator' build` both succeeded — a
+real build on both platforms, not a syntax check. Not visually confirmed
+in a live Settings window or menu bar dropdown — same Accessibility/
+Screen Recording permission gap as every entry in this stretch. Worth a
+real look at: Settings → General's picker, Settings → Connected Sources'
+Add/Reconnect sheets (both empty-state and populated), and the menu bar
+dropdown's new "Settings…" row actually opening the Settings window.
+
+## 2026-09-18 macOS Starling requests were silently blocked by App Sandbox (missing network entitlement)
+
+User reported "Couldn't reach Starling — check your connection" on a real
+Mac and asked specifically whether the earlier Keychain→CloudKit token-
+storage fix (§5.3/§11, 2026-09-17) had regressed on macOS. It hadn't —
+this is a distinct, previously-undiscovered bug: **macOS App Sandbox was
+blocking all outbound network connections from the app**, unrelated to
+the token itself.
+
+**Diagnosis**: the `WiggleRoom` Xcode target's build settings set
+`ENABLE_APP_SANDBOX = YES` (`src/WiggleRoom.xcodeproj/project.pbxproj`),
+which puts the macOS build under App Sandbox — Xcode auto-injects
+`com.apple.security.app-sandbox = true` into the compiled binary's
+entitlements at sign time from that build setting alone, even though the
+checked-in `WiggleRoom/WiggleRoom.entitlements` file never literally
+listed it. Confirmed directly against the actually compiled/signed app
+(`codesign -d --entitlements :- .../WiggleRoom.app`): `com.apple.security
+.app-sandbox` was present, but `com.apple.security.network.client` was
+not. Under App Sandbox, **outbound network connections are blocked
+entirely** without that entitlement — every Starling API call
+(`StarlingAPIClient`'s `URLSession.data(for:)`) would fail at the
+networking layer regardless of whether the stored token was valid,
+producing exactly `StarlingAPIError.network` → "Couldn't reach Starling
+— check your connection." This was confirmed reproducible in this
+session's own sandboxed environment too, independently, before the real
+cause was traced: launching the built app and letting it attempt a
+Starling call showed `dnssd_clientstub ConnectToServer... Operation not
+permitted` / DNS resolution failure in the system log — the same failure
+signature App Sandbox produces for any process lacking
+`network.client`, while a plain `curl` from a Bash shell (a separate,
+unsandboxed process) reached `api.starlingbank.com` from the exact same
+machine without issue at the same time.
+
+This gap had no way to surface before now — every prior session working
+on the Starling integration had no Swift toolchain at all (see the long
+run of "not verified by a compiler" entries through this file), so
+nobody had ever actually run a signed, sandboxed macOS build of this code
+until this session.
+
+**Fix** (`src/WiggleRoom/WiggleRoom.entitlements`): added
+`com.apple.security.network.client = true` directly to the entitlements
+plist. Re-verified against the actually compiled/signed binary after
+rebuilding — `codesign -d --entitlements :-` now shows the key present.
+iOS has no App Sandbox concept at all, so this entitlement is inert
+there — no risk of a cross-platform regression from adding it.
+
+**Not a token/CloudKit-sync issue**: worth stating plainly since that was
+the user's explicit question — `ConnectedSource.credentialToken` was
+being stored and synced correctly the whole time. CloudKit sync itself
+goes through a privileged system XPC path that isn't blocked by the
+missing `network.client` entitlement (that's specifically why CloudKit
+sync appeared to work fine while direct Starling HTTPS calls failed
+outright) — this made the symptom look confusingly selective ("sync
+works, but Starling itself doesn't") rather than a blanket "no network at
+all" failure, which is what actually made it easy to initially suspect
+the token/sync layer instead of entitlements.
+
+### Verifying this session's changes
+
+`xcodebuild -scheme WiggleRoom -destination 'platform=macOS' build`
+succeeded, and `codesign -d --entitlements :-` on the rebuilt,
+freshly-signed `.app` confirms `com.apple.security.network.client` is
+now present — this is a deterministic, well-documented OS-level
+restriction (App Sandbox either grants outbound networking or it
+doesn't), not a "might still fail" fix. **Not verified end-to-end**: this
+machine has no iCloud account signed in and no real Starling token
+available, so an actual successful Starling fetch from the running app
+wasn't observed directly in this session — re-confirming against a real
+Starling account on a real Mac (the exact scenario the user reported)
+would close this out completely.
