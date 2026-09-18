@@ -98,10 +98,25 @@ struct WiggleRoomApp: App {
         #endif
 
         #if os(macOS)
+        // Every configurable thing in the app lives here — General (which
+        // tracker the menu bar item shows) and Connected Sources both, as
+        // of 2026-09-18 — rather than splitting configuration between
+        // Settings and a submenu tucked inside the menu bar dropdown.
         Settings {
-            ConnectedSourcesView()
-                .environment(store)
-                .modelContainer(modelContainer)
+            TabView {
+                GeneralSettingsView()
+                    .environment(store)
+                    .modelContainer(modelContainer)
+                    .tabItem {
+                        Label("General", systemImage: "gearshape")
+                    }
+                ConnectedSourcesView()
+                    .environment(store)
+                    .modelContainer(modelContainer)
+                    .tabItem {
+                        Label("Connected Sources", systemImage: "point.3.filled.connected.trianglepath.dotted")
+                    }
+            }
         }
         #endif
 

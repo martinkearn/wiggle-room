@@ -23,6 +23,17 @@ struct ConnectedSourcesView: View {
 
     @State private var sourcePendingRemoval: ConnectedSource?
     @State private var removalBlockedMessage: String?
+    #if os(macOS)
+    // macOS deliberately doesn't use push/back navigation here (see the
+    // #else branch below and the 2026-09-18 progress-notes entry) — Add/
+    // Reconnect are presented as sheets instead, the same pattern already
+    // used everywhere else in the app on macOS (AddTrackerView,
+    // ReadingHistoryView). A NavigationLink push into this Settings
+    // window's own NavigationStack rendered as a cramped back-chevron/
+    // title bar with a squeezed label column, not a native-looking pane.
+    @State private var isPresentingAddSource = false
+    @State private var sourceToReconnect: ConnectedSource?
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -35,10 +46,21 @@ struct ConnectedSourcesView: View {
                     )
                 } else {
                     List(addedSources) { source in
-                        NavigationLink {
-                            AddSourceView(existingSource: source)
-                        } label: {
-                            row(for: source)
+                        Group {
+                            #if os(macOS)
+                            Button {
+                                sourceToReconnect = source
+                            } label: {
+                                row(for: source)
+                            }
+                            .buttonStyle(.plain)
+                            #else
+                            NavigationLink {
+                                AddSourceView(existingSource: source)
+                            } label: {
+                                row(for: source)
+                            }
+                            #endif
                         }
                         .swipeActions {
                             Button(role: .destructive) {
@@ -53,11 +75,19 @@ struct ConnectedSourcesView: View {
             .navigationTitle("Connected Sources")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
+                    #if os(macOS)
+                    Button {
+                        isPresentingAddSource = true
+                    } label: {
+                        Label("Add Source", systemImage: "plus")
+                    }
+                    #else
                     NavigationLink {
                         AddSourceView()
                     } label: {
                         Label("Add Source", systemImage: "plus")
                     }
+                    #endif
                 }
             }
             .confirmationDialog(
@@ -89,6 +119,21 @@ struct ConnectedSourcesView: View {
                 Text(removalBlockedMessage ?? "")
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 320)
+        .sheet(isPresented: $isPresentingAddSource) {
+            NavigationStack {
+                AddSourceView()
+            }
+            .frame(minWidth: 420, minHeight: 260)
+        }
+        .sheet(item: $sourceToReconnect) { source in
+            NavigationStack {
+                AddSourceView(existingSource: source)
+            }
+            .frame(minWidth: 420, minHeight: 260)
+        }
+        #endif
     }
 
     private func row(for source: ConnectedSource) -> some View {

@@ -10,8 +10,12 @@ import AppKit
 
 /// `UserDefaults` key for the user's chosen menu-bar tracker (§7.2) — a
 /// per-Mac UI preference, not synced data, so it's a plain `@AppStorage`
-/// value rather than anything routed through SwiftData/CloudKit.
-private let menuBarTrackerIDKey = "menuBarTrackerID"
+/// value rather than anything routed through SwiftData/CloudKit. Not
+/// `private`: `GeneralSettingsView` reads/writes the same key, since
+/// choosing the menu bar tracker now lives in Settings (§7.2's 2026-09-18
+/// "everything configurable belongs in Settings" pass) rather than in a
+/// submenu inside the status item's own dropdown.
+let menuBarTrackerIDKey = "menuBarTrackerID"
 
 /// Resolves the tracker the menu bar should show: the user's explicit pin
 /// if it still exists, falling back to the most-recently-started tracker
@@ -23,11 +27,11 @@ private func resolveMenuBarTracker(pinnedID: String, in trackers: [Tracker]) -> 
 
 /// macOS menu bar item (§7.2): the same two-ring visual as the iOS
 /// dashboard/`TrackerDetailView`, plus the ahead/behind figure, for one
-/// tracker. Defaults to the most recently started tracker, but the user can
-/// pin a specific one via the "Show in Menu Bar" submenu below — a single
-/// pinned tracker rather than a submenu of full dashboards, the simpler of
-/// the two options the spec leaves to the build's judgment, good enough
-/// until real usage shows more is needed.
+/// tracker. Defaults to the most recently started tracker; which tracker to
+/// pin instead is chosen in **Settings → General** (`GeneralSettingsView`),
+/// not from a submenu here — a glanceable status-item dropdown shouldn't
+/// double as a configuration surface, and every other configurable thing in
+/// the app (Connected Sources) already lives in Settings, so this matches.
 ///
 /// Presented via `.menuBarExtraStyle(.window)` (`WiggleRoomApp.swift`), not
 /// `.menu` — `.menu` renders this as a real AppKit `NSMenu`, which (a)
@@ -94,26 +98,20 @@ struct MenuBarStatusView: View {
             // `alignment: .leading` alone doesn't produce the flush-left,
             // native-menu-like look these rows are going for.
             VStack(alignment: .leading, spacing: 2) {
-                if trackers.count > 1 {
-                    Menu("Show in Menu Bar") {
-                        ForEach(trackers) { candidate in
-                            Button {
-                                pinnedTrackerID = candidate.id.uuidString
-                            } label: {
-                                if candidate.id == tracker?.id {
-                                    Label(candidate.name, systemImage: "checkmark")
-                                } else {
-                                    Text(candidate.name)
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
                 Button("Open Wiggle Room") {
                     NSApp.activate(ignoringOtherApps: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // SettingsLink (not a plain Button) opens the app's real
+                // Settings window (⌘,) — the only way to reach it without
+                // the main window already being frontmost, now that
+                // choosing the menu bar tracker lives there instead of in
+                // the submenu this replaced.
+                SettingsLink {
+                    Text("Settings\u{2026}")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderless)
                 Button("Quit Wiggle Room") {
                     NSApp.terminate(nil)
                 }
