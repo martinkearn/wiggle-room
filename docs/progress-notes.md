@@ -1,7 +1,13 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 macOS Starling requests were silently blocked by App
+after **2026-09-18 Reconnect sheet had no Cancel; trimmed the PAT footer;
+menu bar item now survives closing the main window** — a same-day
+follow-up fixing a missing Cancel button on the new macOS Reconnect
+sheet, shortening its token-field footer text, and adding an
+`NSApplicationDelegate` so the menu bar item (and the app) survives
+closing the main window rather than quitting with it. Before that,
+**2026-09-18 macOS Starling requests were silently blocked by App
 Sandbox (missing network entitlement)** — a real, previously-undiscovered
 bug found and fixed this session (not the earlier Keychain→CloudKit
 token-storage fix regressing), plus **2026-09-18 Settings screen looked
@@ -2271,3 +2277,55 @@ available, so an actual successful Starling fetch from the running app
 wasn't observed directly in this session — re-confirming against a real
 Starling account on a real Mac (the exact scenario the user reported)
 would close this out completely.
+
+## 2026-09-18 Reconnect sheet had no Cancel; trimmed the PAT footer; menu bar item now survives closing the main window
+
+Same-day follow-up from a fresh screenshot of the new macOS Reconnect
+sheet: the "back-chevron/squeezed-label" problem from the earlier entry
+was gone, but the sheet had no way to dismiss it besides Esc — a lone
+"Reconnect" button sat bottom-trailing with nothing next to it. Also
+flagged: the token field's footer text was too long, and a question
+about whether the menu bar item can stay up even when the app's main
+window isn't open.
+
+**Fix 1 — missing Cancel button**
+(`src/WiggleRoom/Views/AddSourceView.swift`): `AddSourceView` never had a
+`.cancellationAction` toolbar item at all — on iOS this didn't matter
+because it's still pushed via `NavigationLink` there, which gets a free
+back button; but now that macOS presents it as a sheet (previous entry),
+there was genuinely no dismiss affordance besides Esc. Added
+`ToolbarItem(placement: .cancellationAction) { Button("Cancel") {
+dismiss() } }`, gated `#if os(macOS)` since iOS's back button already
+covers it and doesn't need a second, redundant Cancel.
+
+**Fix 2 — footer text trimmed**: `tokenFieldFooter` dropped from three
+sentences (where to get a token + scopes, an iCloud-sync explanation, and
+— for reconnect — a "this replaces the current token" note) down to one:
+"Generate a personal access token at developer.starlingbank.com with
+account:read and balance:read scopes." Per explicit request — just where
+to get the token and the scopes needed, nothing else. The reconnect-only
+branch (`existingSource != nil`) is gone too, so the footer is now
+identical for Add and Reconnect.
+
+**Fix 3 — menu bar item didn't survive closing the main window**: SwiftUI
+terminates a macOS app once its last window closes by default, which
+would take the `MenuBarExtra` down with it — defeating the entire point
+of a menu bar item (glanceable status with no window open). Added
+`src/WiggleRoom/AppDelegate.swift`, a minimal `NSApplicationDelegate`
+overriding `applicationShouldTerminateAfterLastWindowClosed` to return
+`false`, wired in via `@NSApplicationDelegateAdaptor(AppDelegate.self)`
+in `WiggleRoomApp` (macOS only). Closing the main window now just closes
+the window — the app keeps running, the menu bar item stays up, and
+"Open Wiggle Room" in its dropdown brings the main window back.
+
+### Verifying this session's changes
+
+`xcodebuild -scheme WiggleRoom -destination 'platform=macOS' build` and
+`-destination 'generic/platform=iOS Simulator' build` both succeeded.
+Not visually/behaviorally confirmed — same Accessibility/Screen Recording
+gap as this whole stretch of entries. Fix 3 in particular is worth a real
+check: close the main window (red button, not Cmd+Q) and confirm the
+menu bar item is still there and "Open Wiggle Room" brings the window
+back, and separately confirm Cmd+Q from the menu bar's "Quit Wiggle
+Room" still fully quits (this change only touches the last-window-closed
+path, not an explicit quit).
