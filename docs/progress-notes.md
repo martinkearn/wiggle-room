@@ -1,7 +1,15 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Reconnect sheet had no Cancel; trimmed the PAT footer;
+after **2026-09-18 Settings window padding, fixed and actually verified
+on real screenshots** — this session gained real Accessibility/Screen
+Recording permission mid-way through and used it to drive the actual
+running app and screenshot it directly, rather than inferring layout
+from code; found and fixed a real dead-space bug in the Reconnect sheet
+(a forced `minHeight` fighting `Form`'s own fill-to-height behavior) and
+gave the Settings window's `TabView` an explicit, deliberate size instead
+of AppKit's implicit "largest tab" heuristic. Before that, **2026-09-18
+Reconnect sheet had no Cancel; trimmed the PAT footer;
 menu bar item now survives closing the main window** — a same-day
 follow-up fixing a missing Cancel button on the new macOS Reconnect
 sheet, shortening its token-field footer text, and adding an
@@ -2329,3 +2337,71 @@ menu bar item is still there and "Open Wiggle Room" brings the window
 back, and separately confirm Cmd+Q from the menu bar's "Quit Wiggle
 Room" still fully quits (this change only touches the last-window-closed
 path, not an explicit quit).
+
+## 2026-09-18 Settings window padding, fixed and actually verified on real screenshots
+
+User pushed back that the Settings padding "still" didn't look right, and
+asked to actually look at the screen being designed rather than keep
+guessing — a fair complaint, since every prior entry in this stretch
+could only reason from code and the user's own screenshots. This session
+gained real Accessibility/Screen Recording permission partway through
+(confirmed by retrying `screencapture`, which had failed identically
+earlier), and from that point on every claim below was checked against a
+real, running instance of the app — `open` the built `.app`,
+`osascript`/System Events to drive it (`tell application "System Events"
+to keystroke ","` for ⌘,, and clicking accessibility elements resolved
+via `get entire contents` rather than guessed screen coordinates), and
+`screencapture -x` plus reading the resulting PNG to actually see the
+result. This is a meaningfully different verification bar than anything
+else in this file — genuinely seeing the screen, not inferring it.
+
+**Bug found by screenshot**: the Reconnect sheet (`AddSourceView`,
+previous entries) had a large dead-space gap between the token field's
+footer text and the Cancel/Reconnect button bar at the bottom — visually
+confirmed, not assumed. Root cause: `ConnectedSourcesView.swift`'s two
+`.sheet` presentations had `.frame(minWidth: 420, minHeight: 260)`, and
+macOS `Form` stretches to fill whatever height it's given rather than
+hugging its own content — the forced `minHeight` was itself the bug.
+**Fix**: dropped `minHeight` entirely from both sheets and the main
+Settings window's own frame, keeping only `minWidth: 420` for label
+comfort. Re-screenshotted after rebuilding: the sheet now hugs its
+content tightly, gap gone.
+
+**Second thing found only by comparing tabs directly**: even after that
+fix, the main Settings window (not a sheet) still showed a lot of empty
+space below Connected Sources' one row. Screenshotting the General tab
+back-to-back at the same window size (a single Picker row + caption)
+confirmed this wasn't a per-view bug — both tabs render at exactly the
+same size, because a `TabView`-based `Settings` scene keeps one
+consistent window size across every tab (the same convention System
+Settings itself uses, so switching tabs doesn't visibly resize the
+window) rather than auto-sizing per tab. That's correct, native macOS
+behavior, not something to "fix" by fighting the shared-size convention
+— but the specific size AppKit was landing on by its own implicit
+heuristic was bigger than either tab actually needed. **Fix**: added an
+explicit `.frame(width: 480, height: 340)` directly on the `TabView` in
+`WiggleRoomApp.swift`, a deliberate size choice (not a min/max) verified
+against real screenshots of both tabs at that exact size — General's row
++ caption and Connected Sources' row + toolbar both sit comfortably
+without either looking sparse or needing to scroll for a few sources.
+
+**Also fixed, prompted by the same screenshot pass**: `tokenFieldFooter`
+was trimmed (previous entry, before this one) but hadn't been re-verified
+visually until now — confirmed correct at "Generate a personal access
+token at developer.starlingbank.com with account:read and balance:read
+scopes." with no leftover extra sentence.
+
+### Verifying this session's changes
+
+Unlike every other entry in this file, this one **is** visually verified
+— real screenshots of the Reconnect sheet (before and after) and both
+Settings tabs (before and after the fixed frame), all against the
+actual, running, freshly-rebuilt app, not inferred from code or
+described secondhand. `xcodebuild build` succeeded for both
+`platform=macOS` and `generic/platform=iOS Simulator` after each change.
+One thing not re-verified: a macOS password-autofill popover appeared
+over the Personal Access Token field during one automated click pass
+(a system feature reacting to the field gaining focus, unrelated to any
+code here) — worth being aware it can appear over that field in normal
+use, though it's standard macOS behavior for any secure text field, not
+something this app controls or should suppress.
