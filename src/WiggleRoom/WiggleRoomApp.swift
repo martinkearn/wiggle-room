@@ -114,7 +114,15 @@ struct WiggleRoomApp: App {
             MenuBarStatusLabel()
                 .modelContainer(modelContainer)
         }
-        .menuBarExtraStyle(.menu)
+        // `.window`, not `.menu`: `.menu` renders this dropdown as a real
+        // AppKit NSMenu, which forces any content that isn't a
+        // Button/Toggle/Menu control (plain Text/VStack rows, here) into
+        // AppKit's dimmed "informational item" style — the "everything's
+        // greyed out" look reported 2026-09-18 — and can't host an
+        // arbitrary custom view like RingsView at all. `.window` presents
+        // genuine SwiftUI content in a floating panel instead, so both the
+        // text and the rings render normally.
+        .menuBarExtraStyle(.window)
         #endif
     }
 }
