@@ -1,7 +1,15 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Settings window padding, fixed and actually verified
+after **2026-09-18 Settings redesign: sidebar + inline editing, not tabs
++ sheets** — replaced the icon-tab-bar Settings window with a fixed
+sidebar (`SettingsRootView`) and moved Connected Sources to fully inline
+editing on macOS (no pop-ups at all), added a "Connected"/"Not
+Connected" status badge and an unhidden, growable token field (a
+deliberate, user-confirmed choice — see that entry's security note), and
+made the menu bar ring keep its number while dropping its status word.
+Verified via real screenshots on both macOS and iOS this time. Before
+that, **2026-09-18 Settings window padding, fixed and actually verified
 on real screenshots** — this session gained real Accessibility/Screen
 Recording permission mid-way through and used it to drive the actual
 running app and screenshot it directly, rather than inferring layout
@@ -2405,3 +2413,115 @@ over the Personal Access Token field during one automated click pass
 code here) — worth being aware it can appear over that field in normal
 use, though it's standard macOS behavior for any secure text field, not
 something this app controls or should suppress.
+
+## 2026-09-18 Settings redesign: sidebar + inline editing, not tabs + sheets
+
+User pushed back hard on the just-built Settings window: "the basic
+layout is not how settings pages work in macOS apps... navigation
+[should be] on the side... I don't expect the 'add source' button to be
+part of the main navigation, that should be within sources... source
+details [shouldn't be] their own pop-up... they should just be editable
+inside source screen, model this on Claude's own settings page." A fair,
+specific critique — the previous session had built an icon-tab-bar
+`TabView` with a sheet-based Add/Reconnect flow, which is the *older*
+macOS Settings convention (pre-Ventura System Preferences), not the
+sidebar-plus-inline-content style modern macOS System Settings (and
+Claude's own desktop app) actually use.
+
+**Replaced entirely.** New `src/WiggleRoom/Views/SettingsRootView.swift`:
+a fixed, non-collapsing sidebar (`List(selection:)`, deliberately a plain
+`HStack` rather than `NavigationSplitView` — the latter brings a
+draggable/collapsible divider neither System Settings' own sidebar nor
+this one has) alongside a `ScrollView` showing whichever pane is
+selected. `GeneralSettingsView` lost its own `Form`/frame chrome (that
+scene structure moved up to `SettingsRootView`) and is now plain content
+laid directly into the pane.
+
+**Connected Sources changes most**, on macOS only (iOS keeps its
+original List + NavigationLink + full-screen `AddSourceView` push —
+normal, correct iOS Settings navigation, never the thing that was
+broken): no more sheet at all. `SourceEditorCard` edits a source
+directly inline — the name is a live `@Bindable` binding to
+`source.displayName` (saved on every change, no explicit save step,
+since renaming needs no validation), while the token has its own local
+draft and an explicit "Update" button (network validation against
+Starling genuinely needs a deliberate action, unlike the name). Adding a
+new source appends an inline `NewSourceCard` to the bottom of the list
+instead of presenting anything modal, and its "Add Source" trigger lives
+inside the Connected Sources pane's own content — not the window's
+shared toolbar, which is what "part of the main navigation" was
+correctly objecting to.
+
+**Also fixed in the same pass, flagged by the same review**: it was
+impossible to tell whether an existing source actually had a working
+token stored — the token field always started blank ("enter a new token
+to reconnect"), giving no signal either way. Since a Starling PAT is
+user-entered, not a system secret, the user explicitly said hiding it
+added friction without real protection ("given that the pa is user
+entered, we do not need to hide it... given it is a very long string we
+can have a bigger input box"). Fixed three ways: (1) the token field now
+pre-fills from `source.credentialToken` instead of starting empty, so
+what's actually stored is directly visible/reviewable/copyable; (2)
+switched from `SecureField` to a plain, monospaced `TextField(axis:
+.vertical)` that grows to fit a token's real length instead of scrolling
+sideways in a single-line box; (3) added an explicit "Connected"/"Not
+Connected" badge (green checkmark / amber) next to each source's name,
+independent of reading the token itself. Per a follow-up message, this
+was extended to `AddSourceView.swift` too (iOS's Reconnect screen, and
+macOS's own separate inline "Add New Source" shortcut from
+`AddTrackerView`, both of which still use it) — same pre-fill, same
+field style, same status row.
+
+**Security note, surfaced live**: while verifying this on a real
+iOS Simulator (the user signed into their own iCloud account there so
+real synced data — including the real Starling connection — would be
+visible), the Reconnect screen's now-unhidden field displayed the
+user's actual, real, full Starling personal access token, which ended up
+captured in a screenshot inside this AI coding session's conversation
+history. Flagged directly to the user rather than silently proceeding:
+recommended rotating that specific token as a precaution now that it's
+been exposed outside the device, and offered a masked-with-tap-to-reveal
+alternative design instead of always-visible-at-rest. **User's explicit
+decision**: keep it as built (always visible, no masking) — this is a
+deliberate, informed choice, not an oversight. Recorded here so the
+tradeoff is on record: opening this screen for an already-connected
+source shows its real credential in full, to anything that can see the
+screen (screenshot, screen share, recording, shoulder-surfing) — the
+same class of exposure that happened during this session's own
+verification.
+
+Also removed the "Show in Menu Bar" tracker-picker's earlier home (none
+— that was already moved to `GeneralSettingsView` in the previous
+session; this entry is just re-confirming it survived the sidebar
+rewrite intact, which it did without changes needed).
+
+**A separate, smaller fix landed in the same session**: the menu bar
+dropdown's ring showed both its status word ("JUST OVER BUDGET") and its
+number — a follow-up request asked to keep the number (not shown
+anywhere else in that compact dropdown) but drop the word (already
+repeated in the rows below the ring). `RingsView` gained
+`showsStatusLabel` (independent of the existing `showsCenterContent`),
+set `false` only in `MenuBarStatusView`.
+
+### Verifying this session's changes
+
+`xcodebuild build` succeeded for both `platform=macOS` and
+`generic/platform=iOS Simulator` after every change in this entry.
+**Real visual verification this time, on both platforms**: the macOS
+sidebar (General and Connected Sources panes) was screenshotted directly
+via `osascript`/`screencapture` against the actual running, freshly
+built app — confirmed rendering correctly. The iOS Reconnect screen
+(pre-filled token, monospaced growing field, "Connected" status badge)
+was confirmed via a real iOS Simulator screenshot, with the user signed
+into their own iCloud account so genuine synced data was visible rather
+than an empty store. **Not independently re-verified**: the macOS
+Connected Sources inline cards specifically (`SourceEditorCard`/
+`NewSourceCard`) — automated clicking in this session repeatedly
+mis-hit and activated unrelated frontmost apps (Microsoft Teams, once
+landing in a live chat's compose box with no message sent; ChatGPT's own
+Settings window once), so further blind macOS UI automation was
+deliberately stopped rather than risking another mis-click near a real
+app with live content. High confidence from code review and from the
+iOS screenshot (same underlying view code, `#if os(macOS)`-gated but
+structurally identical patterns), but worth a real look on macOS
+specifically before treating it as fully confirmed.
