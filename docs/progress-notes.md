@@ -1,7 +1,13 @@
 # Wiggle Room — Progress Notes
 
-Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Surface the bound account read-only, in two places** —
+Status snapshot for picking this work back up. **Last updated 2026-09-18**,
+after **2026-09-18 Menu bar tracker is now user-configurable** — the macOS
+menu bar item defaulted to whichever tracker started most recently with no
+way to change it; added a "Show in Menu Bar" submenu (shown once there's
+more than one tracker) that pins a specific tracker via `@AppStorage`,
+falling back to the old most-recently-started default when nothing's
+pinned or the pinned tracker gets deleted. Before that, **2026-09-17
+Surface the bound account read-only, in two places** —
 confirmed a tracker's connected source/account is already fully locked
 after creation (only the initializer ever sets those fields), then made
 the binding visible rather than editable: a read-only "Account" row in
@@ -1837,3 +1843,48 @@ needs a real build and a look at an actual Starling tracker's Edit screen
 and dashboard to confirm the caption/row render sensibly and don't
 crowd already-tight layouts (the watch app and small widget families
 were deliberately left untouched — no room for this there).
+
+## 2026-09-18 Menu bar tracker is now user-configurable
+
+**Bug reported by the user**: with more than one tracker, the macOS menu
+bar item always showed the most-recently-started tracker, and there was no
+way to pick a different one — `MenuBarStatusView`/`MenuBarStatusLabel`
+both hard-coded `trackers.first` off a `startDate`-descending `@Query`,
+matching the spec's original "simpler of the two options" decision (§7.2)
+but with no escape hatch once that default wasn't the tracker the user
+actually wanted glanceable.
+
+**Fix** (`MenuBarStatusView.swift`):
+
+- Added a module-private `menuBarTrackerIDKey` (`"menuBarTrackerID"`) and a
+  `resolveMenuBarTracker(pinnedID:in:)` helper shared by both views: looks
+  up a tracker by the stored id string, falling back to `trackers.first`
+  (the old default) if nothing's pinned yet or the pinned tracker was
+  since deleted — so a stale id can never produce a blank menu bar.
+- Both `MenuBarStatusView` and `MenuBarStatusLabel` now read the pin via
+  `@AppStorage(menuBarTrackerIDKey)` — a plain per-Mac UI preference in
+  `UserDefaults.standard`, deliberately **not** routed through
+  SwiftData/CloudKit, since which tracker shows in *this* Mac's menu bar
+  isn't data that should follow the user to their other devices.
+- `MenuBarStatusView`'s dropdown gained a "Show in Menu Bar" submenu
+  (`Menu` with a `Button` per tracker, checkmark on the currently-shown
+  one), shown only once there are 2+ trackers — with a single tracker
+  there's nothing to choose between, matching how the old default already
+  behaved correctly for that case.
+
+No changes to `TrackerPace`, `Tracker`, or any other target — this is
+scoped entirely to the macOS menu bar's own two views.
+
+### Verifying this session's changes
+
+**Not verified by a compiler or the Simulator** — this environment has no
+Xcode/Swift toolchain at all (`xcodebuild`/`swiftc`/`xcode-select` all
+unavailable), consistent with every prior entry in this stretch. The
+change follows an established, already-working pattern in this codebase
+(`@AppStorage` + a plain string key, a `Menu`/`Button` list mirroring the
+one already used elsewhere for pickers) rather than anything novel, but
+build in Xcode and manually confirm before trusting it: create 2+
+trackers, open the menu bar item, pick a non-default tracker from "Show in
+Menu Bar", confirm both the label and dropdown update immediately and
+persist across a relaunch, then delete that tracker and confirm the menu
+bar falls back to the most-recently-started one without crashing.
