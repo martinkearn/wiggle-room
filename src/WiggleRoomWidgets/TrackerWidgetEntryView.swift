@@ -111,7 +111,7 @@ struct TrackerWidgetEntryView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Text(pace(for: tracker).status.label(for: tracker))
+                Text(pace(for: tracker).statusLine(for: tracker))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(pace(for: tracker).displayDifference(for: tracker))
@@ -155,7 +155,7 @@ struct TrackerWidgetEntryView: View {
                     .frame(width: 130, height: 130)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(p.status.label(for: tracker).uppercased())
+                    Text(p.statusLine(for: tracker).uppercased())
                         .font(.caption.weight(.bold))
                         .tracking(0.5)
                         .foregroundStyle(p.status.color)
@@ -290,7 +290,7 @@ struct TrackerWidgetEntryView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(p.displayDifference(for: tracker))
                 .font(.wiggleNumber(.caption))
-            Text(tracker.isCompleted(asOf: entry.date) ? "Completed" : p.status.label(for: tracker))
+            Text(tracker.isCompleted(asOf: entry.date) ? "Completed" : p.statusLine(for: tracker))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

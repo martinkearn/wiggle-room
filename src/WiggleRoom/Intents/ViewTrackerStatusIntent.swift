@@ -22,7 +22,7 @@ struct ViewTrackerStatusIntent: AppIntent {
             return .result(dialog: "I couldn't find that tracker.")
         }
         let pace = liveTracker.pace(actualValue: liveTracker.latestReading?.value ?? liveTracker.startingValue)
-        let dialog = "\(liveTracker.name): \(pace.status.label(for: liveTracker)), \(pace.displayDifference(for: liveTracker))."
+        let dialog = "\(liveTracker.name): \(pace.statusLine(for: liveTracker)) \(pace.displayDifference(for: liveTracker))."
         return .result(dialog: IntentDialog(stringLiteral: dialog))
     }
 }
