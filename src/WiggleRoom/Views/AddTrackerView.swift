@@ -273,6 +273,7 @@ struct AddTrackerView: View {
                     #endif
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -479,11 +480,24 @@ struct AddTrackerView: View {
                 Text(unit)
                     .foregroundStyle(.secondary)
             }
-            TextField("0", text: text)
-                .decimalKeyboardIfAvailable()
-                .multilineTextAlignment(.trailing)
-                .fixedSize()
-                .focused($focusedNumberField, equals: field)
+            // Manual placeholder, not `TextField`'s own — same fix as
+            // `LogReadingView.valueInput` (2026-09-18): `.fixedSize()`
+            // sizes to the bound string, not the placeholder, and on
+            // macOS a real `TextField` placeholder has also been seen
+            // rendering alongside genuinely-typed content at once. A
+            // `Text("0")` shown only while `text` is empty sidesteps both.
+            ZStack(alignment: .trailing) {
+                if text.wrappedValue.isEmpty {
+                    Text("0")
+                        .foregroundStyle(.tertiary)
+                        .allowsHitTesting(false)
+                }
+                TextField("", text: text)
+                    .decimalKeyboardIfAvailable()
+                    .multilineTextAlignment(.trailing)
+                    .focused($focusedNumberField, equals: field)
+            }
+            .frame(minWidth: 60, maxWidth: 120)
             if !unit.isEmpty && !Tracker.isCurrencyUnit(unit) {
                 Text(unit)
                     .foregroundStyle(.secondary)

@@ -85,6 +85,7 @@ struct AddSourceView: View {
                 starlingRateLimitSection
             }
         }
+        .formStyle(.grouped)
         .navigationTitle(existingSource == nil ? "Add Source" : "Edit Source")
         .inlineNavigationBarIfAvailable()
         .task { await refreshStarlingCooldown() }

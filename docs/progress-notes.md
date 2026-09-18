@@ -1,7 +1,34 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Update Current Value's macOS layout fixed — collapsed
+after **2026-09-18 macOS number-field/form-styling fixes, round two — the
+first pass wasn't actually enough** — the previous entry's `.fixedSize()`
+fix for the value field's collapsed focus box turned out to only be half
+the problem: a follow-up screenshot showed the placeholder "0" and
+genuinely-typed content (e.g. "850") rendering **at the same time, side
+by side** ("£ 0    850"), which the earlier `.frame()` fix alone couldn't
+have caused or fixed — a separate, real AppKit/SwiftUI placeholder
+quirk at this large custom font size on macOS, not just a sizing bug.
+Fixed properly this time by not using `TextField`'s own placeholder
+parameter at all: a manual `Text("0")` sits behind the field in a
+`ZStack`, present only while the bound string is genuinely empty and
+hard-removed (not faded) the instant real text exists, so the two
+literally cannot both be on screen. Same screenshot round also showed
+`AddTrackerView`'s "New Tracker" screen with the *identical* collapsed-field
+bug in its own Budget fields (`unitValueField`, which had the same
+`.fixedSize()` call, never touched by the first pass since only
+`LogReadingView` had been reported at the time) — fixed the same way.
+Also addressed, from the same "poor use of space" complaint: none of
+`AddTrackerView`/`LogReadingView`/`AddSourceView`'s `Form`s had an
+explicit `.formStyle` at all, so macOS fell back to sections running
+together with no visual grouping between them — all three now use
+`.formStyle(.grouped)`. `xcodebuild build` succeeded on both
+`platform=macOS` and `generic/platform=iOS`. **Still not visually
+re-verified this session** (no macOS screen automation available,
+consistent with the last several entries) — given the first attempt at
+this exact class of bug wasn't sufficient, this one specifically is
+worth a careful real look before assuming it's actually fixed this time.
+Before that, **2026-09-18 Update Current Value's macOS layout fixed — collapsed
 value field, old-style date picker** — reported straight after the
 Update History fix directly below, from a screenshot: the value entry
 field showed a large "£0" but the actual focusable/highlighted box was a

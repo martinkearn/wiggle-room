@@ -45,6 +45,7 @@ struct LogReadingView: View {
                     }
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(existingReading == nil ? "Update Current Value" : "Edit Update")
             .inlineNavigationBarIfAvailable()
             .toolbar {
@@ -89,20 +90,30 @@ struct LogReadingView: View {
                     .font(.wiggleNumber(size: 34))
                     .foregroundStyle(.secondary)
             }
-            TextField("0", text: $valueText)
-                .decimalKeyboardIfAvailable()
-                .focused($isValueFieldFocused)
-                .font(.wiggleNumber(size: 34))
-                .multilineTextAlignment(.center)
-                .textFieldStyle(.plain)
-                // Explicitly sized rather than `.fixedSize()` — that
-                // modifier sizes a `TextField` to fit its *bound string's*
-                // content, not its placeholder, so with `valueText` empty
-                // it collapsed the field's real interactive/focus box down
-                // to almost nothing on macOS while the "0" placeholder
-                // still visually painted outside that tiny box — exactly
-                // the "leading 0, broken layout" look reported 2026-09-18.
-                .frame(minWidth: 80, maxWidth: 160)
+            // A real `TextField("0", text:)` placeholder kept showing
+            // alongside real typed content on macOS at this large custom
+            // font size (e.g. "£ 0   850" at once, reported 2026-09-18) —
+            // an AppKit/SwiftUI placeholder-rendering quirk, not just the
+            // earlier `.fixedSize()` sizing bug. Sidestepped entirely by
+            // not using `TextField`'s own placeholder at all: a manual
+            // `Text("0")` sits underneath, shown only while `valueText` is
+            // genuinely empty, hard-removed (not just faded) the instant
+            // real text exists, so the two can never coexist.
+            ZStack {
+                if valueText.isEmpty {
+                    Text("0")
+                        .font(.wiggleNumber(size: 34))
+                        .foregroundStyle(.tertiary)
+                        .allowsHitTesting(false)
+                }
+                TextField("", text: $valueText)
+                    .decimalKeyboardIfAvailable()
+                    .focused($isValueFieldFocused)
+                    .font(.wiggleNumber(size: 34))
+                    .multilineTextAlignment(.center)
+                    .textFieldStyle(.plain)
+            }
+            .frame(minWidth: 80, maxWidth: 160)
             if !tracker.isCurrencyUnit {
                 Text(tracker.unit)
                     .font(.wiggleNumber(size: 34))
