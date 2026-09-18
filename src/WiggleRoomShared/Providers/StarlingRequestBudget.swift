@@ -65,4 +65,27 @@ actor StarlingRequestBudget {
             return requestTimestamps.filter { current.timeIntervalSince($0) <= 86400 }.count
         }
     }
+
+    /// Surfaced in Settings → General (§5.3's request-budget mitigations)
+    /// so a real user hitting Starling's rate limit more than expected has
+    /// somewhere to actually see why, rather than just a generic paused-
+    /// refresh message on whichever tracker happened to be open when it
+    /// last hit.
+    struct Status {
+        let requestsInLast24Hours: Int
+        let dailyLimit: Int
+        let cooldownUntil: Date?
+    }
+
+    var status: Status {
+        get async {
+            let current = now()
+            let count = requestTimestamps.filter { current.timeIntervalSince($0) <= 86400 }.count
+            return Status(
+                requestsInLast24Hours: count,
+                dailyLimit: dailyLimit,
+                cooldownUntil: cooldownUntil.flatMap { $0 > current ? $0 : nil }
+            )
+        }
+    }
 }

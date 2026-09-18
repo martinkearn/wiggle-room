@@ -22,6 +22,7 @@ import SwiftData
 struct GeneralSettingsView: View {
     @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
     @AppStorage(menuBarTrackerIDKey) private var pinnedTrackerID: String = ""
+    @State private var starlingStatus: StarlingRequestBudget.Status?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -57,8 +58,54 @@ struct GeneralSettingsView: View {
                 }
             }
 
+            Divider()
+
+            starlingRateLimitSection
+
             Spacer()
         }
+        .task { await refreshStarlingStatus() }
+    }
+
+    /// Rate-limit insight (§5.3/§12) — the budget itself (`StarlingRequestBudget`,
+    /// shared app-wide across every Starling connection, not per-source)
+    /// was previously invisible short of a paused-refresh error on whatever
+    /// tracker happened to be open when it hit. Real usage showed the rate
+    /// limit being hit more than expected, with no way to see why.
+    private var starlingRateLimitSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Starling Requests Today")
+                Spacer()
+                if let starlingStatus {
+                    Text("\(starlingStatus.requestsInLast24Hours) / \(starlingStatus.dailyLimit)")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+                Button {
+                    Task { await refreshStarlingStatus() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+            }
+            if let cooldownUntil = starlingStatus?.cooldownUntil {
+                Text("Paused until \(cooldownUntil.formatted(Self.timeFormatter)) after hitting Starling's rate limit.")
+                    .font(.caption)
+                    .foregroundStyle(WiggleRoomColors.warning)
+            } else {
+                Text("Counts every request across all Starling-connected trackers over the last 24 hours (resets when the app relaunches, not a true rolling 24h count).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private static let timeFormatter: Date.FormatStyle = .init().hour().minute()
+
+    private func refreshStarlingStatus() async {
+        starlingStatus = await StarlingProvider.sharedBudget.status
     }
 }
 
