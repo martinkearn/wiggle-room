@@ -16,6 +16,55 @@ import Foundation
 enum TrackerUpdateScheduling {
     static let defaultWidgetFarInterval: TimeInterval = 300
 
+    /// `BackgroundRefreshScheduler`'s three time-of-day cadence bands
+    /// (§5.3) — foreground polling (`TrackerDetailView`) deliberately does
+    /// *not* use this: a foreground session is short-lived by nature, so
+    /// it just polls on load and every 45s flat, no time-of-day or trend
+    /// logic. Background refresh is where the smarter scheduling lives,
+    /// since it's the thing that would otherwise poll around the clock
+    /// regardless of whether anyone's likely to be transacting.
+    enum RefreshBand {
+        /// 08:00–17:00 local — most transactions happen during the day.
+        case peak
+        /// 00:00–06:00 local — genuinely unlikely to see activity asleep.
+        case offPeak
+        /// Everything else (06:00–08:00, 17:00–24:00).
+        case standard
+
+        var interval: TimeInterval {
+            switch self {
+            case .peak: 5 * 60
+            case .standard: 15 * 60
+            case .offPeak: 60 * 60
+            }
+        }
+    }
+
+    /// Fixed clock windows, not anything adaptive/personalized — a blunt
+    /// but predictable default.
+    static func refreshBand(at date: Date = .now) -> RefreshBand {
+        switch Calendar.current.component(.hour, from: date) {
+        case 8..<17: .peak
+        case 0..<6: .offPeak
+        default: .standard
+        }
+    }
+
+    /// More than one reading logged within the trailing `window` counts as
+    /// an active burst (someone genuinely out and spending right now) —
+    /// deliberately a real trailing time window, not "the last two polls
+    /// happened to both find a change," since two transactions 20 minutes
+    /// apart with several no-change polls in between are just as much a
+    /// burst as two back-to-back ones. A tracker in a burst is scheduled
+    /// at `RefreshBand.peak`'s cadence regardless of the actual time of
+    /// day (§5.3) — on the reasoning that a real detected change is
+    /// stronger evidence than the general time-of-day prior, even at
+    /// 3am — but this only affects *that* tracker's own next-due
+    /// calculation, never any other tracker's.
+    static func isBursting(readings: [ValueSnapshot], asOf now: Date = .now, window: TimeInterval = 30 * 60) -> Bool {
+        readings.filter { now.timeIntervalSince($0.date) <= window }.count > 1
+    }
+
     /// The next moment a display should refresh, walking backward from
     /// `endDate` in `interval`-second steps rather than forward from `now` —
     /// so ticks are anchored to *when the tracker ends*, and the very last

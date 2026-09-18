@@ -153,16 +153,22 @@ final class TrackerStore {
     /// connecting them, and needlessly bloating the synced reading history.
     /// A poll that finds nothing changed still counts as a successful
     /// refresh (clears any stale error state) — it just doesn't need its
-    /// own row.
-    func refreshFromSource(_ tracker: Tracker) async throws {
+    /// own row. Returns whether the value actually changed (a new reading
+    /// was logged), so callers can back off their own poll interval when a
+    /// tracker's value has been static for a while (§5.3) — freshness only
+    /// matters when something's actually moving, and every no-op poll
+    /// still spends a real Starling request either way.
+    @discardableResult
+    func refreshFromSource(_ tracker: Tracker) async throws -> Bool {
         guard !tracker.isManualEntry,
               let sourceTargetId = tracker.sourceTargetId,
               let provider = provider(for: tracker)
-        else { return }
+        else { return false }
         let target = SourceTarget(id: sourceTargetId, displayName: tracker.name)
         let value = try await provider.fetchCurrentValue(target: target)
-        guard value != tracker.latestReading?.value else { return }
+        guard value != tracker.latestReading?.value else { return false }
         logReading(value: value, date: .now, for: tracker)
+        return true
     }
 
     /// Every mutation flows through this store (the app, and Shortcuts/Siri

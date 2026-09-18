@@ -40,6 +40,21 @@ final class Tracker {
     /// whenever this changes.
     var reminderCadenceMinutes: Int?
 
+    /// The last time `BackgroundRefreshScheduler` actually *attempted* a
+    /// Starling fetch for this tracker — `nil` for a manual tracker, or an
+    /// auto-fetch one that's never had a background attempt yet. Deliberately
+    /// tracks attempts, not successful *changes*: `latestReading?.date`
+    /// only moves when the value actually changes, so it can't answer
+    /// "is this tracker due for another background check yet?" on its
+    /// own — a tracker that's been static for days would look permanently
+    /// overdue by that measure. Set on every attempt regardless of outcome
+    /// (a no-change poll or a failure still counts as "checked"), so a
+    /// persistently-failing source doesn't get hammered every wake-up.
+    /// Per-tracker (not a single app-wide timestamp) so each tracker's own
+    /// background cadence — including a burst-detected one running faster
+    /// than its neighbors — is independent of every other tracker's.
+    var lastAutoFetchAttempt: Date?
+
     /// Whether the "closed under budget/on track" celebration has already
     /// been shown for this tracker's completion — a one-shot flag so
     /// re-opening a long-finished tracker's dashboard doesn't replay the
