@@ -2075,3 +2075,27 @@ this still needs an actual look in a running menu bar (click the menu bar
 icon, confirm the rings render and no text looks dimmed) before treating
 it as fully confirmed — flagging this explicitly rather than claiming
 verification that didn't happen.
+
+## 2026-09-18 Menu bar dropdown: drop the duplicate status row
+
+Immediate same-day follow-up, this time with the user's own screenshot of
+the real, running menu bar dropdown (the `.window`-style fix above did
+work — no more dimmed text) confirming the fix and flagging one thing to
+tidy: below the rings, a "Just Over Budget · -£26.48" row sat directly
+underneath a ring whose own center content already reads "JUST OVER
+BUDGET" / "-£26…" — the exact same status label and figure, repeated a
+few pixels apart.
+
+**Fix**: removed that third `HStack` (status label + `displayDifference`)
+from `MenuBarStatusView`'s body (`src/WiggleRoom/Views/MenuBarStatusView.swift`)
+— the "Current Balance"/"Target Right Now" rows above it stay, since
+those two numbers aren't shown anywhere else in the dropdown and remain
+genuinely useful alongside the ring.
+
+### Verifying this session's changes
+
+`xcodebuild -scheme WiggleRoom -destination 'platform=macOS' build`
+succeeded. Not re-confirmed visually in a live menu bar — same
+Accessibility/Screen Recording permission gap as the previous entry — but
+this change only deletes a `View` builder block with no new API surface,
+a much lower-risk change than the `.window`-style switch was.
