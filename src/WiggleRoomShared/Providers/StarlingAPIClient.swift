@@ -7,11 +7,10 @@ import Foundation
 
 /// A minimal, direct HTTPS client for Starling's v2 API (§5.3) — calls go
 /// straight from this client to `api.starlingbank.com`, no intermediary
-/// backend (§11). Only the accounts-list and balance endpoints are
-/// implemented: the Spaces/savings-goals endpoint shape is still unverified
-/// against current Starling docs (§12) and is deliberately left unbuilt
-/// rather than guessed at — trackers pointed at a Space aren't supported
-/// yet.
+/// backend (§11). Accounts, account balance, and Spaces (savings goals +
+/// spending spaces) are implemented; the Spaces response shape below was
+/// verified directly against developer.starlingbank.com's own rendered API
+/// reference (2026-09-18), not guessed at.
 struct StarlingAPIClient {
     private let baseURL: URL
     private let session: URLSession
@@ -41,6 +40,18 @@ struct StarlingAPIClient {
     func fetchBalance(accountUid: String) async throws -> Decimal {
         let response: StarlingBalanceResponse = try await get("/api/v2/accounts/\(accountUid)/balance")
         return Decimal(response.effectiveBalance.minorUnits) / 100
+    }
+
+    /// Every savings goal and spending space for `accountUid`, each
+    /// already carrying its own current balance (`totalSaved`/`balance`)
+    /// directly in this list response — unlike the top-level account,
+    /// there's no separate per-space balance endpoint needed; refetching
+    /// this list is the per-tick call for a tracker pointed at a Space.
+    /// Note the singular `/account/` here, not the plural `/accounts/`
+    /// `fetchAccounts()`/`fetchBalance` use — Starling's own convention for
+    /// a specific account's sub-resources.
+    func fetchSpaces(accountUid: String) async throws -> StarlingSpacesResponse {
+        try await get("/api/v2/account/\(accountUid)/spaces")
     }
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
@@ -114,4 +125,33 @@ struct StarlingBalanceResponse: Decodable {
 struct StarlingAmount: Decodable, Equatable {
     let currency: String
     let minorUnits: Int
+}
+
+/// Schema verified against developer.starlingbank.com's own API reference
+/// (2026-09-18): `GET /api/v2/account/{accountUid}/spaces` returns both
+/// kinds of space together. Only the fields this app actually uses are
+/// decoded — both objects carry several more (sortOrder, target,
+/// savedPercentage, cardAssociationUid, spendingSpaceType, …) that aren't
+/// needed here.
+struct StarlingSpacesResponse: Decodable {
+    let savingsGoals: [StarlingSavingsGoal]
+    let spendingSpaces: [StarlingSpendingSpace]
+}
+
+struct StarlingSavingsGoal: Decodable, Equatable {
+    let savingsGoalUid: String
+    let name: String
+    let totalSaved: StarlingAmount
+    /// e.g. "ACTIVE", "ARCHIVED" — only an `ACTIVE` goal is offered as a
+    /// tracker target; an archived one is no longer a meaningful thing to
+    /// track the pace of.
+    let state: String
+}
+
+struct StarlingSpendingSpace: Decodable, Equatable {
+    let spaceUid: String
+    let name: String
+    let balance: StarlingAmount
+    /// Same `ACTIVE`/otherwise convention as `StarlingSavingsGoal.state`.
+    let state: String
 }
