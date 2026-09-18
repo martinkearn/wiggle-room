@@ -94,15 +94,36 @@ struct TrackerDetailView: View {
     }
 
     var body: some View {
-        ZStack {
-            dashboardScrollView
+        // `tracker` is a direct object reference, not resolved fresh from
+        // a `@Query` on every render — SwiftData's own fine-grained
+        // Observation still re-invokes this body whenever a property of
+        // `tracker` that was previously read changes, *including* when the
+        // tracker is deleted from somewhere else entirely (e.g. Settings'
+        // Reset App Data, §12, running in a separate window from this
+        // detail view). Reading any property on a model whose backing data
+        // has been detached from its context is a hard SwiftData crash
+        // ("This backing data was detached from a context without
+        // resolving attributes"), not a recoverable error — so this checks
+        // `modelContext` (`nil` once deleted) *before* touching anything
+        // else on `tracker`, rather than after. Found via a real crash
+        // report: resetting all data while this screen was open elsewhere.
+        if tracker.modelContext == nil {
+            ContentUnavailableView(
+                "Tracker Deleted",
+                systemImage: "trash",
+                description: Text("This tracker no longer exists.")
+            )
+        } else {
+            ZStack {
+                dashboardScrollView
 
-            if isShowingCelebration, let finalStatus = tracker.finalPaceStatus(asOf: now) {
-                CelebrationView(tracker: tracker, status: finalStatus) {
-                    isShowingCelebration = false
+                if isShowingCelebration, let finalStatus = tracker.finalPaceStatus(asOf: now) {
+                    CelebrationView(tracker: tracker, status: finalStatus) {
+                        isShowingCelebration = false
+                    }
+                    .transition(.opacity)
+                    .zIndex(1)
                 }
-                .transition(.opacity)
-                .zIndex(1)
             }
         }
     }

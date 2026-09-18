@@ -28,50 +28,64 @@ struct WatchTrackerDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                if tracker.isCompleted(asOf: now) {
-                    CompletedBadge()
-                }
+        // Same guard as the phone/Mac dashboard (`TrackerDetailView`) —
+        // `tracker` is a direct object reference, and SwiftData's own
+        // fine-grained Observation re-invokes this body if the tracker is
+        // deleted anywhere (e.g. Reset App Data on another device), which
+        // crashes hard on the first property read afterward unless checked
+        // first. See that view's own comment for the full explanation.
+        if tracker.modelContext == nil {
+            ContentUnavailableView(
+                "Tracker Deleted",
+                systemImage: "trash",
+                description: Text("This tracker no longer exists.")
+            )
+        } else {
+            ScrollView {
+                VStack(spacing: 12) {
+                    if tracker.isCompleted(asOf: now) {
+                        CompletedBadge()
+                    }
 
-                RingsView(tracker: tracker, now: now, lineWidth: 8)
-                    .frame(width: 120, height: 120)
+                    RingsView(tracker: tracker, now: now, lineWidth: 8)
+                        .frame(width: 120, height: 120)
 
-                if !tracker.isCompleted(asOf: now) {
-                    if tracker.isManualEntry {
-                        Button {
-                            isPresentingLogReading = true
-                        } label: {
-                            Label("Log", systemImage: "plus.circle.fill")
+                    if !tracker.isCompleted(asOf: now) {
+                        if tracker.isManualEntry {
+                            Button {
+                                isPresentingLogReading = true
+                            } label: {
+                                Label("Log", systemImage: "plus.circle.fill")
+                            }
+                            .buttonStyle(.borderedProminent)
+                        } else {
+                            Button {
+                                Task { await refreshFromSourceIfNeeded() }
+                            } label: {
+                                Label("Refresh", systemImage: "arrow.clockwise")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(isRefreshingFromSource)
                         }
-                        .buttonStyle(.borderedProminent)
-                    } else {
-                        Button {
-                            Task { await refreshFromSourceIfNeeded() }
-                        } label: {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isRefreshingFromSource)
                     }
                 }
+                .padding(.vertical, 8)
             }
-            .padding(.vertical, 8)
-        }
-        .navigationTitle(tracker.name)
-        .onAppear {
-            // 30s while this detail screen is on-screen (§5.3) — same
-            // cadence and mechanism as the phone/Mac dashboard.
-            ticker.interval = 30
-            ticker.endDatesProvider = { [tracker.endDate] }
-            ticker.onUpdate = { _ in
+            .navigationTitle(tracker.name)
+            .onAppear {
+                // 30s while this detail screen is on-screen (§5.3) — same
+                // cadence and mechanism as the phone/Mac dashboard.
+                ticker.interval = 30
+                ticker.endDatesProvider = { [tracker.endDate] }
+                ticker.onUpdate = { _ in
+                    Task { await refreshFromSourceIfNeeded() }
+                }
+                ticker.start()
                 Task { await refreshFromSourceIfNeeded() }
             }
-            ticker.start()
-            Task { await refreshFromSourceIfNeeded() }
-        }
-        .sheet(isPresented: $isPresentingLogReading) {
-            WatchLogReadingView(tracker: tracker)
+            .sheet(isPresented: $isPresentingLogReading) {
+                WatchLogReadingView(tracker: tracker)
+            }
         }
     }
 }

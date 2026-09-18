@@ -1,8 +1,30 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Reset App Data + a proper iOS Settings screen** — a
-direct follow-up to the schema-mismatch incident below, while cleaning up
+after **2026-09-18 Fixed a real crash: Reset App Data could crash the app
+if a tracker's detail screen was open elsewhere** — the very first real
+use of the Reset App Data feature (added the same day, entry below) hit
+a genuine fatal crash on macOS: "This backing data was detached from a
+context without resolving attributes," in `Tracker.direction.getter`,
+called from `TrackerDetailView.body`. Root cause: `TrackerDetailView`
+holds `tracker` as a direct object reference rather than re-resolving it
+from a live query, so SwiftData's fine-grained Observation re-invokes its
+`body` whenever that tracker changes *anywhere* — including a delete
+happening in Settings (a separate window) while the main window's detail
+view was still showing that same tracker. Reading a property on a
+model whose backing data has been detached from its context is a hard,
+unrecoverable crash, not something catchable. Fixed by checking
+`tracker.modelContext == nil` (becomes `nil` once deleted) as the very
+first thing `body` does, showing a plain "Tracker Deleted" placeholder
+instead of touching any other property. Applied the identical guard to
+`WatchTrackerDetailView`, which has the same structural risk. `xcodebuild
+build` succeeded on both `platform=macOS` and `generic/platform=iOS`
+(which also builds the Watch target). **Not yet re-verified against a
+real Reset App Data run with a detail screen open** — the user hit the
+original crash via a screenshot of Xcode's debugger, not yet confirmed
+the fix resolves it in practice. Before that, **2026-09-18 Reset App Data
++ a proper iOS Settings screen** — a direct follow-up to the
+schema-mismatch incident below, while cleaning up
 its corrupted test data by hand surfaced two more real gaps: some
 trackers couldn't even be *selected* in the macOS sidebar (right-click
 "Delete Tracker" added, bypassing `selection` entirely — see `MacRootView`),
