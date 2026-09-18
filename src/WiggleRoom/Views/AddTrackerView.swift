@@ -594,7 +594,14 @@ struct AddTrackerView: View {
             && Self.parseDecimal(startingValueText) != nil
             && Self.parseDecimal(totalAllowanceText) != nil
             && selectedSourceId != nil
-            && (isManualEntrySelected || selectedTargetId != nil)
+            // `selectedTargetId` is only ever populated by
+            // `loadAvailableTargetsIfNeeded()`, which deliberately does
+            // nothing when editing (`existingTracker != nil`) — the
+            // target picker is replaced by a read-only row there, since a
+            // tracker's source/account can't be changed after creation.
+            // Requiring it unconditionally left Save permanently disabled
+            // for every existing non-manual tracker.
+            && (existingTracker != nil || isManualEntrySelected || selectedTargetId != nil)
     }
 
     private func save() {
