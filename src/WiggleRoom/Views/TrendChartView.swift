@@ -56,38 +56,6 @@ struct TrendChartView: View {
         return (low - padding)...(high + padding)
     }
 
-    private struct LinearFit {
-        let slope: Double
-        let intercept: Double
-        let referenceDate: Date
-
-        func value(at date: Date) -> Double {
-            intercept + slope * date.timeIntervalSince(referenceDate)
-        }
-    }
-
-    /// A least-squares line of best fit through a set of readings
-    /// (date vs. value). `nil` if there are fewer than two readings, or if
-    /// every reading landed at the exact same instant (a degenerate,
-    /// zero-width span) since a slope isn't meaningful then.
-    private func fit(_ readings: ArraySlice<ValueSnapshot>) -> LinearFit? {
-        guard readings.count > 1, let referenceDate = readings.first?.date else { return nil }
-        let xs = readings.map { $0.date.timeIntervalSince(referenceDate) }
-        let ys = readings.map { ($0.value as NSDecimalNumber).doubleValue }
-
-        let n = Double(xs.count)
-        let sumX = xs.reduce(0, +)
-        let sumY = ys.reduce(0, +)
-        let sumXY = zip(xs, ys).reduce(0) { $0 + $1.0 * $1.1 }
-        let sumXX = xs.reduce(0) { $0 + $1 * $1 }
-        let denominator = n * sumXX - sumX * sumX
-        guard denominator != 0 else { return nil }
-
-        let slope = (n * sumXY - sumX * sumY) / denominator
-        let intercept = (sumY - slope * sumX) / n
-        return LinearFit(slope: slope, intercept: intercept, referenceDate: referenceDate)
-    }
-
     /// The trend line's anchor points. Rather than a single straight line
     /// fitted once across every reading, each historical anchor is the
     /// *expanding-window* fit — the best-fit line through every reading up
@@ -120,10 +88,10 @@ struct TrendChartView: View {
 
         var points: [(date: Date, value: Decimal)] = []
         for index in 1..<readings.count {
-            guard let expandingFit = fit(readings[0...index]) else { continue }
+            guard let expandingFit = linearFit(through: readings[0...index]) else { continue }
             points.append((readings[index].date, clamped(expandingFit.value(at: readings[index].date))))
         }
-        guard !points.isEmpty, let fullFit = fit(readings[readings.startIndex...]) else { return nil }
+        guard !points.isEmpty, let fullFit = linearFit(through: readings[readings.startIndex...]) else { return nil }
         points.append((window.end, clamped(fullFit.value(at: window.end))))
         return points
     }

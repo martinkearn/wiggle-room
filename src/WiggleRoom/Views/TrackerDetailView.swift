@@ -60,6 +60,13 @@ struct TrackerDetailView: View {
     /// the same tracker.
     @State private var isRefreshingFromSource = false
 
+    /// Flat while this screen is open — no time-of-day/trend adaptation
+    /// here (that lives in `BackgroundRefreshScheduler` instead, §5.3): a
+    /// foreground session is short-lived by nature, so the smarter
+    /// scheduling only pays off for the background path, which would
+    /// otherwise poll around the clock regardless of anyone watching.
+    private static let basePollInterval: TimeInterval = 45
+
     /// The bound account's display name for a real, non-manual source —
     /// `Tracker` only stores `sourceTargetId` (a bare id), not a
     /// human-readable label, so this is resolved live once on appear
@@ -172,6 +179,10 @@ struct TrackerDetailView: View {
                     TrendChartView(tracker: tracker, now: now)
                         .frame(height: 240)
                         .padding(.horizontal)
+
+                    if !isCompleted, let estimatedFinalValue = tracker.estimatedFinalValue {
+                        estimatedFinalBalanceCard(estimatedFinalValue)
+                    }
                 }
             }
             .padding(.bottom, 32)
@@ -223,11 +234,12 @@ struct TrackerDetailView: View {
         }
         .onAppear {
             let appearedAt = Date.now
-            // 30s while this detail screen is on-screen (§5.3's decided
-            // foreground poll cadence) — down from the 60s display-only
-            // default, since this ticker also drives a real Starling fetch
-            // on every tick now, not just a display recompute.
-            ticker.interval = 30
+            // Flat 45s while this detail screen is on-screen (§5.3) — down
+            // from the 60s display-only default, since this ticker also
+            // drives a real Starling fetch on every tick now, not just a
+            // display recompute. No time-of-day/trend adaptation here on
+            // purpose; that lives in `BackgroundRefreshScheduler` instead.
+            ticker.interval = Self.basePollInterval
             ticker.endDatesProvider = { [tracker.endDate] }
             ticker.onUpdate = { date in
                 // The minute rollover is exactly when Target Right Now's
@@ -400,6 +412,10 @@ struct TrackerDetailView: View {
         return account.isEmpty ? source.displayName : "\(source.displayName) \u{00B7} \(account)"
     }
 
+    /// "3:45 PM" — same-day retry times are the common case, so no date
+    /// component; a rate-limit cooldown is always at most a day out anyway.
+    private static let retryTimeFormatter: Date.FormatStyle = .init().hour().minute()
+
     /// A short, distinct-from-stale-data error line (§8.4) — never leaves a
     /// failed refresh looking like a current, successful one.
     private static func errorMessage(for error: Error) -> String {
@@ -408,8 +424,11 @@ struct TrackerDetailView: View {
             return "Not connected — reconnect this source in Settings."
         case StarlingAPIError.invalidToken:
             return "Connection expired — reconnect this source in Settings."
-        case StarlingAPIError.rateLimited, StarlingAPIError.budgetExceeded:
-            return "Refresh paused — rate limit reached, try again shortly."
+        case StarlingAPIError.rateLimited(let retryAfter):
+            let resumeText = retryAfter.map { " Resumes at \(Date.now.addingTimeInterval($0).formatted(Self.retryTimeFormatter))." } ?? ""
+            return "Refresh paused — Starling rate limit reached.\(resumeText)"
+        case StarlingAPIError.budgetExceeded(let resetsAt):
+            return "Refresh paused — daily request limit reached. Resumes at \(resetsAt.formatted(Self.retryTimeFormatter))."
         case StarlingAPIError.network:
             return "Couldn't reach Starling — check your connection."
         default:
@@ -494,6 +513,32 @@ struct TrackerDetailView: View {
     /// land by the very end of the period.
     private var finalBalanceCaption: String {
         "Final target will be \(tracker.formattedValue(tracker.projectedFinalValue))"
+    }
+
+    /// Where the trend line (§3.5) says this tracker is actually headed,
+    /// as its own labeled figure — detail-screen only, not added to the
+    /// chart itself, which already draws the same trend visually. Colored
+    /// green/red by whether that projection is trending toward or away
+    /// from the tracker's real target, not the three-state amber/red
+    /// `PaceStatus` split used elsewhere — this is a single "which way is
+    /// it leaning" signal, not the live pace-vs-elapsed-time status.
+    private func estimatedFinalBalanceCard(_ estimatedFinalValue: Decimal) -> some View {
+        let difference = tracker.estimatedFinalDifference ?? 0
+        let tint = difference >= 0 ? WiggleRoomColors.good : WiggleRoomColors.bad
+        return card(tint: tint) {
+            figureContent(
+                title: "Estimated Final Balance",
+                value: estimatedFinalValue,
+                caption: estimatedFinalBalanceCaption(difference: difference)
+            )
+        }
+        .padding(.horizontal)
+    }
+
+    private func estimatedFinalBalanceCaption(difference: Decimal) -> String {
+        guard difference != 0 else { return "Right on target" }
+        let verb = difference > 0 ? "under" : "over"
+        return "Trending \(verb) target by \(tracker.formattedValue(abs(difference)))"
     }
 
     private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {
