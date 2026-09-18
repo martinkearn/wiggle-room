@@ -1,7 +1,76 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Fixed a real crash: Reset App Data could crash the app
+after **2026-09-18 A real, verifiable "same code?" indicator in Settings**
+— requested directly out of this session's own debugging pain: mid-way
+through diagnosing why a Mac's Reset App Data wasn't reaching iOS, there
+was no way to confirm both devices were actually running the fixes just
+made, short of trusting "yes I rebuilt it." Landed on a git commit hash
+(plus a `-dirty` suffix for uncommitted changes) rather than a build
+date/timestamp — explicitly rejected once proposed, since two devices
+built minutes apart from the *identical* commit would show different
+"versions" and answer the wrong question (what matters is whether the
+code matches, not when it was compiled).
+
+**Getting the value into the app took three real attempts**, each hitting
+a genuine Xcode build-system wall, all now documented directly in the
+pbxproj build phase's own comment so the reasoning survives without
+needing this log:
+1. **Write directly into Info.plist via PlistBuddy**, in a script phase
+   positioned after Xcode's own Info.plist generation. Failed silently at
+   first — the write never took effect, no error surfaced — traced to
+   **User Script Sandboxing** (`ENABLE_USER_SCRIPT_SANDBOXING = YES`,
+   on by default in this Xcode version): a script phase can only write
+   paths it explicitly declares as `outputPaths`. Declaring the Info.plist
+   path as an output fixed the silent failure, but broke the build
+   outright: `error: invalid task ... with mutable output but no other
+   virtual output node` — a hard rule that two different build steps
+   (here, this script and Xcode's own "ProcessInfoPlistFile") can never
+   both be declared producers of the same file.
+2. **Generate a Swift source file** (`GeneratedGitInfo.swift`) into
+   `$(DERIVED_FILE_DIR)` instead, a brand-new file with exactly one
+   producer — the classic, normally-reliable pattern for exactly this
+   kind of build-time constant. Compiled fine as a file on disk (confirmed
+   it was actually being written, correctly, every time), but the
+   generated type was never visible to the rest of the target:
+   `error: cannot find 'GeneratedGitInfo' in scope`. This project uses
+   Xcode's newer **file-system-synchronized source groups** (folders
+   auto-included as project membership, rather than explicit
+   `PBXSourcesBuildPhase` file lists) — and, empirically, that mechanism
+   doesn't pick up a script-generated derived `.swift` file as a compile
+   input the way a classic explicit-file-list Sources phase would, even
+   though the file inputs the underlying build tasks compile from is not
+   different fundamentally.
+3. **Write a plain text resource** (`git-commit.txt`) directly into the
+   built app's Resources folder instead — sidesteps both problems at
+   once: it's a brand-new file (satisfies the single-producer rule) that
+   nothing needs to "discover" as a compile input (read at runtime via
+   `Bundle.main.url(forResource:withExtension:)` instead). This is what
+   shipped. `AppBuildInfo.swift` moved from `WiggleRoomShared` into the
+   `WiggleRoom` app target specifically, since only that target's build
+   has the generating script phase — the widget/watch/complication
+   targets never needed this and would have failed to compile a reference
+   to a type/resource that only exists for the main app's own build.
+
+The script phase (`Write Git Commit Resource`, `WiggleRoom.xcodeproj/
+project.pbxproj`, the `WiggleRoom` target's last build phase) declares
+`.git/HEAD` and `.git/index` as its inputs, so Xcode's real dependency
+analysis re-runs it whenever the checked-out commit or the working tree's
+staged/unstaged state actually changes — no `alwaysOutOfDate` needed (and
+that setting turned out to be flatly incompatible with declaring a real
+output path anyway, per the Info.plist attempt above). Surfaced in
+Settings on both platforms (macOS's `GeneralSettingsView`, iOS's
+`SettingsView`) right under the existing Danger Zone section.
+
+`xcodebuild build` succeeded on both `platform=macOS` and `generic/
+platform=iOS` (confirmed the resource file lands correctly in both
+built products, with matching content), and the existing
+`StarlingRequestBudgetTests`/`StarlingAPIClientTests` suite still passes
+unchanged. **Not yet verified end-to-end on a real device** — worth
+confirming the "Build" row actually renders correctly once installed, and
+that it reads identically on both the Mac and the iPhone once both are
+rebuilt from the same commit. Before that, **2026-09-18 Fixed a real
+crash: Reset App Data could crash the app
 if a tracker's detail screen was open elsewhere** — the very first real
 use of the Reset App Data feature (added the same day, entry below) hit
 a genuine fatal crash on macOS: "This backing data was detached from a

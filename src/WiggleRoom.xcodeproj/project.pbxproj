@@ -360,6 +360,7 @@
 				EF63B1143056875D0092FD24 /* Resources */,
 				55273DB0609129562CC867EA /* Embed Foundation Extensions */,
 				5A87B6A9F195D51A9434406D /* Embed Watch Content */,
+				4E552DBA7D7CC4D66D4C0B8F /* Write Git Commit Resource */,
 			);
 			buildRules = (
 			);
@@ -509,6 +510,30 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		4E552DBA7D7CC4D66D4C0B8F /* Write Git Commit Resource */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../.git/HEAD",
+				"$(SRCROOT)/../.git/index",
+			);
+			name = "Write Git Commit Resource";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/git-commit.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Writes a plain text resource with the current git commit, read at\n# runtime by AppBuildInfo.swift so Settings can show \"are these two\n# devices actually running the same code\" instead of just \"did I\n# rebuild recently\". A brand-new file (not the app's real Info.plist)\n# specifically because User Script Sandboxing forbids two different\n# build steps writing the same file — writing directly into Info.plist\n# here conflicted with Xcode's own Info.plist generation step\n# (\"invalid task ... mutable output but no other virtual output\n# node\"); this file has exactly one producer, this script. A plain\n# resource (not a generated .swift source compiled into Sources) since\n# this project's file-system-synchronized source groups didn't pick up\n# a script-generated derived .swift file as a compile input the way a\n# classic explicit-file-list Sources phase would (\"cannot find\n# 'GeneratedGitInfo' in scope\" even though the file existed on disk).\n#\n# Declared inputs (.git/HEAD, .git/index) make Xcode's real dependency\n# analysis re-run this whenever the checked-out commit or the working\n# tree's staged/unstaged state actually changes.\nGIT_HASH=$(git -C \"${SRCROOT}\" rev-parse --short HEAD 2>/dev/null)\nif [ -z \"$GIT_HASH\" ]; then\n  GIT_HASH=\"unknown\"\nfi\nif [ -n \"$(git -C \"${SRCROOT}\" status --porcelain 2>/dev/null)\" ]; then\n  GIT_HASH=\"${GIT_HASH}-dirty\"\nfi\nmkdir -p \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nprintf '%s' \"$GIT_HASH\" > \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/git-commit.txt\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		49E5668BF14094AB39EA214A /* Sources */ = {

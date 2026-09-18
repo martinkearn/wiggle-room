@@ -45,6 +45,16 @@ struct SettingsView: View {
                     // exists at all.
                     Text("Permanently deletes every tracker, reading, and connected source — synced to every device. Cannot be undone.")
                 }
+
+                Section {
+                    // Confirms this device is running the exact same code
+                    // as another — see `AppBuildInfo`'s own doc comment for
+                    // why this is a git commit hash, not a build date/time
+                    // or version number.
+                    LabeledContent("Build", value: AppBuildInfo.gitCommitDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .navigationTitle("Settings")
             .inlineNavigationBarIfAvailable()
