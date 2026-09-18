@@ -37,23 +37,23 @@ struct TrendChartView: View {
         }
     }
 
-    /// The Y range the chart should actually be scaled to — based only on
-    /// the pace reference line and the real logged readings, deliberately
-    /// *excluding* the trend line's own extrapolated values. A trend fitted
-    /// from just a couple of early readings can imply a very steep slope;
-    /// letting Swift Charts auto-scale the axis to fit that extrapolation
-    /// all the way out to the period's end would squash the pace line and
-    /// the actual readings into an unreadable sliver at one edge. `trendPoints`
+    /// The Y range the chart should actually be scaled to — `tracker
+    /// .plausibleTrendRange` (shared with `Tracker.estimatedFinalValue`, so
+    /// the detail screen's card can never show a different "where this
+    /// lands" number than what this chart's trend line visually ends at),
+    /// converted to `Double` for Swift Charts. Deliberately based only on
+    /// the pace reference line and the real logged readings, *excluding*
+    /// the trend line's own extrapolated values — a trend fitted from just
+    /// a couple of early readings can imply a very steep slope; letting
+    /// Swift Charts auto-scale the axis to fit that extrapolation all the
+    /// way out to the period's end would squash the pace line and the
+    /// actual readings into an unreadable sliver at one edge. `trendPoints`
     /// below also clamps its own values into this range directly — see that
     /// property for why leaving the raw, un-clamped values for Charts' own
     /// axis-driven clipping to handle isn't enough.
     private var yDomain: ClosedRange<Double> {
-        var values = [tracker.startingValue, targetEndValue].map { ($0 as NSDecimalNumber).doubleValue }
-        values += tracker.sortedReadings.map { ($0.value as NSDecimalNumber).doubleValue }
-        let low = values.min() ?? 0
-        let high = values.max() ?? 0
-        let padding = max((high - low) * 0.1, 1)
-        return (low - padding)...(high + padding)
+        let range = tracker.plausibleTrendRange
+        return (range.lowerBound as NSDecimalNumber).doubleValue...(range.upperBound as NSDecimalNumber).doubleValue
     }
 
     /// The trend line's anchor points. Rather than a single straight line

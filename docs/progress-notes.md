@@ -1,7 +1,23 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Feature/bug backlog pass: Starling Spaces, refresh
+after **2026-09-18 Estimated Final Balance: card and chart now share one
+clamp, not two** — a same-day follow-up fix (below): the first fix for
+this feature (a minimum-data-span guard, described further down) turned
+out not to be the real problem, since the user still saw the card's
+number wildly disagree with where the chart's own trend line visually
+ended, even once that guard was passing. Root cause was structural, not
+a threshold: the chart clamps its trend line's endpoint into its Y-axis
+range before drawing (an existing workaround for a Swift Charts
+rendering bug), while the card computed the same fit's raw, unclamped
+value — same underlying regression, two different displayed numbers by
+design. Fixed by extracting `Tracker.plausibleTrendRange` (starting
+value, fixed target, every logged reading, padded 10%) as the one clamp
+both `Tracker.estimatedFinalValue` and `TrendChartView.yDomain` now
+derive from, so the card always states the exact number the trend line
+visually ends at. `xcodebuild build` (iOS) succeeded; not yet re-verified
+on a real device/simulator against the actual reported case.
+Before that, **2026-09-18 Feature/bug backlog pass: Starling Spaces, refresh
 cadence redesign, Estimated Final Balance (+ same-day fix), and a run of
 smaller fixes** — see that entry (bottom of file) for the full rundown:
 widget "by" wording, the widget resize/reconfigure blank fixed, Starling
@@ -2712,3 +2728,56 @@ system-scheduled and not something a short manual test session can
 force reliably — worth specifically watching real background-refresh
 behavior over the following few days of normal use rather than treating
 this as fully verified from a build pass alone.
+
+## 2026-09-18 Estimated Final Balance: card and chart now share one clamp, not two
+
+Follow-up to the same-day fix in the entry above. That fix added a
+minimum-data-span guard (`hasSufficientSpanForTrend`) to withhold the
+estimate when readings were too closely clustered in time to trust — a
+real safeguard, but not actually what was making the reported number
+(`-£1,458.39`) look wrong, since the tracker in question had enough
+span to clear that guard and still showed a figure nowhere near where
+its own trend line visually ended (screenshotted: the dotted trend line
+ran to just under £0, the card said -£1,458).
+
+**Real root cause**: `TrendChartView`'s trend line and
+`Tracker.estimatedFinalValue` fit the exact same regression through the
+exact same readings and evaluate it at the exact same `endDate` — but
+the chart clamps that endpoint into its Y-axis range before drawing
+(`yDomain`, an existing workaround for a real Swift Charts bug where an
+out-of-frame value's stroke bleeds off the plot area), while the card
+was stating the raw, unclamped value. Structurally, the two were always
+going to be able to disagree — the span guard reduced how *often* they'd
+disagree by a large margin, but never made them structurally incapable
+of it.
+
+**Fix**: extracted the clamp itself into one shared property,
+`Tracker.plausibleTrendRange` (`WiggleRoomShared/Models/LinearFit.swift`)
+— starting value, the fixed target (`projectedFinalValue`), and every
+logged reading, padded 10%, exactly what `TrendChartView.yDomain` used
+to compute privately. `estimatedFinalValue` now clamps the raw fit value
+into this range before returning it; `TrendChartView.yDomain` now just
+converts the same range to `Double` instead of recomputing it. The two
+can no longer structurally diverge — the card will always show the
+literal number the trend line visually ends at, since they're now the
+same clamp applied once. The minimum-span guard from the earlier fix was
+removed — the clamp alone is what keeps the number sane, and it no
+longer needs a separate "don't even try yet" threshold on top.
+
+Chosen over the alternative of switching to a different projection
+formula (e.g. averaging the overall observed rate since `startDate`
+rather than least-squares through logged readings) — that would still
+be capable of producing a large number whenever little time has elapsed
+relative to what's left (the ratio-amplification problem is inherent to
+*any* linear extrapolation run that early in a tracker's life, not
+specific to least-squares), and wouldn't address the actual complaint,
+which was inconsistency between the two displayed numbers rather than
+the projection method itself being wrong.
+
+### Verifying this change
+
+`xcodebuild build` (iOS, `generic/platform=iOS`) succeeded. **Not
+verified on a real device/simulator against the actual tracker the user
+reported this against** — worth specifically re-checking that tracker's
+detail screen once rebuilt, to confirm the card's number now matches
+where its trend line visually ends.
