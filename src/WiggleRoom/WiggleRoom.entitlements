@@ -18,5 +18,18 @@
 	<array>
 		<string>group.martinkearn.WiggleRoom</string>
 	</array>
+	<!--
+	  Required for any direct HTTPS call (Starling, and eventually Tesla,
+	  §5.3/§5.4) to succeed on macOS. ENABLE_APP_SANDBOX = YES (this
+	  target's build settings) puts the macOS build under App Sandbox,
+	  which blocks all outbound network connections unless this
+	  entitlement is present — confirmed missing from the actually
+	  compiled/signed binary (`codesign -d --entitlements :-`) on
+	  2026-09-18, exactly matching a real "Couldn't reach Starling" error
+	  reported from a real Mac. iOS ignores this key entirely (no App
+	  Sandbox concept there), so it's harmless on that platform.
+	-->
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>
