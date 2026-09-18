@@ -123,70 +123,74 @@ struct ConnectedSourcesView: View {
         }
     }
     #else
+    /// No `NavigationStack` of its own — pushed as a destination from
+    /// `SettingsView`'s own stack (§7.1/§7.2's iOS Settings screen), not
+    /// presented standalone. Nesting a second `NavigationStack` inside
+    /// another breaks back-button/toolbar behavior, so this relies entirely
+    /// on whatever stack is hosting it.
     private var iosBody: some View {
-        NavigationStack {
-            Group {
-                if addedSources.isEmpty {
-                    WiggleEmptyState(
-                        symbol: "point.3.filled.connected.trianglepath.dotted",
-                        title: "No Connected Sources",
-                        message: "Add a source like Starling or Tesla to fetch readings automatically."
-                    )
-                } else {
-                    List(addedSources) { source in
-                        NavigationLink {
-                            AddSourceView(existingSource: source)
-                        } label: {
-                            row(for: source)
-                        }
-                        .swipeActions {
-                            Button(role: .destructive) {
-                                requestRemoval(of: source)
-                            } label: {
-                                Label("Remove", systemImage: "trash")
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Connected Sources")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    NavigationLink {
-                        AddSourceView()
-                    } label: {
-                        Label("Add Source", systemImage: "plus")
-                    }
-                }
-            }
-            .confirmationDialog(
-                "Remove \u{201C}\(sourcePendingRemoval?.displayName ?? "")\u{201D}?",
-                isPresented: Binding(
-                    get: { sourcePendingRemoval != nil },
-                    set: { if !$0 { sourcePendingRemoval = nil } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("Remove Source", role: .destructive) {
-                    if let source = sourcePendingRemoval {
-                        remove(source)
-                    }
-                    sourcePendingRemoval = nil
-                }
-            } message: {
-                Text("This removes the connection and its stored token everywhere it's synced. Only allowed while no trackers use it.")
-            }
-            .alert(
-                "Can't Remove Source",
-                isPresented: Binding(
-                    get: { removalBlockedMessage != nil },
-                    set: { if !$0 { removalBlockedMessage = nil } }
+        Group {
+            if addedSources.isEmpty {
+                WiggleEmptyState(
+                    symbol: "point.3.filled.connected.trianglepath.dotted",
+                    title: "No Connected Sources",
+                    message: "Add a source like Starling or Tesla to fetch readings automatically."
                 )
-            ) {
-                Button("OK") { removalBlockedMessage = nil }
-            } message: {
-                Text(removalBlockedMessage ?? "")
+            } else {
+                List(addedSources) { source in
+                    NavigationLink {
+                        AddSourceView(existingSource: source)
+                    } label: {
+                        row(for: source)
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            requestRemoval(of: source)
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+                }
             }
+        }
+        .navigationTitle("Connected Sources")
+        .inlineNavigationBarIfAvailable()
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    AddSourceView()
+                } label: {
+                    Label("Add Source", systemImage: "plus")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Remove \u{201C}\(sourcePendingRemoval?.displayName ?? "")\u{201D}?",
+            isPresented: Binding(
+                get: { sourcePendingRemoval != nil },
+                set: { if !$0 { sourcePendingRemoval = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove Source", role: .destructive) {
+                if let source = sourcePendingRemoval {
+                    remove(source)
+                }
+                sourcePendingRemoval = nil
+            }
+        } message: {
+            Text("This removes the connection and its stored token everywhere it's synced. Only allowed while no trackers use it.")
+        }
+        .alert(
+            "Can't Remove Source",
+            isPresented: Binding(
+                get: { removalBlockedMessage != nil },
+                set: { if !$0 { removalBlockedMessage = nil } }
+            )
+        ) {
+            Button("OK") { removalBlockedMessage = nil }
+        } message: {
+            Text(removalBlockedMessage ?? "")
         }
     }
 
@@ -515,10 +519,16 @@ private struct NewSourceCard: View {
 #endif
 
 #Preview {
+    #if os(macOS)
     ConnectedSourcesView()
         .modelContainer(PreviewData.container)
         .environment(PreviewData.store)
-        #if os(macOS)
         .frame(width: 640, height: 440)
-        #endif
+    #else
+    NavigationStack {
+        ConnectedSourcesView()
+    }
+    .modelContainer(PreviewData.container)
+    .environment(PreviewData.store)
+    #endif
 }

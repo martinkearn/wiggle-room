@@ -62,6 +62,38 @@ final class TrackerStore {
         reloadWidgets()
     }
 
+    /// Wipes every tracker (and, via its cascade delete rule, every
+    /// reading), every real connected source, and every Starling request
+    /// log entry — a full reset back to a blank app. Deliberately something
+    /// the user has to explicitly trigger from Settings (§7.2/§12) rather
+    /// than anything automatic, after a real 2026-09-18 incident where a
+    /// schema mismatch across processes corrupted local test data badly
+    /// enough that some records couldn't even be selected/deleted
+    /// individually (see progress-notes.md) — this is the clean-slate
+    /// escape hatch for exactly that kind of situation, not a routine
+    /// feature. The fixed "Manual Entry" pseudo-source (`manualEntrySource`)
+    /// is deliberately **not** deleted — it's required plumbing every
+    /// tracker's source picker depends on existing, not user data, and
+    /// `TrackerStore` doesn't currently support recreating it without a
+    /// fresh `init`.
+    func resetAllData() {
+        let trackers = (try? modelContext.fetch(FetchDescriptor<Tracker>())) ?? []
+        for tracker in trackers {
+            ReminderScheduler.cancel(tracker)
+            modelContext.delete(tracker)
+        }
+        let sources = (try? modelContext.fetch(FetchDescriptor<ConnectedSource>())) ?? []
+        for source in sources where source.providerId != manualProvider.providerId {
+            modelContext.delete(source)
+        }
+        let requestLog = (try? modelContext.fetch(FetchDescriptor<StarlingRequestLogEntry>())) ?? []
+        for entry in requestLog {
+            modelContext.delete(entry)
+        }
+        try? modelContext.save()
+        reloadWidgets()
+    }
+
     /// Persists in-place edits to an existing `@Model` object (e.g. from
     /// editing a tracker's details) — SwiftData tracks the mutation, this
     /// just flushes it. `reminderCadenceMinutes` may have changed as part of

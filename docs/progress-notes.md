@@ -1,7 +1,30 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Fixed a real, serious data-corruption bug: mismatched
+after **2026-09-18 Reset App Data + a proper iOS Settings screen** — a
+direct follow-up to the schema-mismatch incident below, while cleaning up
+its corrupted test data by hand surfaced two more real gaps: some
+trackers couldn't even be *selected* in the macOS sidebar (right-click
+"Delete Tracker" added, bypassing `selection` entirely — see `MacRootView`),
+and there was no in-app way to wipe everything and start clean short of
+deleting records one at a time. Added `TrackerStore.resetAllData()` (wipes
+every tracker/reading, every real connected source, every Starling request
+log entry — the fixed Manual Entry source is left alone) behind a
+destructive confirmation, in Settings → General on macOS. Doing the iOS
+equivalent raised a design question — iOS had no Settings screen at all,
+just a gear icon opening Connected Sources directly — and the answer was
+to build a real one: `SettingsView` (new, iOS-only), a List with
+Connected Sources as its own row/section and a Danger Zone section below,
+mirroring macOS's General/Connected Sources split instead of continuing
+to bolt admin features onto whichever screen was nearest. `ConnectedSourcesView`'s
+iOS body lost its own `NavigationStack` wrapper since it's now pushed
+inside `SettingsView`'s stack rather than presented standalone. `xcodebuild
+build` succeeded on both `platform=macOS` and `generic/platform=iOS`
+(including a real gotcha: `TrackerListView.swift` compiles unconditionally
+on macOS too even though never used there at runtime — `SettingsView`
+being iOS-only needed an explicit `#if !os(macOS)`/`#else EmptyView()`
+split at that one call site to keep the macOS build green). Before that,
+**2026-09-18 Fixed a real, serious data-corruption bug: mismatched
 SwiftData schemas across processes sharing the CloudKit store** — see the
 full incident writeup at the bottom of this file before touching the data
 model again. Short version: adding `StarlingRequestLogEntry` to the main

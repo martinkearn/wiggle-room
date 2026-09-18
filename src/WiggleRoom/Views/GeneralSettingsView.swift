@@ -20,8 +20,10 @@ import SwiftData
 /// structure moved to `SettingsRootView` when the window switched from a
 /// `TabView` to a fixed sidebar (2026-09-18).
 struct GeneralSettingsView: View {
+    @Environment(TrackerStore.self) private var store
     @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
     @AppStorage(menuBarTrackerIDKey) private var pinnedTrackerID: String = ""
+    @State private var isPresentingResetConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -57,7 +59,39 @@ struct GeneralSettingsView: View {
                 }
             }
 
+            Divider()
+
+            dangerZoneSection
+
             Spacer()
+        }
+        .confirmationDialog(
+            "Reset All App Data?",
+            isPresented: $isPresentingResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Reset Everything", role: .destructive) {
+                store.resetAllData()
+            }
+        } message: {
+            Text("Deletes every tracker, reading, and connected source, on every device signed into this iCloud account. This can't be undone.")
+        }
+    }
+
+    /// A deliberate, explicit escape hatch — see `TrackerStore.resetAllData()`'s
+    /// own doc comment for why this exists at all (a real data-corruption
+    /// incident, 2026-09-18) rather than being a routine feature.
+    private var dangerZoneSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Danger Zone")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(WiggleRoomColors.error)
+            Button("Reset App Data…", role: .destructive) {
+                isPresentingResetConfirmation = true
+            }
+            Text("Permanently deletes every tracker, reading, and connected source — synced to every device. Cannot be undone.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }
@@ -65,6 +99,7 @@ struct GeneralSettingsView: View {
 #Preview {
     GeneralSettingsView()
         .modelContainer(PreviewData.container)
+        .environment(PreviewData.store)
         .frame(width: 640, height: 440)
 }
 #endif

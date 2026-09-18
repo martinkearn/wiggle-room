@@ -1,0 +1,77 @@
+//
+//  SettingsView.swift
+//  WiggleRoom
+//
+
+#if !os(macOS)
+import SwiftUI
+import SwiftData
+
+/// iOS Settings (§7.1): a List-based settings screen mirroring macOS's
+/// sidebar structure (`SettingsRootView` — General + Connected Sources) so
+/// admin/configuration features have one consistent home on both platforms
+/// instead of accumulating on whichever screen happens to be nearby.
+/// Added 2026-09-18 replacing a direct `ConnectedSourcesView` sheet —
+/// Connected Sources is now one row within this screen rather than the
+/// screen itself, matching macOS's own General/Connected Sources split.
+///
+/// Presented via `.sheet` from `TrackerListView`'s toolbar gear icon.
+struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(TrackerStore.self) private var store
+    @State private var isPresentingResetConfirmation = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    NavigationLink {
+                        ConnectedSourcesView()
+                    } label: {
+                        Label("Connected Sources", systemImage: "point.3.filled.connected.trianglepath.dotted")
+                    }
+                }
+
+                Section {
+                    Button("Reset App Data…", role: .destructive) {
+                        isPresentingResetConfirmation = true
+                    }
+                } header: {
+                    Text("Danger Zone")
+                } footer: {
+                    // Same reasoning as macOS's copy of this feature
+                    // (`GeneralSettingsView`) — see `TrackerStore
+                    // .resetAllData()`'s own doc comment for why this
+                    // exists at all.
+                    Text("Permanently deletes every tracker, reading, and connected source — synced to every device. Cannot be undone.")
+                }
+            }
+            .navigationTitle("Settings")
+            .inlineNavigationBarIfAvailable()
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .confirmationDialog(
+            "Reset All App Data?",
+            isPresented: $isPresentingResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Reset Everything", role: .destructive) {
+                store.resetAllData()
+                dismiss()
+            }
+        } message: {
+            Text("Deletes every tracker, reading, and connected source, on every device signed into this iCloud account. This can't be undone.")
+        }
+    }
+}
+
+#Preview {
+    SettingsView()
+        .modelContainer(PreviewData.container)
+        .environment(PreviewData.store)
+}
+#endif

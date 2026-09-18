@@ -22,7 +22,7 @@ struct TrackerListView: View {
     @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
 
     @State private var isPresentingAddTracker = false
-    @State private var isPresentingSources = false
+    @State private var isPresentingSettings = false
     @State private var navigationPath = NavigationPath()
 
     // Mirrors TrackerDetailView's own ticker (§7.1) — without this, a row's
@@ -66,9 +66,9 @@ struct TrackerListView: View {
             .toolbar {
                 ToolbarItem(placement: .navigation) {
                     Button {
-                        isPresentingSources = true
+                        isPresentingSettings = true
                     } label: {
-                        Label("Connected Sources", systemImage: "gearshape")
+                        Label("Settings", systemImage: "gearshape")
                     }
                 }
                 ToolbarItem(placement: .primaryAction) {
@@ -82,8 +82,18 @@ struct TrackerListView: View {
             .sheet(isPresented: $isPresentingAddTracker) {
                 AddTrackerView()
             }
-            .sheet(isPresented: $isPresentingSources) {
-                ConnectedSourcesView()
+            .sheet(isPresented: $isPresentingSettings) {
+                // `TrackerListView` itself is iOS/iPadOS-only at runtime
+                // (`ContentView` routes macOS to `MacRootView` instead,
+                // §7.2), but this file still compiles for macOS since it
+                // isn't `#if os`-gated at the file level — `SettingsView`
+                // is iOS-only (§7.1), so this branch only exists to keep
+                // the macOS compile happy; it's never actually reached.
+                #if !os(macOS)
+                SettingsView()
+                #else
+                EmptyView()
+                #endif
             }
             .onAppear {
                 ticker.endDatesProvider = { trackers.map(\.endDate) }
