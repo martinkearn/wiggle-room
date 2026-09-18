@@ -75,7 +75,7 @@ struct AddSourceView: View {
                 }
             }
         }
-        .navigationTitle(existingSource == nil ? "Add Source" : "Reconnect")
+        .navigationTitle(existingSource == nil ? "Add Source" : "Edit Source")
         .inlineNavigationBarIfAvailable()
         .toolbar {
             // Only on macOS, where this view is always presented as a
@@ -96,7 +96,13 @@ struct AddSourceView: View {
                     if isConnecting {
                         ProgressView()
                     } else {
-                        Text(existingSource == nil ? "Connect" : "Reconnect")
+                        // "Save", not "Reconnect" — this same button also
+                        // covers a plain rename with no token change at
+                        // all, where "Reconnect" read oddly (nothing was
+                        // actually disconnected). Saving still validates
+                        // the token against Starling either way (§5.3) and
+                        // reports a failure inline if it's no longer valid.
+                        Text(existingSource == nil ? "Connect" : "Save")
                     }
                 }
                 .disabled(trimmedToken.isEmpty || isConnecting)
