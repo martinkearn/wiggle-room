@@ -61,6 +61,10 @@ struct MenuBarStatusView: View {
                     RingsView(tracker: tracker, now: .now, lineWidth: 14)
                         .frame(width: 132, height: 132)
 
+                    // No separate status-label/difference row here — the
+                    // ring's own center content (RingsView) already shows
+                    // both, so repeating them below would just duplicate
+                    // what's already on screen a few pixels up.
                     VStack(spacing: 6) {
                         HStack {
                             Text(tracker.currentValueLabel)
@@ -72,12 +76,6 @@ struct MenuBarStatusView: View {
                             Spacer()
                             Text(tracker.formattedValue(pace.targetValueToday))
                         }
-                        HStack {
-                            Text(pace.status.label(for: tracker))
-                            Spacer()
-                            Text(pace.displayDifference(for: tracker))
-                        }
-                        .foregroundStyle(pace.status.color)
                     }
                     .font(.system(size: 12))
                 }
