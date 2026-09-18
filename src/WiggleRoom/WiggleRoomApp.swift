@@ -17,6 +17,9 @@ struct WiggleRoomApp: App {
     #if os(iOS)
     @Environment(\.scenePhase) private var scenePhase
     #endif
+    #if os(macOS)
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #endif
 
     init() {
         let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
