@@ -14,40 +14,57 @@ import SwiftData
 /// thing in the app lives in one place (Settings), the same way Connected
 /// Sources already does, rather than a glanceable status-item dropdown
 /// also doubling as a settings surface.
+///
+/// Plain content laid directly into `SettingsRootView`'s sidebar-detail
+/// pane — no `Form`/`NavigationStack` chrome of its own, since that scene
+/// structure moved to `SettingsRootView` when the window switched from a
+/// `TabView` to a fixed sidebar (2026-09-18).
 struct GeneralSettingsView: View {
     @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
     @AppStorage(menuBarTrackerIDKey) private var pinnedTrackerID: String = ""
 
     var body: some View {
-        Form {
-            Section {
-                if trackers.isEmpty {
-                    Text("Add a tracker to choose one for the menu bar.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    // Empty-string tag matches `resolveMenuBarTracker`'s own
-                    // fallback rule (`MenuBarStatusView.swift`): no tracker
-                    // id is ever the empty string, so this option always
-                    // means "fall back to most-recently-started" rather
-                    // than pinning a specific tracker.
-                    Picker("Show in Menu Bar", selection: $pinnedTrackerID) {
-                        Text("Most Recently Started").tag("")
-                        ForEach(trackers) { tracker in
-                            Text(tracker.name).tag(tracker.id.uuidString)
+        VStack(alignment: .leading, spacing: 20) {
+            Text("General")
+                .font(.title2.weight(.semibold))
+
+            if trackers.isEmpty {
+                Text("Add a tracker to choose one for the menu bar.")
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Show in Menu Bar")
+                        Spacer()
+                        // Empty-string tag matches `resolveMenuBarTracker`'s
+                        // own fallback rule (`MenuBarStatusView.swift`): no
+                        // tracker id is ever the empty string, so this
+                        // option always means "fall back to
+                        // most-recently-started" rather than pinning a
+                        // specific tracker.
+                        Picker("", selection: $pinnedTrackerID) {
+                            Text("Most Recently Started").tag("")
+                            ForEach(trackers) { tracker in
+                                Text(tracker.name).tag(tracker.id.uuidString)
+                            }
                         }
+                        .labelsHidden()
+                        .frame(width: 240)
                     }
+                    Text("Choose which tracker's rings and figures appear in the menu bar dropdown.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-            } footer: {
-                Text("Choose which tracker's rings and figures appear in the menu bar dropdown.")
             }
+
+            Spacer()
         }
-        .formStyle(.grouped)
-        .frame(minWidth: 420, minHeight: 200)
     }
 }
 
 #Preview {
     GeneralSettingsView()
         .modelContainer(PreviewData.container)
+        .frame(width: 640, height: 440)
 }
 #endif
