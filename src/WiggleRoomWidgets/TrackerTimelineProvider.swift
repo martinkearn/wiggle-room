@@ -16,9 +16,23 @@ struct TrackerTimelineProvider: AppIntentTimelineProvider {
         TrackerTimelineEntry(date: .now, tracker: try? WidgetDataStore.fetchAllTrackersImmediately().first)
     }
 
+    /// `snapshot` is what WidgetKit shows immediately while the user is
+    /// actively resizing/reconfiguring a widget (family change, or picking
+    /// a different tracker) — Apple's own guidance is that it should return
+    /// essentially instantly, unlike `timeline` below. It deliberately does
+    /// **not** go through `resolvedTracker(for:)`/`WidgetDataStore
+    /// .fetchAllTrackers()`, which bakes in an unconditional ~2s CloudKit-
+    /// import wait meant for periodic background reloads catching a fresh
+    /// value — appropriate for `timeline`, but exactly the kind of avoidable
+    /// delay that made reconfiguring visibly blank for longer than it
+    /// needed to. A plain immediate local fetch here is a real, local
+    /// SwiftData read (already synced data on disk), not a network call, so
+    /// it's fast regardless.
     @MainActor
     func snapshot(for configuration: SelectTrackerIntent, in context: Context) async -> TrackerTimelineEntry {
-        TrackerTimelineEntry(date: .now, tracker: await resolvedTracker(for: configuration))
+        let trackers = (try? WidgetDataStore.fetchAllTrackersImmediately()) ?? []
+        let tracker = configuration.tracker.flatMap { id in trackers.first { $0.id == id.id } } ?? trackers.first
+        return TrackerTimelineEntry(date: .now, tracker: tracker)
     }
 
     /// A tracker's pace figures drift continuously, but they only need to be
