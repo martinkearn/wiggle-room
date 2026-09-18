@@ -70,12 +70,15 @@ final class StarlingProvider: SourceProvider {
     /// argument, so the daily request count is tracked app-wide rather than
     /// resetting every time `TrackerStore.provider(for:)` hands back a fresh
     /// instance for the same connection. Resets on app relaunch (in-memory
-    /// only, not persisted) — an accepted simplification for v1, since it
-    /// still catches the case this exists for (heavy same-session polling),
-    /// just not a genuinely 24h-spanning count across app restarts. Not
-    /// `private`: `GeneralSettingsView` reads `sharedBudget.status` to
-    /// surface rate-limit insight (§5.3) in Settings.
-    static let sharedBudget = StarlingRequestBudget()
+    /// only, not persisted) — an accepted simplification for v1 for this
+    /// local safety-net count specifically (see `StarlingRequestBudget`'s
+    /// own doc comment for why the *displayed* count doesn't rely on this
+    /// at all). `onRequestLogged: StarlingRequestLogger.record` is what
+    /// makes every real request from this device show up in the synced,
+    /// cross-device "Starling Requests Today" figure. Not `private`:
+    /// `GeneralSettingsView` reads `sharedBudget.status` to surface the
+    /// active cool-down (§5.3) in Settings.
+    static let sharedBudget = StarlingRequestBudget(onRequestLogged: StarlingRequestLogger.record)
 
     private let boundConnection: ConnectedSource?
     private let budget: StarlingRequestBudget

@@ -32,6 +32,12 @@ struct AddSourceView: View {
     @State private var token = ""
     @State private var isConnecting = false
     @State private var errorMessage: String?
+    // Only ever queried/shown on iOS (this screen's rate-limit section is
+    // this platform's only surface for it — macOS has its own copy in
+    // Settings → General, `GeneralSettingsView`), but the `@Query` itself
+    // is harmless to declare on every platform.
+    @Query(sort: \StarlingRequestLogEntry.date, order: .reverse) private var starlingRequestLog: [StarlingRequestLogEntry]
+    @State private var starlingCooldownUntil: Date?
 
     init(existingSource: ConnectedSource? = nil) {
         self.existingSource = existingSource
@@ -74,9 +80,14 @@ struct AddSourceView: View {
                         .foregroundStyle(WiggleRoomColors.error)
                 }
             }
+
+            if existingSource != nil {
+                starlingRateLimitSection
+            }
         }
         .navigationTitle(existingSource == nil ? "Add Source" : "Edit Source")
         .inlineNavigationBarIfAvailable()
+        .task { await refreshStarlingCooldown() }
         .toolbar {
             // Only on macOS, where this view is always presented as a
             // sheet (`ConnectedSourcesView`'s `.sheet`) with no other way
@@ -127,6 +138,41 @@ struct AddSourceView: View {
         return Label(isConnected ? "Connected" : "Not Connected", systemImage: isConnected ? "checkmark.circle.fill" : "exclamationmark.circle")
             .font(.subheadline.weight(.medium))
             .foregroundStyle(isConnected ? WiggleRoomColors.good : WiggleRoomColors.warning)
+    }
+
+    /// The same rate-limit insight `GeneralSettingsView` shows on macOS
+    /// (`starlingRateLimitSection`/`GeneralSettingsView.starlingRequestCaption`)
+    /// — this screen is the only place an iOS user can see it at all, since
+    /// iOS has no dedicated Settings scene the way macOS does (§7.2). The
+    /// request count is the same live, CloudKit-synced `StarlingRequestLogEntry`
+    /// query as the macOS copy — see that section's own doc comment for why
+    /// it reflects every device, not just this one.
+    private var starlingRateLimitSection: some View {
+        Section {
+            HStack {
+                Text("Starling Requests Today")
+                Spacer()
+                Text("\(starlingRequestsToday) / \(StarlingRequestBudget.dailyLimit)")
+                    .foregroundStyle(.secondary)
+            }
+            if let starlingCooldownUntil {
+                Text("Paused until \(starlingCooldownUntil.formatted(Self.timeFormatter)) after hitting Starling's rate limit.")
+                    .font(.caption)
+                    .foregroundStyle(WiggleRoomColors.warning)
+            }
+        } footer: {
+            Text(StarlingRequestBudget.requestCaption)
+        }
+    }
+
+    private var starlingRequestsToday: Int {
+        starlingRequestLog.count { Calendar.current.isDateInToday($0.date) }
+    }
+
+    private static let timeFormatter: Date.FormatStyle = .init().hour().minute()
+
+    private func refreshStarlingCooldown() async {
+        starlingCooldownUntil = await StarlingProvider.sharedBudget.status.cooldownUntil
     }
 
     private func connect() async {

@@ -22,6 +22,7 @@ import SwiftData
 struct GeneralSettingsView: View {
     @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
     @AppStorage(menuBarTrackerIDKey) private var pinnedTrackerID: String = ""
+    @Query(sort: \StarlingRequestLogEntry.date, order: .reverse) private var starlingRequestLog: [StarlingRequestLogEntry]
     @State private var starlingStatus: StarlingRequestBudget.Status?
 
     var body: some View {
@@ -67,39 +68,46 @@ struct GeneralSettingsView: View {
         .task { await refreshStarlingStatus() }
     }
 
-    /// Rate-limit insight (§5.3/§12) — the budget itself (`StarlingRequestBudget`,
-    /// shared app-wide across every Starling connection, not per-source)
-    /// was previously invisible short of a paused-refresh error on whatever
-    /// tracker happened to be open when it hit. Real usage showed the rate
-    /// limit being hit more than expected, with no way to see why.
+    /// Rate-limit insight (§5.3/§12) — was previously invisible short of a
+    /// paused-refresh error on whatever tracker happened to be open when it
+    /// hit. Real usage showed the rate limit being hit more than expected,
+    /// with no way to see why. The count itself comes from `starlingRequestLog`
+    /// (a live `@Query`, see the property above) rather than from
+    /// `StarlingRequestBudget` — that actor only ever sees this device's
+    /// own requests, whereas the synced `StarlingRequestLogEntry` log
+    /// reflects every device sharing this (CloudKit-synced) Starling token,
+    /// which is what "Starling Requests Today" is meant to mean. Shared
+    /// verbatim with `AddSourceView`'s per-source version of this section.
     private var starlingRateLimitSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Starling Requests Today")
-                Spacer()
-                if let starlingStatus {
-                    Text("\(starlingStatus.requestsInLast24Hours) / \(starlingStatus.dailyLimit)")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ProgressView().controlSize(.small)
-                }
-                Button {
-                    Task { await refreshStarlingStatus() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.borderless)
-            }
+            starlingRequestCountRow(refreshAction: { Task { await refreshStarlingStatus() } })
             if let cooldownUntil = starlingStatus?.cooldownUntil {
                 Text("Paused until \(cooldownUntil.formatted(Self.timeFormatter)) after hitting Starling's rate limit.")
                     .font(.caption)
                     .foregroundStyle(WiggleRoomColors.warning)
             } else {
-                Text("Counts every request across all Starling-connected trackers over the last 24 hours (resets when the app relaunches, not a true rolling 24h count).")
+                Text(StarlingRequestBudget.requestCaption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func starlingRequestCountRow(refreshAction: @escaping () -> Void) -> some View {
+        HStack {
+            Text("Starling Requests Today")
+            Spacer()
+            Text("\(starlingRequestsToday) / \(StarlingRequestBudget.dailyLimit)")
+                .foregroundStyle(.secondary)
+            Button(action: refreshAction) {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.borderless)
+        }
+    }
+
+    private var starlingRequestsToday: Int {
+        starlingRequestLog.count { Calendar.current.isDateInToday($0.date) }
     }
 
     private static let timeFormatter: Date.FormatStyle = .init().hour().minute()

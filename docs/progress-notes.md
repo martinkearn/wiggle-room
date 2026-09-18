@@ -1,7 +1,22 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Estimated Final Balance: card and chart now share one
+after **2026-09-18 "Starling Requests Today" is now a real, synced,
+cross-device count** — the rate-limit insight added earlier the same day
+only ever counted the current device's own in-memory requests since its
+last relaunch; the user pointed out that since the Starling token is
+CloudKit-synced (§5.3), the same PAT is typically active from more than
+one device at once, so the count needs to be genuinely shared. Added a
+new synced `StarlingRequestLogEntry` model (one record per real request,
+inserted via `StarlingRequestBudget`'s new `onRequestLogged` hook →
+`StarlingRequestLogger`), queried live via `@Query` and filtered to
+`Calendar.current.isDateInToday(_:)` so it resets at local midnight. Also
+surfaced this on iOS for the first time, on the Connected Source detail
+screen (`AddSourceView`) — iOS has no Settings scene equivalent to
+macOS's. Flagged explicitly and up front: Starling's API has no way to
+report usage from other apps/scripts sharing the same token, so that part
+of the ask isn't achievable — the caption text says so. Before that,
+**2026-09-18 Estimated Final Balance: card and chart now share one
 clamp, not two** — a same-day follow-up fix (below): the first fix for
 this feature (a minimum-data-span guard, described further down) turned
 out not to be the real problem, since the user still saw the card's
@@ -2781,3 +2796,90 @@ verified on a real device/simulator against the actual tracker the user
 reported this against** — worth specifically re-checking that tracker's
 detail screen once rebuilt, to confirm the card's number now matches
 where its trend line visually ends.
+
+## 2026-09-18 "Starling Requests Today" is now a real, synced, cross-device count
+
+Follow-up to the rate-limit insight added earlier in the same day's
+backlog-pass entry. The user's ask, verbatim: it should be "a real count
+of all requests across all apps which share that PAT," resetting at
+00:00 — and, once told that "across all apps" (meaning any app/script,
+not just this one) isn't achievable, clarified the real requirement:
+this app's own count, but shared correctly across this user's own
+devices, "since it is now sync'd" (the Starling PAT lives on
+`ConnectedSource.credentialToken`, CloudKit-synced like everything else,
+§5.3 — so the same real token is genuinely active from more than one
+device at once, and a per-device-only count was quietly wrong for
+exactly that reason).
+
+**What's achievable vs. not, told to the user up front before building
+anything**: Starling's public API has no endpoint and no response header
+that reports how many requests have been made against a token, to any
+client, ever. There is no way — from this app, or any app — to see usage
+by some *other* app or script sharing the same PAT. That part of the
+original ask is a hard technical limit, not a design tradeoff. What
+genuinely is achievable: a true count of every request *this app* makes,
+merged correctly across every device the user runs it on.
+
+**Design**: added `StarlingRequestLogEntry` (`WiggleRoomShared/Models/
+StarlingRequestLogEntry.swift`) — a minimal `@Model` with just a `date`,
+inserted into the same CloudKit-synced schema every other model already
+uses (added to `WiggleRoomApp.swift`'s `Schema([...])` list). One record
+per real Starling HTTP request, never a shared mutable counter —
+CloudKit resolves a genuine write conflict on a single record by picking
+one side, which would silently drop whichever device's increment lost;
+independent inserts instead merge additively with no conflict possible,
+identical reasoning to why `ValueSnapshot` already stores reading history
+as discrete records rather than one overwritten "current value" (§6).
+`StarlingRequestBudget` gained an `onRequestLogged: (@Sendable (Date) ->
+Void)?` hook, fired once per successfully-consumed request slot;
+`StarlingProvider.sharedBudget` wires it to a new `StarlingRequestLogger
+.record(at:)`, which opens its own short-lived `ModelContext` (not
+`container.mainContext`, which is main-actor-bound — this can be called
+from `StarlingRequestBudget`'s own, non-main, actor executor) and
+inserts/saves. `StarlingRequestLogger.configure(container:)` is called
+from `WiggleRoomApp.init()` alongside the existing `BackgroundRefreshScheduler
+.register(container:)`, and also prunes entries older than 3 days at
+launch — generous enough to always cover "today" in any timezone,
+without keeping every request ever made as a permanent synced record.
+
+Both display surfaces (`GeneralSettingsView.starlingRateLimitSection` on
+macOS, a new section in `AddSourceView` on iOS — the latter added because
+iOS has no Settings scene at all equivalent to macOS's, so the Connected
+Source detail screen is the only place to put this there) now read a
+live `@Query(sort: \StarlingRequestLogEntry.date, ...)` directly, filtered
+in-view to `Calendar.current.isDateInToday($0.date)` — genuinely resets
+at local midnight rather than a rolling window, and updates automatically
+as CloudKit sync delivers another device's requests, with no polling or
+actor round-trip needed for the number itself. The shared caption text
+explaining what is and isn't counted (`StarlingRequestBudget.requestCaption`)
+lives on the plain, non-platform-gated `StarlingRequestBudget` type so
+both the macOS-only `GeneralSettingsView` and the cross-platform
+`AddSourceView` can reference the same string without either depending
+on the other.
+
+**What deliberately did not change**: `StarlingRequestBudget.consumeSlot()`
+— the actual pre-flight check that refuses to make a request once near
+the daily cap — still uses its original local, in-memory, rolling-24h
+window, unaware of other devices. This is a deliberate choice, not an
+oversight: it's a same-device safety margin, and Starling doesn't
+document whether its own real daily window is rolling or resets at a
+fixed clock boundary, so weakening this check to match the new
+midnight-reset *display* semantics would have traded a conservative,
+safe local guard for one that could theoretically let a device exceed
+the real cap depending on how Starling's own window actually works. The
+existing 429-triggered cooldown (`recordRateLimited`) remains the
+authoritative backstop regardless of how any client-side estimate is
+computed.
+
+### Verifying this change
+
+`xcodebuild build` succeeded for both `platform=macOS` and
+`generic/platform=iOS`. `xcodebuild test` (macOS) — `StarlingRequestBudgetTests`
+and `StarlingAPIClientTests` (9 tests total) — passed unchanged (the
+`onRequestLogged` parameter defaults to `nil`, so no existing test needed
+updating). **Not verified on a real device against genuine multi-device
+sync** — worth specifically checking, once this reaches an actual iPhone
+and Mac signed into the same iCloud account with the same Starling
+source connected, that a request made on one device does show up in the
+other device's "Starling Requests Today" figure within a reasonable
+CloudKit sync delay.

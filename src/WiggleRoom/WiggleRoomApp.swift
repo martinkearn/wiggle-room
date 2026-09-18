@@ -22,7 +22,7 @@ struct WiggleRoomApp: App {
     #endif
 
     init() {
-        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
+        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self, StarlingRequestLogEntry.self])
 
         // Full cross-device sync via CloudKit (§6), now that the paid Apple
         // Developer Program account is active and the iCloud capability is
@@ -55,6 +55,7 @@ struct WiggleRoomApp: App {
 
         _store = State(initialValue: TrackerStore(modelContext: modelContainer.mainContext))
         CloudSyncWidgetRefresher.start()
+        StarlingRequestLogger.configure(container: modelContainer)
 
         #if os(iOS)
         WiggleRoomFont.installNavigationBarAppearance()
