@@ -240,11 +240,12 @@ struct AddTrackerView: View {
                 }
 
                 // Deliberately the last thing on the screen, with extra
-                // space above it (`.listSectionSpacing`) so it reads as its
-                // own separate zone rather than sitting shoulder-to-shoulder
-                // with an ordinary field — this used to be a "…" menu item
-                // right next to Edit Tracker with no gap at all, an easy
-                // mis-tap on iOS. See progress-notes.md's 2026-09-18 entry.
+                // space above it (`.listSectionSpacing`, iOS/iPadOS only —
+                // unavailable on macOS) so it reads as its own separate zone
+                // rather than sitting shoulder-to-shoulder with an ordinary
+                // field — this used to be a "…" menu item right next to Edit
+                // Tracker with no gap at all, an easy mis-tap on iOS. See
+                // progress-notes.md's 2026-09-18 entry.
                 if existingTracker != nil {
                     Section {
                         Button(role: .destructive) {
@@ -259,7 +260,9 @@ struct AddTrackerView: View {
                     } footer: {
                         Text("This removes the tracker and all its logged readings. This can't be undone.")
                     }
+                    #if os(iOS)
                     .listSectionSpacing(.custom(48))
+                    #endif
                 }
             }
             .navigationTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
