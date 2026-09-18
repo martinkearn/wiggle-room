@@ -27,6 +27,13 @@ struct TrackerDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let tracker: Tracker
 
+    /// Backs `starlingRequestsCard` — only meaningful for a Starling-sourced
+    /// tracker (`isStarlingTracker`), but declared unconditionally since
+    /// `@Query` can't be created conditionally; the query itself is cheap
+    /// and simply goes unused on a manual/other-source tracker's screen.
+    @Query(sort: \StarlingRequestLogEntry.date, order: .reverse) private var starlingRequestLog: [StarlingRequestLogEntry]
+    @State private var starlingCooldownUntil: Date?
+
     @State private var isPresentingLogReading = false
     @State private var isPresentingEditTracker = false
     @State private var isPresentingReadingHistory = false
@@ -184,9 +191,14 @@ struct TrackerDetailView: View {
                         estimatedFinalBalanceCard(estimatedFinalValue)
                     }
                 }
+
+                if isStarlingTracker {
+                    starlingRequestsCard
+                }
             }
             .padding(.bottom, 32)
         }
+        .task { await refreshStarlingCooldownIfNeeded() }
         #if !os(macOS)
         .refreshable {
             await handleUpdateGesture()
@@ -539,6 +551,60 @@ struct TrackerDetailView: View {
         guard difference != 0 else { return "Right on target" }
         let verb = difference > 0 ? "under" : "over"
         return "Trending \(verb) target by \(tracker.formattedValue(abs(difference)))"
+    }
+
+    /// Not applicable to a manual tracker or (eventually) any other future
+    /// source — this is specifically about Starling's own request budget,
+    /// so it only makes sense to show for a tracker actually reading from
+    /// Starling.
+    private var isStarlingTracker: Bool {
+        tracker.connectedSource?.providerId == "starling"
+    }
+
+    /// Rate-limit insight (§5.3/§12) — shown on every Starling-connected
+    /// tracker's own dashboard rather than tucked away in Settings, since
+    /// that's where a user actually hits a rate limit and wants to
+    /// understand why. This figure is **shared across every Starling
+    /// tracker**, not specific to this one — Starling's daily limit
+    /// applies per personal access token, and one token is commonly used
+    /// by more than one tracker (§4.4) and, since the token is
+    /// CloudKit-synced, more than one of the user's own devices at once
+    /// (§5.3's `StarlingRequestLogEntry`) — so the same number appears
+    /// identically on every Starling tracker's screen, not scoped down to
+    /// just this tracker's own requests.
+    private var starlingRequestsCard: some View {
+        let tint: Color = starlingCooldownUntil != nil ? WiggleRoomColors.warning : Color.secondary
+        return card(tint: tint) {
+            VStack(spacing: 6) {
+                HStack {
+                    Text("Starling Requests Today")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(starlingRequestsToday) / \(StarlingRequestBudget.dailyLimit)")
+                        .font(.caption.weight(.semibold))
+                }
+                if let starlingCooldownUntil {
+                    Text("Paused until \(starlingCooldownUntil.formatted(Self.retryTimeFormatter)) after hitting Starling's rate limit.")
+                        .font(.caption2)
+                        .foregroundStyle(WiggleRoomColors.warning)
+                } else {
+                    Text("Shared across every Starling tracker, on any of your devices. \(StarlingRequestBudget.requestCaption)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private var starlingRequestsToday: Int {
+        starlingRequestLog.count { Calendar.current.isDateInToday($0.date) }
+    }
+
+    private func refreshStarlingCooldownIfNeeded() async {
+        guard isStarlingTracker else { return }
+        starlingCooldownUntil = await StarlingProvider.sharedBudget.status.cooldownUntil
     }
 
     private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {

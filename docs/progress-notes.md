@@ -1,8 +1,30 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 "Starling Requests Today" is now a real, synced,
-cross-device count** — the rate-limit insight added earlier the same day
+after **2026-09-18 "Starling Requests Today" moved out of Settings, onto
+every Starling tracker's own detail screen** — a same-day follow-up to
+the cross-device-count fix directly below: the user pointed out this is
+tracker-contextual information ("shown in the context of any and all
+starling trackers, not on general settings... not applicable to manual
+trackers or other sources"), not app configuration, so it had no business
+living in Settings → General on macOS or the Connected Source detail
+screen on iOS. Removed from both; added instead as a new card on
+`TrackerDetailView`, shown only when that specific tracker's own source
+is Starling (`isStarlingTracker`), on every platform uniformly — so a
+manual tracker or (once built) a Tesla one never shows it. The figure
+itself didn't change (still the same synced `StarlingRequestLogEntry`
+query, still resets at local midnight) — only where it's surfaced. The
+card's own caption makes clear the number is shared across every Starling
+tracker (it's a per-token budget, not per-tracker), not implying each
+tracker has its own separate quota. `xcodebuild build` succeeded on both
+`platform=macOS` and `generic/platform=iOS`. **Unrelated pre-existing
+flake noticed while re-running the test suite**: `ManualEntryProviderTests`
+fails locally with "No eligible connection available" (a SwiftData
+in-memory `ModelContainer` error) — confirmed present at the prior commit
+too (before any of this session's changes), so it isn't something this
+session introduced; not investigated further, worth a look in its own
+right at some point. Before that, **2026-09-18
+"Starling Requests Today" is now a real, synced, cross-device count** — the rate-limit insight added earlier the same day
 only ever counted the current device's own in-memory requests since its
 last relaunch; the user pointed out that since the Starling token is
 CloudKit-synced (§5.3), the same PAT is typically active from more than
