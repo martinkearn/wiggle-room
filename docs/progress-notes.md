@@ -1,7 +1,11 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Move Delete Tracker out of the crowded "…" menu** — on
+after **2026-09-18 Fix macOS build: `.listSectionSpacing` unavailable +
+`SourceProvider` not class-constrained** — see that entry below for the
+first session in this project's history with a real Xcode/simulator
+toolchain, so these fixes are actually build-verified, not just re-read.
+Before that, **2026-09-18 Move Delete Tracker out of the crowded "…" menu** — on
 the dashboard's "…" menu, Edit Tracker and Delete Tracker (destructive) sat
 directly adjacent with no visual separation, a real mis-tap risk on iOS.
 Delete now lives in its own section at the bottom of the Edit Tracker
@@ -1945,3 +1949,72 @@ confirmation dialog still reads correctly, and confirm deleting closes
 both the Edit sheet and the dashboard behind it (landing back on the
 tracker list). Also confirm the New Tracker flow (`TrackerListView`'s "+"
 and `MacRootView`'s toolbar button) shows no Delete section at all.
+
+## 2026-09-18 Fix macOS build: `.listSectionSpacing` unavailable + `SourceProvider` not class-constrained
+
+User reported an Xcode build error direct from their own machine:
+`'listSectionSpacing' is unavailable in macOS` in `AddTrackerView.swift`
+(the `.listSectionSpacing(.custom(48))` call added in the previous
+session's "Move Delete Tracker out of the crowded '…' menu" entry, to give
+the new Delete Tracker section visual separation). The modifier is
+iOS/iPadOS/tvOS/watchOS-only and simply doesn't exist on macOS, and
+`AddTrackerView` is shared, unconditional code across every platform —
+this always would have failed a macOS build, just never one until now,
+since prior sessions had no Swift toolchain at all to catch it (see the
+long run of "not verified by a compiler" caveats through this file).
+
+**This is the first session in this project with a real Xcode
+installation and simulators available** (Xcode 27.0, confirmed via
+`xcodebuild -version` and `xcrun simctl list devices`), so unlike every
+prior entry here, these fixes are genuinely build-verified rather than
+just carefully re-read.
+
+**Fix 1** (`src/WiggleRoom/Views/AddTrackerView.swift`): wrapped the
+`.listSectionSpacing(.custom(48))` call in `#if os(iOS) … #endif`. macOS
+already has no equivalent list-section-spacing API and didn't need one —
+the Delete section still renders in its own `Section`, just without the
+extra gap on macOS specifically (its list rendering has more inherent
+breathing room between sections than iOS's grouped-list style already).
+
+**Fix 2, found while verifying the first fix** (`xcodebuild build`
+succeeded, but a follow-up `xcodebuild test` run surfaced a second,
+unrelated pre-existing compile error): `TrackerStoreTests.swift`'s
+`testProvider_forManualTracker_returnsManualProvider` does
+`XCTAssertTrue(provider === store.manualProvider)` to confirm
+`TrackerStore.provider(for:)` returned the shared `manualProvider`
+instance rather than a fresh one — but `SourceProvider` (the protocol
+`provider(for:)` returns, §5.1) was declared as a plain, non-class
+protocol, so `===` identity comparison on `(any SourceProvider)?` doesn't
+type-check ("expected to be an instance of a class or class-constrained
+type"). This test must never have compiled successfully before either —
+another casualty of no compiler ever having checked this codebase until
+now. Fixed by declaring `protocol SourceProvider: AnyObject` in
+`src/WiggleRoomShared/Providers/SourceProvider.swift`: both real
+conformers (`ManualEntryProvider`, `StarlingProvider`) are already `final
+class`, so this doesn't constrain anything that wasn't already true in
+practice — it just makes the compiler enforce it, which is exactly what
+the identity-comparison test needs.
+
+**Verification**: `xcodebuild -scheme WiggleRoom build` succeeded for
+both `-destination 'platform=macOS'` and `-destination 'generic/platform=iOS
+Simulator'` after both fixes — a real build, not a syntax check, the first
+of its kind for this project. `xcodebuild test -destination
+'platform=macOS'` then compiled and ran the full suite (fixing fix 2 was
+required to get the test target to build at all), but a large batch of
+`TrackerStoreTests`/`ManualEntryProviderTests` cases failed at runtime
+with CoreData's `NSInternalInconsistencyException: No eligible connection
+available` — traced to this specific machine/session having **no iCloud
+account signed into System Settings** (`defaults read MobileMeAccounts`
+returns empty) while every target's entitlements require
+`com.apple.developer.icloud-services`/CloudKit; SwiftData's in-memory test
+`ModelContainer` (`TestSupport.swift`'s `makeInMemoryModelContainer()`)
+still appears to attempt CloudKit-related setup tied to those entitlements
+even for a local-only store, and fails without a signed-in account. This
+reproduced identically with the command sandbox disabled, ruling out a
+sandboxing artifact. **Not a code bug** — it's an environment gap specific
+to this machine having no Apple ID configured in Xcode/System Settings,
+distinct from (and narrower than) the "no toolchain at all" gap every
+prior entry in this file describes. `WiggleRoomUITests` (which don't touch
+SwiftData) passed cleanly in the same run. Whoever picks this up on a
+machine with a signed-in Apple ID should re-run the full test suite to
+confirm — this session couldn't get further than isolating the cause.
