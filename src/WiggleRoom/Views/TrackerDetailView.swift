@@ -29,7 +29,6 @@ struct TrackerDetailView: View {
 
     @State private var isPresentingLogReading = false
     @State private var isPresentingEditTracker = false
-    @State private var isPresentingDeleteConfirmation = false
     @State private var isPresentingReadingHistory = false
 
     /// Drives `now` forward on a schedule aligned to this tracker's own end
@@ -200,11 +199,6 @@ struct TrackerDetailView: View {
                             Label("Update History", systemImage: "clock")
                         }
                     }
-                    Button(role: .destructive) {
-                        isPresentingDeleteConfirmation = true
-                    } label: {
-                        Label("Delete Tracker", systemImage: "trash")
-                    }
                 } label: {
                     Label("More", systemImage: "ellipsis.circle")
                 }
@@ -214,24 +208,18 @@ struct TrackerDetailView: View {
             LogReadingView(tracker: tracker)
         }
         .sheet(isPresented: $isPresentingEditTracker) {
-            AddTrackerView(existingTracker: tracker)
+            // Delete now lives at the bottom of the Edit Tracker screen
+            // itself, with a clear visual gap from the fields above (§7.1) —
+            // moved out of this "…" menu, where it used to sit directly
+            // under Edit Tracker with no separation, an easy mis-tap on
+            // iOS. `onDelete` dismisses this dashboard too, since the
+            // tracker it was showing no longer exists once the sheet closes.
+            AddTrackerView(existingTracker: tracker, onDelete: { dismiss() })
         }
         .sheet(isPresented: $isPresentingReadingHistory) {
             NavigationStack {
                 ReadingHistoryView(tracker: tracker)
             }
-        }
-        .confirmationDialog(
-            "Delete \u{201C}\(tracker.name)\u{201D}?",
-            isPresented: $isPresentingDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete Tracker", role: .destructive) {
-                store.deleteTracker(tracker)
-                dismiss()
-            }
-        } message: {
-            Text("This removes the tracker and all its logged readings. This can't be undone.")
         }
         .onAppear {
             let appearedAt = Date.now

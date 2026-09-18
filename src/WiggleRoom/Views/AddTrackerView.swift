@@ -38,6 +38,12 @@ struct AddTrackerView: View {
     /// period, and budget.
     var existingTracker: Tracker?
 
+    /// Called after the user confirms deleting `existingTracker`, right
+    /// before this view dismisses itself — lets a presenting screen (e.g.
+    /// `TrackerDetailView`) dismiss itself too, since the tracker it was
+    /// showing no longer exists. `nil`/unused when creating a new tracker.
+    var onDelete: (() -> Void)?
+
     @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
     private var addedSources: [ConnectedSource]
 
@@ -82,6 +88,7 @@ struct AddTrackerView: View {
     @State private var reminderCadenceMinutes: Int?
 
     @State private var errorMessage: String?
+    @State private var isPresentingDeleteConfirmation = false
 
     private enum NumberField {
         case startingValue, totalAllowance
@@ -231,6 +238,29 @@ struct AddTrackerView: View {
                             .foregroundStyle(.red)
                     }
                 }
+
+                // Deliberately the last thing on the screen, with extra
+                // space above it (`.listSectionSpacing`) so it reads as its
+                // own separate zone rather than sitting shoulder-to-shoulder
+                // with an ordinary field — this used to be a "…" menu item
+                // right next to Edit Tracker with no gap at all, an easy
+                // mis-tap on iOS. See progress-notes.md's 2026-09-18 entry.
+                if existingTracker != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            isPresentingDeleteConfirmation = true
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Text("Delete Tracker")
+                                Spacer()
+                            }
+                        }
+                    } footer: {
+                        Text("This removes the tracker and all its logged readings. This can't be undone.")
+                    }
+                    .listSectionSpacing(.custom(48))
+                }
             }
             .navigationTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
             .toolbar {
@@ -272,6 +302,21 @@ struct AddTrackerView: View {
             }
             .task(id: selectedTargetId) {
                 await prefillStartingValueIfNeeded()
+            }
+            .confirmationDialog(
+                "Delete \u{201C}\(existingTracker?.name ?? "")\u{201D}?",
+                isPresented: $isPresentingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Tracker", role: .destructive) {
+                    if let existingTracker {
+                        store.deleteTracker(existingTracker)
+                    }
+                    onDelete?()
+                    dismiss()
+                }
+            } message: {
+                Text("This removes the tracker and all its logged readings. This can't be undone.")
             }
         }
     }
