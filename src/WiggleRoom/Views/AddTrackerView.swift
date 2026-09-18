@@ -121,7 +121,9 @@ struct AddTrackerView: View {
                 Section {
                     let components: DatePicker.Components = includesTime ? [.date, .hourAndMinute] : [.date]
                     DatePicker("Start", selection: $startDate, displayedComponents: components)
+                        .datePickerStyle(.compact)
                     DatePicker("End", selection: $endDate, displayedComponents: components)
+                        .datePickerStyle(.compact)
                     Toggle("Set specific times", isOn: $includesTime)
                         .onChange(of: includesTime) { _, newValue in
                             guard !newValue else { return }

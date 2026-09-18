@@ -31,6 +31,7 @@ struct LogReadingView: View {
                         .listRowInsets(EdgeInsets())
                         .padding(.vertical, 12)
                     DatePicker("Date", selection: $date)
+                        .datePickerStyle(.compact)
                 } footer: {
                     Text(footerHint)
                 }
@@ -93,7 +94,15 @@ struct LogReadingView: View {
                 .focused($isValueFieldFocused)
                 .font(.wiggleNumber(size: 34))
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: true, vertical: false)
+                .textFieldStyle(.plain)
+                // Explicitly sized rather than `.fixedSize()` — that
+                // modifier sizes a `TextField` to fit its *bound string's*
+                // content, not its placeholder, so with `valueText` empty
+                // it collapsed the field's real interactive/focus box down
+                // to almost nothing on macOS while the "0" placeholder
+                // still visually painted outside that tiny box — exactly
+                // the "leading 0, broken layout" look reported 2026-09-18.
+                .frame(minWidth: 80, maxWidth: 160)
             if !tracker.isCurrencyUnit {
                 Text(tracker.unit)
                     .font(.wiggleNumber(size: 34))

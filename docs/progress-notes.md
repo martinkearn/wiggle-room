@@ -1,7 +1,30 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Update History rendering blank on macOS** — reported
+after **2026-09-18 Update Current Value's macOS layout fixed — collapsed
+value field, old-style date picker** — reported straight after the
+Update History fix directly below, from a screenshot: the value entry
+field showed a large "£0" but the actual focusable/highlighted box was a
+narrow sliver next to it, and the Date field looked like an old-fashioned
+stepper-and-text control ("like a '90s web browser"). Root cause for the
+value field: `.fixedSize(horizontal: true, vertical: false)` sizes a
+`TextField` to fit its *bound string's* content, not its placeholder —
+with `valueText` starting as an empty string (by design, so typing
+doesn't insert ahead of a stray placeholder digit, same reasoning as
+§5.3's Starling starting-value fix), the field's real interactive width
+collapsed to almost nothing while the "0" placeholder still painted at
+full size outside that tiny box — exactly the look in the screenshot.
+Fixed with an explicit `.frame(minWidth: 80, maxWidth: 160)` and
+`.textFieldStyle(.plain)` instead of `fixedSize`. The date field had no
+`.datePickerStyle` set at all, defaulting on macOS to the old
+field-and-stepper look rather than a modern compact pill — added
+`.datePickerStyle(.compact)` there and, for consistency, to
+`AddTrackerView`'s Start/End date pickers too (same missing style, not
+yet reported but the same underlying gap). `xcodebuild build` succeeded
+on both `platform=macOS` and `generic/platform=iOS`. **Not yet visually
+re-verified** — same caveat as the entry below, no macOS screen
+automation available this session; worth a real look after rebuilding.
+Before that, **2026-09-18 Update History rendering blank on macOS** — reported
 right after the foreground auto-refresh removal below (real multi-device
 testing): the Starling tracker's Update History sheet showed nothing on
 macOS while iOS correctly listed its readings. Worked through by
