@@ -62,13 +62,13 @@ struct MenuBarStatusView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
 
-                    RingsView(tracker: tracker, now: .now, lineWidth: 14)
+                    // showsStatusLabel: false — the status word ("JUST OVER
+                    // BUDGET") is redundant here since it's repeated in the
+                    // rows directly below the ring, but the number itself
+                    // isn't shown anywhere else in this compact dropdown,
+                    // so it stays.
+                    RingsView(tracker: tracker, now: .now, lineWidth: 14, showsStatusLabel: false)
                         .frame(width: 132, height: 132)
-
-                    // No separate status-label/difference row here — the
-                    // ring's own center content (RingsView) already shows
-                    // both, so repeating them below would just duplicate
-                    // what's already on screen a few pixels up.
                     VStack(spacing: 6) {
                         HStack {
                             Text(tracker.currentValueLabel)

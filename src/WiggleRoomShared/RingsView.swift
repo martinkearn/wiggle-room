@@ -35,6 +35,17 @@ struct RingsView: View {
     var lineWidth: CGFloat = 20
     var showsCenterContent: Bool = true
 
+    /// Whether the center content's status-word line ("JUST OVER BUDGET")
+    /// and its "difference from target" caption are shown alongside the
+    /// number. The number itself (`centerAmountText`) always shows
+    /// whenever `showsCenterContent` is true — this only controls the
+    /// surrounding label text. `false` for the macOS menu bar dropdown
+    /// (`MenuBarStatusView`), where the same status word and figure
+    /// already appear in the rows directly below the ring, so repeating
+    /// the word specifically (not the number, which isn't repeated
+    /// elsewhere in that compact context) would be pure duplication.
+    var showsStatusLabel: Bool = true
+
     /// Widgets render from a static `TimelineEntry` snapshot rather than a
     /// live SwiftUI runloop — WidgetKit captures the view's appearance
     /// essentially immediately, well before a deferred `onAppear` animation
@@ -202,17 +213,19 @@ struct RingsView: View {
     private var centerContent: some View {
         if tracker.latestReading != nil {
             VStack(spacing: 4) {
-                Text(centerStatusLine.uppercased())
-                    .font(.caption.weight(.bold))
-                    .tracking(0.5)
-                    .foregroundStyle(statusColor)
-                    .multilineTextAlignment(.center)
+                if showsStatusLabel {
+                    Text(centerStatusLine.uppercased())
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
+                        .foregroundStyle(statusColor)
+                        .multilineTextAlignment(.center)
+                }
                 Text(centerAmountText)
                     .font(.wiggleNumber(size: 32, weight: .bold))
                     .foregroundStyle(statusColor)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
-                if !tracker.usesBudgetLanguage || status == .warning {
+                if showsStatusLabel && (!tracker.usesBudgetLanguage || status == .warning) {
                     Text("difference from target")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
