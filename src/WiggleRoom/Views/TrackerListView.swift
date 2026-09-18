@@ -42,6 +42,21 @@ struct TrackerListView: View {
                     EmptyTrackersView(isPresentingAddTracker: $isPresentingAddTracker)
                 } else {
                     List {
+                        // Top of the list, not bottom — always visible
+                        // without scrolling, and newly created trackers
+                        // sort to the top anyway (`\Tracker.startDate,
+                        // order: .reverse`), so this is exactly where a
+                        // just-added tracker will actually appear. Replaces
+                        // the old toolbar "+" button entirely, styled to
+                        // match a real tracker row rather than as a plain
+                        // list button.
+                        AddTrackerRow {
+                            isPresentingAddTracker = true
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+
                         ForEach(trackers) { tracker in
                             NavigationLink {
                                 TrackerDetailView(tracker: tracker)
@@ -69,13 +84,6 @@ struct TrackerListView: View {
                         isPresentingSettings = true
                     } label: {
                         Label("Settings", systemImage: "gearshape")
-                    }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        isPresentingAddTracker = true
-                    } label: {
-                        Label("Add Tracker", systemImage: "plus")
                     }
                 }
             }
@@ -187,6 +195,46 @@ private struct TrackerRow: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(status.color.opacity(0.16), lineWidth: 1)
         )
+    }
+}
+
+/// The "Add Tracker" entry point, styled as its own card matching
+/// `TrackerRow`'s exact shape/sizing (same padding, corner radius, ring
+/// size) rather than a plain list button — reads as "one more thing you
+/// could add to this stack," not chrome bolted onto the list. Dashed
+/// rather than solid stroke, and a "+" in place of a ring, distinguish it
+/// from a real tracker at a glance. Lives at the top of the list (see
+/// `TrackerListView.body`) rather than the bottom or the toolbar.
+private struct AddTrackerRow: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(WiggleRoomColors.brand.opacity(0.4), style: StrokeStyle(lineWidth: 2.5, dash: [5, 4]))
+                        .frame(width: 46, height: 46)
+                    Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(WiggleRoomColors.brand)
+                }
+
+                Text("Add Tracker")
+                    .font(WiggleRoomFont.headline(18, weight: 650))
+                    .foregroundStyle(WiggleRoomColors.brand)
+
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .background(WiggleRoomColors.brand.opacity(0.06), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
+                    .foregroundStyle(WiggleRoomColors.brand.opacity(0.3))
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

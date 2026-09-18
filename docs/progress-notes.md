@@ -1,7 +1,30 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 macOS number-field/form-styling fixes, round two — the
+after **2026-09-18 Add Tracker moved from the toolbar into the list
+itself, at the top** — asked as a design question ("would the button be
+better at the bottom or top of the list, taking the same shape as a
+tracker?"); recommended bottom first (a common pattern, e.g. Reminders/
+Things), but the user's own counter-reasoning was better and is what
+shipped: **top**, specifically because it's always visible without
+scrolling *and* a newly created tracker sorts to the top of the list
+anyway (`\Tracker.startDate, order: .reverse`), so top is exactly where
+it will land once added — bottom would have put the entry point and the
+result in two different places. New `AddTrackerRow` (both `TrackerListView`
+on iOS and `MacRootView`'s sidebar equivalent on macOS) matches the real
+tracker row's exact shape/sizing — same padding, corner radius, ring
+size — but with a dashed ring, a "+" in place of a pace ring, and
+brand-tinted text, so it reads as "one more thing you could add" rather
+than a plain list button. Replaces the old toolbar "+" button entirely
+on both platforms; macOS's Cmd+N menu command is untouched. On macOS,
+required restructuring `MacRootView`'s sidebar from `List(trackers,
+selection:)` to explicit `List(selection:) { ... }` content, since the
+new row isn't a `Tracker` and (deliberately) carries no `.tag`, so it
+never participates in `selection` at all. `xcodebuild build` succeeded on
+both `platform=macOS` and `generic/platform=iOS`. **Not yet visually
+re-verified** (no macOS screen automation available this session, same
+caveat as recent entries) — worth a look on both platforms once rebuilt.
+Before that, **2026-09-18 macOS number-field/form-styling fixes, round two — the
 first pass wasn't actually enough** — the previous entry's `.fixedSize()`
 fix for the value field's collapsed focus box turned out to only be half
 the problem: a follow-up screenshot showed the placeholder "0" and

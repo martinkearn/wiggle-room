@@ -34,43 +34,47 @@ struct MacRootView: View {
                         description: Text("Add a tracker to start tracking pace against a target.")
                     )
                 } else {
-                    List(trackers, selection: $selection) { tracker in
-                        MacTrackerRow(tracker: tracker)
-                            .tag(tracker.id)
-                            // A delete path that doesn't depend on
-                            // `selection` at all — operates directly on
-                            // this row's own `tracker` reference from the
-                            // `trackers` array, not on whatever `selection`
-                            // currently holds. Exists specifically for the
-                            // case `List(selection:)`'s own tap-to-select
-                            // silently fails to register (seen in practice
-                            // after a store-level data issue left two rows
-                            // with ambiguous identity — selection could
-                            // never be confirmed for either, so there was
-                            // no other way to remove them from the UI).
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    store.deleteTracker(tracker)
-                                } label: {
-                                    Label("Delete Tracker", systemImage: "trash")
+                    // Explicit `List(selection:) { ... }` content rather
+                    // than `List(trackers, selection:)` — needed to prepend
+                    // the "Add Tracker" row below, which isn't a `Tracker`
+                    // and (deliberately) carries no `.tag`, so it never
+                    // participates in `selection` at all.
+                    List(selection: $selection) {
+                        // Top of the sidebar, not the toolbar — always
+                        // visible without scrolling, and newly created
+                        // trackers sort to the top anyway (`\Tracker
+                        // .startDate, order: .reverse`), so this is exactly
+                        // where a just-added tracker will actually appear.
+                        AddTrackerRow {
+                            isPresentingAddTracker = true
+                        }
+
+                        ForEach(trackers) { tracker in
+                            MacTrackerRow(tracker: tracker)
+                                .tag(tracker.id)
+                                // A delete path that doesn't depend on
+                                // `selection` at all — operates directly on
+                                // this row's own `tracker` reference from the
+                                // `trackers` array, not on whatever `selection`
+                                // currently holds. Exists specifically for the
+                                // case `List(selection:)`'s own tap-to-select
+                                // silently fails to register (seen in practice
+                                // after a store-level data issue left two rows
+                                // with ambiguous identity — selection could
+                                // never be confirmed for either, so there was
+                                // no other way to remove them from the UI).
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        store.deleteTracker(tracker)
+                                    } label: {
+                                        Label("Delete Tracker", systemImage: "trash")
+                                    }
                                 }
-                            }
+                        }
                     }
                 }
             }
             .navigationTitle("Trackers")
-            .toolbar {
-                // Connected Sources moved to the native Settings scene (⌘,,
-                // §7.2) — the standard macOS home for this kind of
-                // configuration, rather than a bespoke sheet duplicating it.
-                ToolbarItem {
-                    Button {
-                        isPresentingAddTracker = true
-                    } label: {
-                        Label("Add Tracker", systemImage: "plus")
-                    }
-                }
-            }
         } detail: {
             if let selectedTracker = trackers.first(where: { $0.id == selection }) {
                 TrackerDetailView(tracker: selectedTracker)
@@ -119,6 +123,36 @@ struct MacRootView: View {
         NSApplication.shared.dockTile.badgeLabel = anyBehindPace ? "!" : nil
     }
     #endif
+}
+
+/// The "Add Tracker" entry point, styled to echo `MacTrackerRow`'s shape
+/// (same ring size/spacing) rather than a plain row — replaces the old
+/// toolbar "+" button entirely. A dashed ring with a "+" in place of a
+/// real pace ring, and brand-tinted text, distinguish it from an actual
+/// tracker row at a glance. Deliberately not selectable — no `.tag`, so it
+/// never becomes a `NavigationSplitView` selection.
+private struct AddTrackerRow: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(WiggleRoomColors.brand.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [3, 2.5]))
+                        .frame(width: 28, height: 28)
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(WiggleRoomColors.brand)
+                }
+                Text("Add Tracker")
+                    .foregroundStyle(WiggleRoomColors.brand)
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 private struct MacTrackerRow: View {
