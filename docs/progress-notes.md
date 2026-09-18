@@ -2018,3 +2018,60 @@ prior entry in this file describes. `WiggleRoomUITests` (which don't touch
 SwiftData) passed cleanly in the same run. Whoever picks this up on a
 machine with a signed-in Apple ID should re-run the full test suite to
 confirm — this session couldn't get further than isolating the cause.
+
+## 2026-09-18 Menu bar dropdown was greyed out; added the rings
+
+User asked why the macOS menu bar item's dropdown looked entirely greyed
+out, and whether the same two-ring visual from the iOS dashboard could be
+shown there too.
+
+**Root cause of the greyed-out look**: `WiggleRoomApp.swift`'s
+`MenuBarExtra` used `.menuBarExtraStyle(.menu)`, which renders the
+dropdown as a genuine AppKit `NSMenu`. AppKit forces any menu content that
+isn't a `Button`/`Toggle`/`Menu` control into its own dimmed
+"informational item" text style — `MenuBarStatusView`'s tracker
+name/current-value/target/difference rows are all plain `Text`/`HStack`,
+so every one of them rendered dimmed even though nothing was actually
+disabled. `.menu` style also can't host an arbitrary custom SwiftUI view
+at all, which was the second half of the ask — there was no way to drop
+`RingsView` into an `NSMenu`.
+
+**Fix**: switched to `.menuBarExtraStyle(.window)` in
+`src/WiggleRoom/WiggleRoomApp.swift`. `.window` presents the dropdown as
+genuine SwiftUI content in a floating panel rather than a real menu, which
+fixes both problems at once — plain text renders normally, and the panel
+can hold any view. Rewrote `MenuBarStatusView`
+(`src/WiggleRoom/Views/MenuBarStatusView.swift`) to add `RingsView` (the
+same view `TrackerDetailView` uses, §3.4/§7.1) above the existing
+current/target/difference rows, at a 132×132pt size with a 14pt line
+width scaled down from the dashboard's larger hero size. The "Show in Menu
+Bar" tracker-picker `Menu` and the "Open Wiggle Room"/"Quit Wiggle Room"
+buttons are unchanged in behavior — in `.window` style they now act as
+ordinary SwiftUI buttons/menus rather than NSMenu items, which if
+anything reads more consistently than before.
+
+**Not built, scope kept to the actual ask**: build-spec.md's §7.2 already
+called for "a refresh/log-reading button" in this dropdown, but that was
+never actually implemented even before this session (confirmed by
+re-reading the pre-existing `MenuBarStatusView` — it only ever had the
+tracker picker and Open/Quit) — that's a pre-existing spec/implementation
+gap, not something introduced or fixed here. Left as-is rather than
+building it opportunistically while already in this file; §7.2 now notes
+it explicitly as a known gap instead of silently implying it exists.
+
+### Verifying this session's changes
+
+`xcodebuild -scheme WiggleRoom -destination 'platform=macOS' build`
+succeeded — a real build, not a syntax check. Could not visually confirm
+the fix in the actual running menu bar: the app was launched
+(`open .../WiggleRoom.app`), but driving/screenshotting the live menu bar
+item needs Accessibility/Screen Recording permission this sandboxed
+session doesn't have (`osascript` failed with "not allowed assistive
+access", `screencapture` failed with "could not create image from
+display"). The `.window`-style fix itself is a well-documented, common
+pattern for exactly this AppKit dimming behavior, and the view code
+compiles and type-checks against real `RingsView`/`TrackerPace` APIs, but
+this still needs an actual look in a running menu bar (click the menu bar
+icon, confirm the rings render and no text looks dimmed) before treating
+it as fully confirmed — flagging this explicitly rather than claiming
+verification that didn't happen.
