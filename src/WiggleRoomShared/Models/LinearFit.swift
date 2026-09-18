@@ -41,15 +41,43 @@ func linearFit(through readings: some Collection<ValueSnapshot>) -> LinearFit? {
 }
 
 extension Tracker {
+    /// Below this, a fit's slope is trusted too little to extrapolate all
+    /// the way to `endDate` — see `hasSufficientSpanForTrend`.
+    private static let minimumTrendSpanFraction = 0.1
+    private static let minimumTrendSpanFloor: TimeInterval = 6 * 3600
+
+    /// Whether the logged readings span enough real time to trust a
+    /// straight-line extrapolation out to `endDate`. A least-squares slope
+    /// fitted through readings taken minutes apart (e.g. a couple of
+    /// foreground polls) is only reliable over that same short window — a
+    /// tiny, meaningless wobble between two close-together readings, spread
+    /// linearly across weeks remaining, produces a wildly exaggerated final
+    /// figure even though the fit itself is mathematically correct. This is
+    /// exactly what `TrendChartView`'s trend line hides by clamping its
+    /// plotted points into the chart's Y range (§3.5) — this card shows a
+    /// specific number rather than just a line, so it can't rely on the
+    /// same visual clamp and instead withholds the estimate until there's
+    /// enough real elapsed history to back it: at least 10% of the
+    /// tracker's total period, with a 6-hour floor for very short trackers.
+    private var hasSufficientSpanForTrend: Bool {
+        guard let first = sortedReadings.first, let last = sortedReadings.last else { return false }
+        let span = last.date.timeIntervalSince(first.date)
+        let totalDuration = endDate.timeIntervalSince(startDate)
+        let required = max(Self.minimumTrendSpanFloor, totalDuration * Self.minimumTrendSpanFraction)
+        return span >= required
+    }
+
     /// Where the trend line (§3.5) projects this tracker's value to land by
     /// `endDate`, based on a least-squares fit through every reading logged
     /// so far — **unclamped**, unlike `TrendChartView`'s own plotted trend
     /// points (clamped into the chart's visible Y range purely to avoid a
     /// Swift Charts rendering bug, §3.5). `nil` before at least two readings
-    /// exist, matching the chart's own threshold for showing a trend line
-    /// at all — a single point has no slope to extrapolate from.
+    /// exist (matching the chart's own threshold for showing a trend line at
+    /// all — a single point has no slope to extrapolate from), or before
+    /// `hasSufficientSpanForTrend` — a fit from readings clustered close
+    /// together in time isn't a trustworthy long-range prediction yet.
     var estimatedFinalValue: Decimal? {
-        guard let fit = linearFit(through: sortedReadings) else { return nil }
+        guard hasSufficientSpanForTrend, let fit = linearFit(through: sortedReadings) else { return nil }
         return Decimal(fit.value(at: endDate))
     }
 
