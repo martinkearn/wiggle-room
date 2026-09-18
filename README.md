@@ -27,7 +27,7 @@ continuously-updated log of what's built, key decisions, and known gaps.
 Rough shape of what's implemented vs. still to come:
 
 - [x] Core Tracker model & pace/consumption calculations
-- [~] Starling provider (implemented — accounts + balance, token stored on the synced ConnectedSource record (CloudKit, not Keychain), 30s foreground/5-minute background refresh, reconnect/remove in Settings, build-verified on both iOS and macOS as of 2026-09-18 including a real macOS App Sandbox networking entitlement fix — see progress-notes.md's 2026-09-18 entries. Spaces/savings-goal targets not yet supported)
+- [x] Starling provider (implemented — accounts, balances, and Spaces (savings goals + spending spaces) as tracker targets; token stored on the synced ConnectedSource record (CloudKit, not Keychain); flat 45s foreground refresh, time-of-day-banded + per-tracker-burst background refresh with a cross-tracker balance cache and a rate-limit insight panel in Settings; edit/remove in Settings. Build-verified on both iOS and macOS as of 2026-09-18 — see progress-notes.md's 2026-09-18 entries)
 - [x] Manual entry provider
 - [ ] Tesla provider (not started — deliberately out of scope so far)
 - [x] SwiftData + CloudKit sync

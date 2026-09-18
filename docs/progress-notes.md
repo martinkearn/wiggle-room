@@ -1,7 +1,18 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Settings redesign: sidebar + inline editing, not tabs
+after **2026-09-18 Feature/bug backlog pass: Starling Spaces, refresh
+cadence redesign, Estimated Final Balance (+ same-day fix), and a run of
+smaller fixes** — see that entry (bottom of file) for the full rundown:
+widget "by" wording, the widget resize/reconfigure blank fixed, Starling
+Spaces as tracker targets, a cross-tracker balance cache, the Edit
+Tracker Save-button bug fixed, the Estimated Final Balance feature (plus
+a same-day fix for an over-extrapolated figure it could show), a Done
+button on Update History, rate-limit insight in Settings + clearer
+rate-limit error text, "Reconnect" renamed to "Save", and — the biggest
+piece — a full redesign of Starling's refresh cadence (flat 45s
+foreground, time-of-day-banded + per-tracker-burst background). Before
+that, **2026-09-18 Settings redesign: sidebar + inline editing, not tabs
 + sheets** — replaced the icon-tab-bar Settings window with a fixed
 sidebar (`SettingsRootView`) and moved Connected Sources to fully inline
 editing on macOS (no pop-ups at all), added a "Connected"/"Not
@@ -2525,3 +2536,179 @@ app with live content. High confidence from code review and from the
 iOS screenshot (same underlying view code, `#if os(macOS)`-gated but
 structurally identical patterns), but worth a real look on macOS
 specifically before treating it as fully confirmed.
+
+## 2026-09-18 Feature/bug backlog pass: Starling Spaces, refresh cadence redesign, Estimated Final Balance (+ same-day fix)
+
+A single consolidated list of bugs/features across Widgets, Starling,
+Edit Tracker, Tracker chart, Tracker history, Tracker details, and
+Connected Sources, worked through in one session after the macOS
+Settings redesign above. Ordered roughly by size.
+
+**Widgets**: added "by" after "Under Budget"/"Over Budget" wherever the
+status word sits next to a figure (`TrackerPace.statusLine(for:)`,
+already shared by widgets/complication/Shortcuts dialog — the wording
+was already centralized, so this was a one-line change plus updating the
+three call sites in `TrackerWidgetEntryView`/`TrackerComplicationEntryView`/
+`ViewTrackerStatusIntent` that had been calling the plainer
+`PaceStatus.label(for:)` instead). Also fixed the ~20s blank a widget
+shows on resize/reconfigure: `TrackerTimelineProvider.snapshot(for:in:)`
+was sharing `timeline(for:in:)`'s fetch path, which includes a
+deliberate CloudKit-wait for freshly-created trackers — correct for a
+real timeline reload, wrong for `snapshot`, which WidgetKit expects back
+near-instantly. Switched `snapshot` to
+`WidgetDataStore.fetchAllTrackersImmediately()`, a plain local fetch.
+
+**Starling Spaces**: a tracker can now target a savings goal or spending
+space, not just the top-level account — `StarlingAPIClient.fetchSpaces
+(accountUid:)` (`GET /api/v2/account/{accountUid}/spaces`, note singular
+"account" unlike the other endpoints), new `StarlingSpacesResponse`/
+`StarlingSavingsGoal`/`StarlingSpendingSpace` structs. Schema was
+verified live against Starling's own API reference before writing any
+code, not guessed. `StarlingProvider.listAvailableTargets(for:)` now
+flattens each account with its active spaces underneath; a private
+`StarlingSpaceTargetID` enum encodes which kind a given target id is
+(account vs. space, and which account it belongs to) so
+`fetchCurrentValue(target:)` knows which endpoint to call.
+
+**Edit Tracker Save button greyed out**: a real bug, not a missing
+feature. `AddTrackerView.isValid` required `selectedTargetId != nil`
+unconditionally, but that's never populated in edit mode (the target
+picker isn't shown when editing) — so Save stayed disabled regardless of
+what the user actually changed. Fields themselves (name, unit,
+direction, dates, starting value, allowance, reminder) were always
+editable; `save()` never touches source/target either way. Fixed by
+exempting `existingTracker != nil` from that one validity check.
+
+**Estimated Final Balance**: a new detail-screen-only card
+(`TrackerDetailView.estimatedFinalBalanceCard`) showing where a
+tracker's trend line projects it to land by `endDate`, and how far that
+is above/below the fixed target — `Tracker.estimatedFinalValue`/
+`estimatedFinalDifference` in a new `WiggleRoomShared/Models/
+LinearFit.swift`, which also became the one shared regression
+implementation (`linearFit(through:)`) — `TrendChartView`'s own trend
+line now calls it too instead of keeping a private duplicate.
+
+**Same-day fix — the estimate could be wildly wrong**: reported by the
+user as "-£1458 whihc is crazy and doe snot align with where the trend
+line is heading." Root cause: `TrendChartView`'s dotted trend line and
+the new card compute the *exact same* fit and endpoint value, but the
+chart line is deliberately clamped into the visible Y range before
+drawing (an existing, commented workaround for a real Swift Charts
+rendering bug when handed far-out-of-frame values) — so on-screen the
+trend line always looks like a plausible, bounded slope, while the
+card's raw unclamped number can be anything the fit implies. With only
+two or three readings logged close together in time (e.g. from the 45s
+foreground poll), the fit's slope is only meaningful over that short
+span; extrapolating it linearly across the weeks remaining in the
+tracker amplifies any small wobble into a huge, untrustworthy figure —
+mathematically correct for that fit, not a credible prediction. Fixed by
+withholding the estimate (`nil`) until the logged readings span at least
+10% of the tracker's total period, with a 6-hour floor for short
+trackers (`Tracker.hasSufficientSpanForTrend`, `LinearFit.swift`) — the
+chart's trend line is untouched (it still shows *something* even with
+sparse data, which is fine for a visual "steepness" cue that's already
+being clamped), only the numeric card became more conservative about
+when it states a specific number.
+
+**Tracker history duplicate-recording — investigated, not resolved**:
+reported as readings seeming to log even when the balance hasn't
+changed. Re-read `TrackerStore.refreshFromSource`'s dedup guard (`guard
+value != tracker.latestReading?.value else { return false }`) and every
+call site (`BackgroundRefreshScheduler`, `TrackerDetailView`) — the logic
+already looks correct: a new `ValueSnapshot` is only inserted when the
+fetched value differs from the last one on record, for both background
+and foreground paths. No bug was found via static review. Possible
+explanation floated back to the user rather than assumed: Starling's
+`effectiveBalance` includes pending-transaction holds that can genuinely
+shift by pennies between polls even when nothing "really" changed from
+the user's point of view — meaning what looks like a duplicate-despite-
+no-change might be a real (tiny) change. Needs either a real-device repro
+with the exact values involved, or confirmation the "duplicates" really
+do carry the exact same value, before this can be investigated further.
+
+**Reading History dismissal**: `ReadingHistoryView` was swipe-down-only
+to dismiss, not an obvious affordance per Apple HIG for a
+sheet/pushed history view. Added a trailing "Done" `ToolbarItem`
+alongside the existing gesture.
+
+**Rate-limit insight + smarter refresh cadence** — the largest single
+piece of this pass, and the one that went through the most design
+back-and-forth before landing (see the "Design process" subsection
+below for the actual back-and-forth, since the final design differs
+non-trivially from the first few proposals):
+- `TrackerDetailView`'s rate-limit error message now names the actual
+  retry/reset time instead of a generic "try again shortly"
+  (`errorMessage(for:)`, new `retryTimeFormatter`).
+- **Settings → General** gained a "Starling Requests Today" section —
+  current count vs. the 1000/day limit, an active cooldown message, and
+  a manual refresh — via a new `StarlingRequestBudget.status` (`Status`:
+  `requestsInLast24Hours`, `dailyLimit`, `cooldownUntil`).
+- **Cross-tracker balance cache**: `StarlingBalanceCache` (new actor,
+  25s TTL) — two trackers on the same account/Space now share one
+  fetched value within that window rather than each polling
+  independently, closing a gap the spec had flagged as not built.
+- **Refresh cadence redesigned**: foreground is now a flat **45s** poll
+  on load + every tick, no adaptive logic at all
+  (`TrackerDetailView.basePollInterval`). Background
+  (`BackgroundRefreshScheduler`) now uses three local time-of-day bands
+  (`TrackerUpdateScheduling.RefreshBand`: peak 08:00–17:00 → 5 min,
+  standard → 15 min, off-peak 00:00–06:00 → 60 min) plus **per-tracker**
+  burst detection (`isBursting`: more than one reading in a trailing
+  30-minute window bumps *that tracker only* to peak cadence, regardless
+  of clock time). This needed a real schema change — `Tracker
+  .lastAutoFetchAttempt: Date?`, set on every background attempt
+  regardless of outcome — since `BGAppRefreshTask` only supports one
+  earliest-begin-date for the whole app/process; per-tracker cadence
+  instead comes from computing each tracker's own next-due time from
+  this field and skipping any tracker that isn't due yet on a given
+  wake-up.
+- **Compatibility checked before building, not after**: re-confirmed via
+  developer.starlingbank.com that a personal access token is still 5
+  req/s / 1000 req/day. Worst case under the new bands (one tracker
+  sustained at peak cadence around the clock) is ~288 requests/day —
+  well inside budget even with several trackers running; the
+  `StarlingRequestBudget` hard cap/cooldown already covers the
+  pathological continuous-foreground-viewing case regardless of cadence
+  design.
+
+**Design process for the refresh cadence** (kept for the record, since
+the shipped design differs from the first few ideas floated): started
+from "freshest data possible while minimizing/eliminating rate limits."
+First proposal (adaptive backoff based on how recently a value had
+changed) was rejected — "just because something moves, it doe snot meant
+it will move again quickly," and time-of-day matters (unlikely to see
+transactions overnight). Added time-of-day bands plus a "look at trends,
+ramp up on concurrent changes" idea; the exact burst threshold was
+refined twice (first "more than 1 transaction in 20 minutes," revised to
+"more than 1 change in a 30 minute window"). Was asked to stop mid-
+implementation and design in prose first rather than keep iterating in
+code — the design that resulted from that conversation (flat 45s
+foreground / three-band + per-tracker-burst background) is what
+actually shipped; several rounds of adaptive-foreground logic built
+during the earlier iteration were fully reverted, confirmed via a clean
+build with no dangling references. The per-tracker-only burst scoping
+was an explicit choice over a simpler app-wide-burst approximation, made
+knowingly as a real schema change ("we're still building so its ok to
+change the schema") rather than deferred.
+
+**Connected Sources wording**: "Reconnect" renamed to "Save" — the old
+label read wrong for the common case of just renaming a source, and
+"save" better describes what the button does either way (re-validates
+the PAT, reports connection status, whether or not the token itself
+changed). `AddSourceView`'s title changed from "Reconnect" to "Edit
+Source" to match.
+
+### Verifying this session's changes
+
+`xcodebuild build` (iOS, `generic/platform=iOS`) succeeded after every
+change in this entry, including the same-day Estimated Final Balance
+fix. **Not verified in a simulator/on a real device this session** —
+no simulator/device pass was run against the actual UI for any of these
+changes (Spaces picker, Edit Tracker Save button, Estimated Final
+Balance card, rate-limit Settings panel, background refresh timing).
+Background refresh cadence in particular is inherently hard to verify
+quickly even on-device, since `BGAppRefreshTask` firing is
+system-scheduled and not something a short manual test session can
+force reliably — worth specifically watching real background-refresh
+behavior over the following few days of normal use rather than treating
+this as fully verified from a build pass alone.
