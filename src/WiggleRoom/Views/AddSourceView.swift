@@ -36,13 +36,28 @@ struct AddSourceView: View {
     init(existingSource: ConnectedSource? = nil) {
         self.existingSource = existingSource
         _displayName = State(initialValue: existingSource?.displayName ?? "My Starling Account")
+        // Pre-filled from the stored token (not left blank) — a Starling
+        // personal access token is user-entered, not a system secret, so
+        // there's no reason to hide it, and showing what's actually
+        // stored is what makes it obvious at a glance whether this source
+        // is genuinely connected rather than looking connected with
+        // nothing behind it.
+        _token = State(initialValue: existingSource?.credentialToken ?? "")
     }
 
     var body: some View {
         Form {
             Section {
                 TextField("Name", text: $displayName)
-                SecureField("Personal Access Token", text: $token)
+                if let existingSource {
+                    connectionStatusRow(for: existingSource)
+                }
+                // axis: .vertical grows the field to fit a token's real
+                // length (Starling's are long strings) rather than
+                // scrolling it sideways in a single-line box.
+                TextField("Paste a Personal Access Token", text: $token, axis: .vertical)
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(2...6)
                     #if !os(macOS)
                     .textInputAutocapitalization(.never)
                     #endif
@@ -95,6 +110,17 @@ struct AddSourceView: View {
 
     private var trimmedToken: String {
         token.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// "Connected"/"Not Connected", based on whether `source` actually has
+    /// a stored token right now — not whether this screen's own `token`
+    /// field currently has text in it, which just reflects what's about to
+    /// be saved (possibly still unedited, possibly cleared).
+    private func connectionStatusRow(for source: ConnectedSource) -> some View {
+        let isConnected = !(source.credentialToken ?? "").isEmpty
+        return Label(isConnected ? "Connected" : "Not Connected", systemImage: isConnected ? "checkmark.circle.fill" : "exclamationmark.circle")
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(isConnected ? WiggleRoomColors.good : WiggleRoomColors.warning)
     }
 
     private func connect() async {
