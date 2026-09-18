@@ -260,6 +260,18 @@ struct TrackerDetailView: View {
         // refreshes `now` — for a manual tracker this is the only place
         // that happens outside of appear, since logging a reading (not
         // `refreshFromSourceIfNeeded`) is that tracker's own "update" path.
+        // The clock's own tick (every 30s, display-only — never fetches a
+        // balance): advance `now`, and flip the Target Right Now card only
+        // if that figure actually changed at the displayed precision.
+        .onChange(of: PaceClock.shared.tickCount) { _, _ in
+            let before = tracker.formattedValue(pace.targetValueToday)
+            now = PaceClock.shared.now
+            if tracker.formattedValue(pace.targetValueToday) != before, !isCompleted {
+                withAnimation(.easeInOut(duration: 0.7)) {
+                    targetFlipCount += 1
+                }
+            }
+        }
         .onChange(of: tracker.latestReading?.id) { _, _ in
             now = Date.now
             withAnimation(.easeInOut(duration: 0.7)) {

@@ -32,8 +32,7 @@ struct TrackerListView: View {
     // the *earliest* upcoming end date among all listed trackers, so a
     // tracker close to completing still gets its final on-time tick even
     // while sitting in a list alongside trackers with much later end dates.
-    @State private var ticker = AutoUpdateTicker()
-    private var now: Date { ticker.now }
+    private var now: Date { PaceClock.shared.now }
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -104,8 +103,6 @@ struct TrackerListView: View {
                 #endif
             }
             .onAppear {
-                ticker.endDatesProvider = { trackers.map(\.endDate) }
-                ticker.start()
                 navigateToPendingDeepLinkIfAny()
             }
             .onChange(of: deepLinkRouter.pendingTrackerId) { _, _ in

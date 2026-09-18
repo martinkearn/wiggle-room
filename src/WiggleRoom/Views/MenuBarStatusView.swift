@@ -50,7 +50,7 @@ struct MenuBarStatusView: View {
 
     private var pace: TrackerPace? {
         guard let tracker else { return nil }
-        return tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue)
+        return tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: PaceClock.shared.now)
     }
 
     var body: some View {
@@ -67,7 +67,7 @@ struct MenuBarStatusView: View {
                     // rows directly below the ring, but the number itself
                     // isn't shown anywhere else in this compact dropdown,
                     // so it stays.
-                    RingsView(tracker: tracker, now: .now, lineWidth: 14, showsStatusLabel: false)
+                    RingsView(tracker: tracker, now: PaceClock.shared.now, lineWidth: 14, showsStatusLabel: false)
                         .frame(width: 132, height: 132)
                     VStack(spacing: 6) {
                         HStack {
@@ -132,7 +132,7 @@ struct MenuBarStatusLabel: View {
 
     var body: some View {
         if let tracker = resolveMenuBarTracker(pinnedID: pinnedTrackerID, in: trackers) {
-            let pace = tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue)
+            let pace = tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: PaceClock.shared.now)
             Text(pace.displayDifference(for: tracker))
         } else {
             Text("Wiggle Room")

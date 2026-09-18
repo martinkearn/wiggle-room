@@ -20,9 +20,6 @@ struct MacRootView: View {
 
     @State private var selection: Tracker.ID?
     @State private var isPresentingAddTracker = false
-    #if os(macOS)
-    @State private var ticker = AutoUpdateTicker()
-    #endif
 
     var body: some View {
         NavigationSplitView {
@@ -102,9 +99,9 @@ struct MacRootView: View {
             PaceCrossingNotifier.shared.requestAuthorizationIfNeeded()
         }
         .onAppear {
-            ticker.endDatesProvider = { trackers.map(\.endDate) }
-            ticker.onUpdate = { _ in refreshPaceDrivenState() }
-            ticker.start()
+            refreshPaceDrivenState()
+        }
+        .onChange(of: PaceClock.shared.tickCount) { _, _ in
             refreshPaceDrivenState()
         }
         .onChange(of: trackers) { _, _ in
@@ -157,19 +154,20 @@ private struct AddTrackerRow: View {
 
 private struct MacTrackerRow: View {
     let tracker: Tracker
+    private var now: Date { PaceClock.shared.now }
 
     private var pace: TrackerPace {
-        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue)
+        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
     }
 
     var body: some View {
         HStack(spacing: 10) {
-            RingsView(tracker: tracker, now: .now, lineWidth: 4, showsCenterContent: false)
+            RingsView(tracker: tracker, now: now, lineWidth: 4, showsCenterContent: false)
                 .frame(width: 28, height: 28)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(tracker.name)
-                    if tracker.isCompleted() {
+                    if tracker.isCompleted(asOf: now) {
                         CompletedBadge()
                     }
                 }

@@ -1,7 +1,7 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 Add Tracker moved from the toolbar into the list
+after **2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched** (see its section at the bottom) — before that, **2026-09-18 Add Tracker moved from the toolbar into the list
 itself, at the top** — asked as a design question ("would the button be
 better at the bottom or top of the list, taking the same shape as a
 tracker?"); recommended bottom first (a common pattern, e.g. Reminders/
@@ -3339,3 +3339,36 @@ can't reach. `xcodebuild build` succeeded on `platform=macOS`.
 practical way to delete an affected row when it happens. If a tracker
 ever again can't be selected/opened normally, this context menu is the
 way to remove it.
+
+## 2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched
+
+**Problem:** "Target Right Now" moves every minute, so the under/over figure
+drifts with time alone, but the detail screen only recomputed on
+appear/refresh, the list ticked at a flat 60s, and the macOS menu bar
+label/dropdown and sidebar rows used a frozen `.now` — they only updated
+when data changed. **Scope, per explicit instruction: only these
+time-driven figures. How the current balance is fetched is unchanged.**
+
+**Change:** new [`PaceClock`](src/WiggleRoom/PaceClock.swift) — an
+app-wide `@Observable` clock ticking every 30s while the app is active
+and every 5 min otherwise, never calling a provider. Each tick also calls
+`WidgetCenter.reloadAllTimelines()`. Wired into
+[`TrackerListView`](src/WiggleRoom/Views/TrackerListView.swift) (replaces
+its `AutoUpdateTicker`), [`MacRootView`](src/WiggleRoom/Views/MacRootView.swift)
+(rows now use the clock; dock badge/pace-crossing check re-run per tick),
+[`MenuBarStatusView`](src/WiggleRoom/Views/MenuBarStatusView.swift) (label
+and dropdown), and [`TrackerDetailView`](src/WiggleRoom/Views/TrackerDetailView.swift)
+(advances `now` per tick and plays the existing flip animation only if the
+displayed Target Right Now string changed). Widgets keep their existing
+~5 min timeline backstop. `AutoUpdateTicker` is now unused (left in
+place).
+
+**Bugs fixed along the way:** the menu bar text and macOS sidebar rows
+never updated with time alone (they read `.now` once per data change).
+
+**Verified:** `xcodebuild build` succeeded for `platform=macOS` and
+`generic/platform=iOS`. **Not verified:** runtime behavior (tick cadence,
+flip animation, widget reload, background 5-min tick on macOS) — no
+simulator/screen automation used this session. watchOS detail view is
+unchanged (still updates on open/refresh); the complication gets its
+5-min timeline reload only.
