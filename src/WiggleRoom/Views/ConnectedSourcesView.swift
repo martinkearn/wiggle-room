@@ -260,6 +260,8 @@ private struct SourceEditorCard: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var didUpdate = false
+    @Query(sort: \StarlingRequestLogEntry.date, order: .reverse) private var starlingRequestLog: [StarlingRequestLogEntry]
+    @State private var starlingCooldownUntil: Date?
 
     init(source: ConnectedSource, onRemove: @escaping () -> Void) {
         self.source = source
@@ -343,9 +345,56 @@ private struct SourceEditorCard: View {
                 }
                 .disabled(trimmedToken.isEmpty || !hasUnsavedChanges || isSaving)
             }
+
+            if source.providerId == "starling" {
+                Divider()
+                starlingRateLimitSection
+            }
         }
         .padding(14)
         .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+        .task { await refreshStarlingCooldown() }
+    }
+
+    /// Admin/diagnostic info about this connection's shared Starling
+    /// request budget — deliberately lives here (per-source), not on any
+    /// individual tracker: the figure is the same regardless of which
+    /// tracker asked, since Starling's limit applies per personal access
+    /// token, not per tracker (§4.4), so showing it per-tracker would just
+    /// repeat the same number in several places. Live, CloudKit-synced —
+    /// see `StarlingRequestLogEntry`'s own doc comment for why it reflects
+    /// every device sharing this token, not just this one.
+    private var starlingRateLimitSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Starling Requests Today")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(starlingRequestsToday) / \(StarlingRequestBudget.dailyLimit)")
+                    .font(.caption.weight(.medium))
+            }
+            if let starlingCooldownUntil {
+                Text("Paused until \(starlingCooldownUntil.formatted(Self.timeFormatter)) after hitting Starling's rate limit.")
+                    .font(.caption2)
+                    .foregroundStyle(WiggleRoomColors.warning)
+            } else {
+                Text(StarlingRequestBudget.requestCaption)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var starlingRequestsToday: Int {
+        starlingRequestLog.count { Calendar.current.isDateInToday($0.date) }
+    }
+
+    private static let timeFormatter: Date.FormatStyle = .init().hour().minute()
+
+    private func refreshStarlingCooldown() async {
+        guard source.providerId == "starling" else { return }
+        starlingCooldownUntil = await StarlingProvider.sharedBudget.status.cooldownUntil
     }
 
     private var connectionStatusBadge: some View {

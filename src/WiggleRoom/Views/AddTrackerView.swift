@@ -88,6 +88,12 @@ struct AddTrackerView: View {
     @State private var reminderCadenceMinutes: Int?
 
     @State private var errorMessage: String?
+
+    /// Guards `save()` against a double-tap/double-click on the Save
+    /// button inserting two trackers — `save()` itself has no async gap for
+    /// SwiftUI's own touch-debouncing to help with, so without this a fast
+    /// second tap before the sheet dismisses could fire `save()` twice.
+    @State private var isSaving = false
     @State private var isPresentingDeleteConfirmation = false
 
     private enum NumberField {
@@ -272,7 +278,7 @@ struct AddTrackerView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(!isValid)
+                        .disabled(!isValid || isSaving)
                 }
             }
             .task {
@@ -605,10 +611,14 @@ struct AddTrackerView: View {
     }
 
     private func save() {
+        guard !isSaving else { return }
+        isSaving = true
+
         guard let startingValue = Self.parseDecimal(startingValueText),
               let totalAllowance = Self.parseDecimal(totalAllowanceText)
         else {
             errorMessage = "Please fill in all fields correctly."
+            isSaving = false
             return
         }
 
@@ -641,6 +651,7 @@ struct AddTrackerView: View {
               let source = resolveSource(withId: selectedSourceId)
         else {
             errorMessage = "Please fill in all fields correctly."
+            isSaving = false
             return
         }
 
@@ -654,6 +665,7 @@ struct AddTrackerView: View {
         } else {
             guard let selectedTargetId else {
                 errorMessage = "Please choose an account for this source."
+                isSaving = false
                 return
             }
             resolvedTargetId = selectedTargetId

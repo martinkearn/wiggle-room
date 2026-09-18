@@ -57,13 +57,21 @@ actor StarlingRequestBudget {
     private var requestTimestamps: [Date] = []
     private var cooldownUntil: Date?
     private let now: @Sendable () -> Date
-    private let onRequestLogged: (@Sendable (Date) -> Void)?
+    /// `@MainActor`-isolated — `StarlingRequestLogger.record(at:)` touches
+    /// a `ModelContainer`, and this project defaults every unannotated
+    /// declaration to `@MainActor` isolation (`SWIFT_DEFAULT_ACTOR_ISOLATION`),
+    /// so matching that here (rather than forcing `StarlingRequestLogger`
+    /// to opt out of it) is what keeps this a plain, ordinary function
+    /// reference at the call site instead of an isolation mismatch. Costs
+    /// one extra actor hop per real Starling request (not per app tick),
+    /// which is negligible.
+    private let onRequestLogged: (@MainActor @Sendable (Date) -> Void)?
 
     init(
         dailyLimit: Int = StarlingRequestBudget.dailyLimit,
         warningThreshold: Int = 900,
         now: @escaping @Sendable () -> Date = Date.init,
-        onRequestLogged: (@Sendable (Date) -> Void)? = nil
+        onRequestLogged: (@MainActor @Sendable (Date) -> Void)? = nil
     ) {
         self.dailyLimit = dailyLimit
         self.warningThreshold = warningThreshold
@@ -76,7 +84,7 @@ actor StarlingRequestBudget {
     /// active 429 cool-down. On success, also fires `onRequestLogged` — the
     /// hook `StarlingProvider.sharedBudget` uses to record the request into
     /// the synced, cross-device log (see the type-level note above).
-    func consumeSlot() throws {
+    func consumeSlot() async throws {
         let current = now()
         if let cooldownUntil, current < cooldownUntil {
             throw BudgetExceeded(resetsAt: cooldownUntil)
@@ -87,7 +95,7 @@ actor StarlingRequestBudget {
             throw BudgetExceeded(resetsAt: oldestStillCounted.addingTimeInterval(86400))
         }
         requestTimestamps.append(current)
-        onRequestLogged?(current)
+        await onRequestLogged?(current)
     }
 
     /// Records a server-side 429 — future requests back off until

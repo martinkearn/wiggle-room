@@ -1,8 +1,43 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 "Starling Requests Today" moved out of Settings, onto
-every Starling tracker's own detail screen** — a same-day follow-up to
+after **2026-09-18 "Starling Requests Today" moved again, onto the
+Connected Source screen; fixed a real actor-isolation warning; guarded
+against duplicate trackers from a double-tap Save** — three small
+follow-ups in one pass. First: the "shown on every tracker" placement
+from the entry directly below turned out not to be quite right either —
+follow-up direction was that this admin/diagnostic figure belongs with
+the *connection* it describes (Connected Sources → the specific Starling
+source), not repeated identically on every tracker that happens to use
+it, and that Settings is fine as long as it's the right (source-specific)
+pane. Removed from `TrackerDetailView` again; restored on macOS's inline
+`SourceEditorCard` (`ConnectedSourcesView`) and iOS's `AddSourceView`,
+both gated to `source.providerId == "starling"`. Second: fixed a real
+Xcode warning ("Converting function value of type '@MainActor @Sendable
+(Date) -> ()' to '@Sendable (Date) -> Void'") that showed up across every
+target (`WiggleRoom`, `WiggleRoomWatch`, `WiggleRoomComplication`,
+`WiggleRoomWidgets`) — this project defaults every unannotated
+declaration to `@MainActor` (`SWIFT_DEFAULT_ACTOR_ISOLATION` build
+setting), so `StarlingRequestLogger.record(at:)` was implicitly
+`@MainActor`-isolated, mismatching `StarlingRequestBudget`'s plain
+`@Sendable` `onRequestLogged` closure type. Fixed by typing the closure
+as `@MainActor @Sendable (Date) -> Void` and making `consumeSlot()`
+`async` so it can `await` into it, rather than fighting the project's
+isolation default inside `StarlingRequestLogger`. Third: the user
+reported a tracker appearing twice in the macOS sidebar — investigated
+`AddTrackerView.save()` and found no debounce against a fast double
+click/tap firing it twice (no async gap of its own for SwiftUI's normal
+touch-debouncing to help with), a real, if narrow, path to a genuine
+duplicate `Tracker` record. Added an `isSaving` guard, disabling the Save
+button for the duration of a save. **Note**: this guards against a
+*future* duplicate from this specific cause; it does not explain or
+remove whichever existing duplicate the user saw, which — if caused by
+this bug — would need finding and deleting by hand (or telling me its
+name/dates so I can help identify it). `xcodebuild build` succeeded, with
+no remaining warnings from any of these files, on `platform=macOS` and
+`generic/platform=iOS`. Before that, **2026-09-18 "Starling Requests
+Today" moved out of Settings, onto every Starling tracker's own detail
+screen** — a same-day follow-up to
 the cross-device-count fix directly below: the user pointed out this is
 tracker-contextual information ("shown in the context of any and all
 starling trackers, not on general settings... not applicable to manual

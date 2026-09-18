@@ -6,22 +6,22 @@
 import Foundation
 import SwiftData
 
-/// Bridges `StarlingRequestBudget`'s plain-actor `onRequestLogged` hook
-/// (fired once per real Starling request, from whatever thread that
-/// actor's own executor happens to run on) into a CloudKit-synced
-/// `StarlingRequestLogEntry` insert — see that model's own doc comment for
-/// why a per-request insert, not a shared counter, is what actually merges
-/// safely across the user's devices.
+/// Bridges `StarlingRequestBudget`'s `onRequestLogged` hook (fired once per
+/// real Starling request, `await`ed onto this, `@MainActor`-isolated type
+/// from that plain actor) into a CloudKit-synced `StarlingRequestLogEntry`
+/// insert — see that model's own doc comment for why a per-request insert,
+/// not a shared counter, is what actually merges safely across the user's
+/// devices.
 ///
 /// Configured once at launch (`configure(container:)`, mirroring
 /// `BackgroundRefreshScheduler.register(container:)`) so the rest of the
 /// app doesn't need to thread a `ModelContext` through every Starling call
 /// site. `record(at:)` opens its own fresh `ModelContext` per call rather
-/// than reusing `container.mainContext` — `mainContext` is main-actor
-/// bound, and this can be called from `StarlingRequestBudget`'s own
-/// (non-main) actor executor; a short-lived context created, used, and
-/// discarded within one synchronous call needs no thread coordination of
-/// its own.
+/// than reusing `container.mainContext` — not strictly required now that
+/// this whole type is `@MainActor` (this project defaults every
+/// unannotated declaration to `@MainActor`, `SWIFT_DEFAULT_ACTOR_ISOLATION`),
+/// but a short-lived context avoids any risk of contending with the main
+/// context's own pending changes from elsewhere in the app.
 enum StarlingRequestLogger {
     private static var container: ModelContainer?
 
