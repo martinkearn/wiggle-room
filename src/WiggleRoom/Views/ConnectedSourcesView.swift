@@ -120,18 +120,24 @@ struct ConnectedSourcesView: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 420, minHeight: 320)
+        // Width only, deliberately no minHeight: a macOS Form/List stretches
+        // to fill whatever height it's given rather than hugging its own
+        // content, so a forced minHeight here just pushes a dead-space gap
+        // in above the sheet's bottom Cancel/Reconnect bar (reported
+        // 2026-09-18, confirmed by screenshot) — letting height stay
+        // intrinsic sizes each screen to its actual content instead.
+        .frame(minWidth: 420)
         .sheet(isPresented: $isPresentingAddSource) {
             NavigationStack {
                 AddSourceView()
             }
-            .frame(minWidth: 420, minHeight: 260)
+            .frame(minWidth: 420)
         }
         .sheet(item: $sourceToReconnect) { source in
             NavigationStack {
                 AddSourceView(existingSource: source)
             }
-            .frame(minWidth: 420, minHeight: 260)
+            .frame(minWidth: 420)
         }
         #endif
     }

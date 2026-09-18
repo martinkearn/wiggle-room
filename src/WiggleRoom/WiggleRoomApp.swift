@@ -120,6 +120,19 @@ struct WiggleRoomApp: App {
                         Label("Connected Sources", systemImage: "point.3.filled.connected.trianglepath.dotted")
                     }
             }
+            // A tabbed Settings window keeps one consistent size across
+            // every tab (so switching tabs doesn't visibly resize the
+            // window — the same convention System Settings itself uses),
+            // which otherwise leaves whichever tab has the least content
+            // (General, a single row) looking mostly empty. An explicit,
+            // deliberate fixed size — instead of leaving it to whatever
+            // implicit "largest tab" heuristic AppKit lands on — keeps
+            // both tabs comfortably filled without either looking sparse:
+            // General's one row plus caption, and a handful of Connected
+            // Sources rows plus its toolbar, both fit without excess
+            // dead space or needing to scroll. Real per-tab content
+            // sizing was screenshotted and confirmed 2026-09-18.
+            .frame(width: 480, height: 340)
         }
         #endif
 
