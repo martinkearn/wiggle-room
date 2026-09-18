@@ -31,11 +31,22 @@ struct TrackerDetailView: View {
     @State private var isPresentingEditTracker = false
     @State private var isPresentingReadingHistory = false
 
-    /// Drives `now` forward on a schedule aligned to this tracker's own end
-    /// date (see `AutoUpdateTicker`/`TrackerUpdateScheduling`) instead of a
-    /// flat 60-second cadence — the last automatic update before the
-    /// tracker completes always lands exactly on `tracker.endDate`.
-    @State private var ticker = AutoUpdateTicker()
+    /// **Fully manual as of 2026-09-18** — this screen no longer ticks or
+    /// auto-refreshes on any timer while open. Multiple devices each
+    /// running their own independent foreground ticker (previously a flat
+    /// 45s auto-fetch) turned out to be a real, avoidable source of extra
+    /// Starling requests — every open detail screen on every device was
+    /// polling on its own schedule, uncoordinated with any other. `now` is
+    /// set once when the screen appears (and again after any refresh
+    /// completes) rather than continuously advancing — figures are exact
+    /// as of the last time this tracker was actually opened or refreshed,
+    /// not live-ticking in between. The user updates it deliberately, via
+    /// pull-to-refresh (iOS) or the Refresh/Update Current Balance button
+    /// (macOS) — see `handleUpdateGesture()`/`updateBalanceButton`.
+    /// Background refresh (`BackgroundRefreshScheduler`, §5.3) is
+    /// unaffected — its own time-of-day-banded cadence continues exactly
+    /// as before regardless of whether any detail screen is open anywhere.
+    @State private var now: Date = .now
 
     /// Ever-incrementing rather than a toggled `Bool` — each increment
     /// always spins a fresh full turn forward from wherever the last one
@@ -49,33 +60,24 @@ struct TrackerDetailView: View {
     @State private var isShowingCelebration = false
 
     /// Set whenever a Starling (or future auto-fetch provider) refresh
-    /// fails — either from the pull-to-refresh gesture or the ticker's own
-    /// 30s background fetch — and shown as a distinct error line (§8.4)
-    /// rather than silently leaving the last-known figure looking current.
-    /// Cleared on the next successful refresh.
+    /// fails — from opening this screen or a manual pull-to-refresh/button
+    /// press — and shown as a distinct error line (§8.4) rather than
+    /// silently leaving the last-known figure looking current. Cleared on
+    /// the next successful refresh.
     @State private var refreshErrorMessage: String?
 
-    /// Guards against overlapping fetches — the 30s ticker tick and a
+    /// Guards against overlapping fetches — the on-appear refresh and a
     /// manual pull-to-refresh could otherwise both be in flight at once for
     /// the same tracker.
     @State private var isRefreshingFromSource = false
 
-    /// Flat while this screen is open — no time-of-day/trend adaptation
-    /// here (that lives in `BackgroundRefreshScheduler` instead, §5.3): a
-    /// foreground session is short-lived by nature, so the smarter
-    /// scheduling only pays off for the background path, which would
-    /// otherwise poll around the clock regardless of anyone watching.
-    private static let basePollInterval: TimeInterval = 45
-
     /// The bound account's display name for a real, non-manual source —
     /// `Tracker` only stores `sourceTargetId` (a bare id), not a
     /// human-readable label, so this is resolved live once on appear
-    /// (`resolveAccountNameIfNeeded()`), not on every 30s tick, to avoid
-    /// spending a Starling request on something that never changes for a
-    /// given tracker. Falls back to the raw id if unresolved.
+    /// (`resolveAccountNameIfNeeded()`), never re-fetched afterward, to
+    /// avoid spending a Starling request on something that never changes
+    /// for a given tracker. Falls back to the raw id if unresolved.
     @State private var resolvedAccountName: String?
-
-    private var now: Date { ticker.now }
 
     private var isCompleted: Bool {
         tracker.isCompleted(asOf: now)
@@ -138,29 +140,14 @@ struct TrackerDetailView: View {
                         .padding(.top, 4)
                 }
 
-                // The whole screen's figures update on this cadence (Target
-                // Right Now, the ring, the difference) — not just one card —
-                // so the countdown lives up top rather than tucked under a
-                // single figure. The pull-gesture hint sits right next to it
-                // on the same line, above the rings, rather than lower on
-                // the screen — this is the one spot on the dashboard already
-                // telling you your figures are about to move on their own,
-                // so it's the natural place to also say how to make that
-                // happen right now instead of waiting.
-                if let screenUpdateCaption {
-                    HStack(spacing: 6) {
-                        Text(screenUpdateCaption)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        #if !os(macOS)
-                        Text("\u{00B7}")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        pullToUpdateHint
-                        #endif
-                    }
+                // No more live countdown here — figures are fully manual
+                // now (see `now`'s own doc comment) — just the pull-gesture
+                // hint on iOS, above the rings alongside everything else
+                // that's static context for this screen.
+                #if !os(macOS)
+                pullToUpdateHint
                     .padding(.top, sourceCaption == nil ? 4 : 0)
-                }
+                #endif
 
                 if isCompleted {
                     CompletedBadge()
@@ -254,33 +241,12 @@ struct TrackerDetailView: View {
             }
         }
         .onAppear {
-            let appearedAt = Date.now
-            // Flat 45s while this detail screen is on-screen (§5.3) — down
-            // from the 60s display-only default, since this ticker also
-            // drives a real Starling fetch on every tick now, not just a
-            // display recompute. No time-of-day/trend adaptation here on
-            // purpose; that lives in `BackgroundRefreshScheduler` instead.
-            ticker.interval = Self.basePollInterval
-            ticker.endDatesProvider = { [tracker.endDate] }
-            ticker.onUpdate = { date in
-                // The minute rollover is exactly when Target Right Now's
-                // value actually moves (it's a live function of `now`), so
-                // the card's flip should register here too — previously the
-                // flip only fired from a newly logged reading, so the "live"
-                // side of this card never visibly updated at all, only the
-                // "Update Current Value" side did.
-                withAnimation(.easeInOut(duration: 0.7)) {
-                    targetFlipCount += 1
-                }
-                // Catches a tracker whose period ends while its dashboard
-                // happens to already be open, not just on a fresh appear.
-                checkForCompletionCelebration(asOf: date)
-                if !tracker.isManualEntry && !isCompleted {
-                    Task { await refreshFromSourceIfNeeded() }
-                }
-            }
-            ticker.start(now: appearedAt)
-            checkForCompletionCelebration(asOf: appearedAt)
+            now = Date.now
+            checkForCompletionCelebration(asOf: now)
+            // Always refresh once when a tracker is first opened, even
+            // though there's no ongoing ticker anymore — opening the
+            // screen is itself the signal "I want current data," same as
+            // a manual pull-to-refresh would be.
             if !tracker.isManualEntry && !isCompleted {
                 Task { await refreshFromSourceIfNeeded() }
             }
@@ -290,15 +256,19 @@ struct TrackerDetailView: View {
         }
         // Keyed on the reading's own id, not its value — logging a reading
         // that happens to match the previous one is still a genuine update
-        // and should still visibly register, not silently no-op.
+        // and should still visibly register, not silently no-op. Also
+        // refreshes `now` — for a manual tracker this is the only place
+        // that happens outside of appear, since logging a reading (not
+        // `refreshFromSourceIfNeeded`) is that tracker's own "update" path.
         .onChange(of: tracker.latestReading?.id) { _, _ in
+            now = Date.now
             withAnimation(.easeInOut(duration: 0.7)) {
                 targetFlipCount += 1
             }
             // A final reading logged after the period's already ended (a
             // late "closing out" update) can be what actually puts the
             // tracker under budget — worth checking here too, not just on
-            // appear/minute-tick.
+            // appear/refresh.
             checkForCompletionCelebration(asOf: now)
         }
     }
@@ -389,10 +359,11 @@ struct TrackerDetailView: View {
     #endif
 
     /// Fetches a fresh value from the tracker's connected source and logs it
-    /// (§5.3) — called from the 30s ticker tick and from a manual
-    /// pull-to-refresh/macOS button alike. `force` skips the
-    /// already-in-flight guard, since a user's own manual pull should always
-    /// go through even if a background tick happens to be mid-fetch.
+    /// (§5.3) — called on appear and from a manual pull-to-refresh/macOS
+    /// button alike, now that this screen has no ongoing ticker of its own.
+    /// `force` skips the already-in-flight guard, since a user's own manual
+    /// pull should always go through even if the on-appear fetch happens to
+    /// still be in flight.
     private func refreshFromSourceIfNeeded(force: Bool = false) async {
         guard !tracker.isManualEntry, !isCompleted else { return }
         guard force || !isRefreshingFromSource else { return }
@@ -403,6 +374,14 @@ struct TrackerDetailView: View {
             refreshErrorMessage = nil
         } catch {
             refreshErrorMessage = Self.errorMessage(for: error)
+        }
+        // `now` only otherwise moves on appear — refresh it here too so
+        // Target Right Now/the ring reflect the actual moment this fetch
+        // completed, not whenever the screen happened to be opened.
+        now = Date.now
+        checkForCompletionCelebration(asOf: now)
+        withAnimation(.easeInOut(duration: 0.7)) {
+            targetFlipCount += 1
         }
     }
 
@@ -513,14 +492,6 @@ struct TrackerDetailView: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(tint.opacity(0.18), lineWidth: 1)
         )
-    }
-
-    /// The whole screen's live figures (the ring, the difference, Target
-    /// Right Now) recompute on this cadence — not just one card — so this
-    /// sits at the very top of the screen rather than under a single figure.
-    private var screenUpdateCaption: String? {
-        guard now < tracker.endDate else { return nil }
-        return "Refreshes in \(ticker.secondsUntilNextUpdate)s"
     }
 
     private var remainingInAllowanceCaption: String? {

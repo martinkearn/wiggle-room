@@ -1,7 +1,36 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 A real, verifiable "same code?" indicator in Settings**
+after **2026-09-18 Foreground auto-refresh removed entirely — fully
+manual, always-refresh-on-open** — a direct, deliberate follow-up once
+real multi-device testing (the same session that verified sync end-to-end
+for manual trackers, Connected Sources, and a Starling tracker, all
+working correctly) surfaced the actual insight: with the app open on more
+than one device at once, each device's `TrackerDetailView`/
+`WatchTrackerDetailView` ran its own independent flat-45s (30s on watch)
+ticker, uncoordinated with any other device's — meaning the real number
+of Starling requests being made for one tracker scaled with however many
+devices happened to have its detail screen open, not just one. Removed
+the ticker (`AutoUpdateTicker`) from both detail screens entirely — no
+more periodic auto-fetch, no more live "Refreshes in Xs" countdown. The
+screen still **always refreshes once when first opened** (on appear) and
+whenever a manual pull-to-refresh (iOS)/Refresh or Update Current Balance
+button (macOS/watchOS) is used — those were kept exactly as they already
+worked — but nothing polls in between while the screen just sits open.
+`now` (driving the ring, Target Right Now, days-remaining) is now a plain
+`@State` set on appear and refreshed again after any successful
+fetch/logged reading, rather than continuously advancing — figures are
+exact as of the last open/refresh, not live-ticking. **Background
+refresh is completely unaffected** — `BackgroundRefreshScheduler`'s
+time-of-day-banded cadence and per-tracker burst detection (§5.3) keep
+working exactly as before, independent of whether any foreground screen
+is open anywhere. `xcodebuild build` succeeded on both `platform=macOS`
+and `generic/platform=iOS` (covers the Watch target too). **Not yet
+verified on real devices** — worth specifically confirming the
+always-refresh-on-open behavior feels right in practice, and that
+request counts (visible in Connected Sources per the same day's earlier
+work) actually drop now that multiple open devices no longer each poll
+independently. Before that, **2026-09-18 A real, verifiable "same code?" indicator in Settings**
 — requested directly out of this session's own debugging pain: mid-way
 through diagnosing why a Mac's Reset App Data wasn't reaching iOS, there
 was no way to confirm both devices were actually running the fixes just

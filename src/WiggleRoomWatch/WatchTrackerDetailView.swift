@@ -15,16 +15,21 @@ struct WatchTrackerDetailView: View {
     let tracker: Tracker
 
     @State private var isPresentingLogReading = false
-    @State private var ticker = AutoUpdateTicker()
+    /// Fully manual as of 2026-09-18, same as the phone/Mac dashboard — no
+    /// ongoing ticker while this screen is open. Set on appear and again
+    /// after any refresh completes; the "Refresh" button is how a user
+    /// updates it deliberately. Multiple devices each independently
+    /// auto-polling on their own timer turned out to be a real, avoidable
+    /// source of extra Starling requests. Background refresh is unaffected.
+    @State private var now: Date = .now
     @State private var isRefreshingFromSource = false
-
-    private var now: Date { ticker.now }
 
     private func refreshFromSourceIfNeeded() async {
         guard !tracker.isManualEntry, !tracker.isCompleted(asOf: now), !isRefreshingFromSource else { return }
         isRefreshingFromSource = true
         defer { isRefreshingFromSource = false }
         try? await store.refreshFromSource(tracker)
+        now = Date.now
     }
 
     var body: some View {
@@ -73,14 +78,10 @@ struct WatchTrackerDetailView: View {
             }
             .navigationTitle(tracker.name)
             .onAppear {
-                // 30s while this detail screen is on-screen (§5.3) — same
-                // cadence and mechanism as the phone/Mac dashboard.
-                ticker.interval = 30
-                ticker.endDatesProvider = { [tracker.endDate] }
-                ticker.onUpdate = { _ in
-                    Task { await refreshFromSourceIfNeeded() }
-                }
-                ticker.start()
+                now = Date.now
+                // Always refresh once when a tracker is first opened, even
+                // with no ongoing ticker — opening the screen is itself the
+                // signal "I want current data."
                 Task { await refreshFromSourceIfNeeded() }
             }
             .sheet(isPresented: $isPresentingLogReading) {
