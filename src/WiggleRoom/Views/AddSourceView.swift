@@ -63,6 +63,17 @@ struct AddSourceView: View {
         .navigationTitle(existingSource == nil ? "Add Source" : "Reconnect")
         .inlineNavigationBarIfAvailable()
         .toolbar {
+            // Only on macOS, where this view is always presented as a
+            // sheet (`ConnectedSourcesView`'s `.sheet`) with no other way
+            // to dismiss it — Esc aside — now that it's no longer a pushed
+            // NavigationLink destination there. iOS keeps the push, which
+            // already has a free back button, so an explicit Cancel here
+            // would just be redundant with it.
+            #if os(macOS)
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+            #endif
             ToolbarItem(placement: .confirmationAction) {
                 Button {
                     Task { await connect() }
@@ -79,9 +90,7 @@ struct AddSourceView: View {
     }
 
     private var tokenFieldFooter: String {
-        let base = "Generate a personal access token at developer.starlingbank.com with account:read and balance:read scopes, then paste it here. It syncs via iCloud with the rest of your data, scoped to your own account."
-        guard existingSource != nil else { return base }
-        return base + " This replaces the token currently stored for this source — trackers using it keep working once it validates."
+        "Generate a personal access token at developer.starlingbank.com with account:read and balance:read scopes."
     }
 
     private var trimmedToken: String {
