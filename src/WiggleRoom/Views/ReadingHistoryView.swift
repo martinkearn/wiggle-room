@@ -14,6 +14,7 @@ import SwiftData
 /// reported, not something the user hand-edits.
 struct ReadingHistoryView: View {
     @Environment(TrackerStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
     let tracker: Tracker
 
     @State private var editingReading: ValueSnapshot?
@@ -59,6 +60,15 @@ struct ReadingHistoryView: View {
         .navigationTitle("Update History")
         .inlineNavigationBarIfAvailable()
         .toolbar {
+            // This sheet's only other dismissal was swipe-down — not
+            // obvious, per Apple's own HIG ("provide a visible way to
+            // dismiss a sheet, don't rely on the swipe gesture alone"),
+            // and macOS had no equivalent gesture at all. A trailing
+            // "Done" matches how a plain browsable list (not a form with
+            // its own Save) is conventionally dismissed on both platforms.
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }
+            }
             #if !os(macOS)
             if tracker.isManualEntry && !readingsNewestFirst.isEmpty {
                 ToolbarItem(placement: .primaryAction) {
