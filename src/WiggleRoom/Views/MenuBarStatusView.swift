@@ -88,6 +88,11 @@ struct MenuBarStatusView: View {
 
             Divider()
 
+            // Each row is explicitly stretched to the full width and
+            // left-aligned — a Button/Menu's own label otherwise just sizes
+            // to fit its text and centers within that, so the VStack's
+            // `alignment: .leading` alone doesn't produce the flush-left,
+            // native-menu-like look these rows are going for.
             VStack(alignment: .leading, spacing: 2) {
                 if trackers.count > 1 {
                     Menu("Show in Menu Bar") {
@@ -103,13 +108,16 @@ struct MenuBarStatusView: View {
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Button("Open Wiggle Room") {
                     NSApp.activate(ignoringOtherApps: true)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Button("Quit Wiggle Room") {
                     NSApp.terminate(nil)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.borderless)
             .padding(8)
