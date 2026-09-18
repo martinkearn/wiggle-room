@@ -18,7 +18,11 @@ struct WiggleRoomWatchApp: App {
     @State private var store: TrackerStore
 
     init() {
-        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
+        // Must stay identical to every other process's schema for this same
+        // store (`WiggleRoomApp`, `WidgetDataStore`, `IntentDataStore`) — a
+        // mismatched schema between processes sharing one on-disk/CloudKit
+        // store is a real corruption risk, not just a compile-time detail.
+        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self, StarlingRequestLogEntry.self])
         // Shared App Group container (see `AppGroup`) so the complication
         // extension (`WidgetDataStore`, embedded alongside this app on the
         // same Watch) reads the exact same on-disk store instead of its own

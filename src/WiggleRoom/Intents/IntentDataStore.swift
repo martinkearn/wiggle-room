@@ -14,7 +14,11 @@ import SwiftData
 enum IntentDataStore {
     @MainActor
     static func makeContainer() throws -> ModelContainer {
-        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
+        // Must stay identical to every other process's schema for this same
+        // store (`WiggleRoomApp`, `WidgetDataStore`, `WiggleRoomWatchApp`) —
+        // a mismatched schema between processes sharing one on-disk/CloudKit
+        // store is a real corruption risk, not just a compile-time detail.
+        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self, StarlingRequestLogEntry.self])
         // Shared App Group container (see `AppGroup`) — same store the app
         // and widget extension use, so a Shortcut logging a reading is
         // reflected everywhere instantly rather than waiting on CloudKit.

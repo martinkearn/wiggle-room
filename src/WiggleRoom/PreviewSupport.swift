@@ -11,7 +11,7 @@ import SwiftData
 enum PreviewData {
     @MainActor
     static let container: ModelContainer = {
-        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self])
+        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self, StarlingRequestLogEntry.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         return try! ModelContainer(for: schema, configurations: [configuration])
     }()

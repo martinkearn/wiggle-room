@@ -1,9 +1,38 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 "Starling Requests Today" moved again, onto the
-Connected Source screen; fixed a real actor-isolation warning; guarded
-against duplicate trackers from a double-tap Save** — three small
+after **2026-09-18 Fixed a real, serious data-corruption bug: mismatched
+SwiftData schemas across processes sharing the CloudKit store** — see the
+full incident writeup at the bottom of this file before touching the data
+model again. Short version: adding `StarlingRequestLogEntry` to the main
+app's schema without adding it everywhere else that opens the same
+CloudKit+App Group store (the widget extension, the Watch app, the
+Shortcuts intent handler) left those processes running an older,
+mismatched schema against the same on-disk/CloudKit store the main app
+had already migrated — a real, documented way to trigger store
+corruption, not just a theoretical risk. The user reported exactly the
+matching symptoms in the field: a duplicate tracker appearing with no
+user action, then **all trackers and all connected sources disappearing
+entirely** roughly half an hour later, confirmed happening across
+multiple synced devices. All data lost was test data, not anything
+irreplaceable. **Fixed**: every `Schema([...])` in the codebase
+(`WiggleRoomApp`, `WidgetDataStore`, `IntentDataStore`,
+`WiggleRoomWatchApp`, plus the in-memory preview ones for consistency)
+now lists the exact same model types, with a comment at each site naming
+every other site that must stay in sync. **This is now a standing rule,
+not a one-off fix**: any future new `@Model` type must be added to *all
+six* `Schema([...])` call sites in the same change, or this can recur.
+`xcodebuild build` succeeded for the `WiggleRoom` scheme (which embeds
+the Watch app and widget extension, so this covers all of them) on both
+`generic/platform=iOS` and `platform=macOS`. **Not yet verified against
+a real device reinstall** — the user still needs to rebuild and install
+this fix on every device, ideally close together in time (quit the app
+everywhere first) to avoid a transition window where an old, still-
+mismatched build and this fixed build are both touching the same synced
+store at once. Before that, **2026-09-18 "Starling Requests Today" moved
+again, onto the Connected Source screen; fixed a real actor-isolation
+warning; guarded against duplicate trackers from a double-tap Save** —
+three small
 follow-ups in one pass. First: the "shown on every tracker" placement
 from the entry directly below turned out not to be quite right either —
 follow-up direction was that this admin/diagnostic figure belongs with
@@ -2940,3 +2969,108 @@ and Mac signed into the same iCloud account with the same Starling
 source connected, that a request made on one device does show up in the
 other device's "Starling Requests Today" figure within a reasonable
 CloudKit sync delay.
+
+## 2026-09-18 Incident: mismatched SwiftData schemas across processes caused duplicate then vanished data
+
+**Symptom, reported by the user in this exact order**: a Starling tracker
+appeared duplicated (an exact clone — same name, dates, values) with no
+user action taken on any device; roughly an hour later, still without
+touching the app; about 30 minutes after that, **both the duplicate and
+the original tracker were gone, and separately, every Connected Source
+had also disappeared**. Confirmed the user runs the app on more than one
+device (iPhone + Mac) signed into the same iCloud account, and that the
+duplicate was an exact clone, not two separately-entered trackers.
+
+**Investigation**: first ruled out an obvious application-level cause —
+grepped the whole codebase for anywhere a `Tracker` gets created and
+found exactly one call site, `AddTrackerView.save()` → `TrackerStore
+.addTracker(_:)`, already guarded against a same-device double-tap by an
+earlier fix in this same session (an `isSaving` flag disabling the Save
+button for the duration of the call — see the entry above). That
+ruled out the most obvious "why would this be duplicated" theory.
+
+With a code-level double-insert ruled out and the user confirming
+multi-device use, the investigation turned to how the shared store itself
+is configured. This app has **six separate places** that construct a
+`ModelContainer`/`Schema` against the same on-disk store (the App
+Group-shared, CloudKit-synced SQLite file) or an in-memory preview
+equivalent:
+
+- `WiggleRoomApp.swift` (the main app — every platform)
+- `WiggleRoomShared/WidgetDataStore.swift` (Home/Lock Screen widgets, the
+  watch complication — a separate process per extension)
+- `WiggleRoom/Intents/IntentDataStore.swift` (Shortcuts/Siri, runs even
+  when the app isn't open)
+- `WiggleRoomWatch/WiggleRoomWatchApp.swift` (the watch companion app)
+- `WiggleRoom/PreviewSupport.swift` / `WiggleRoomShared/SharedPreviewData.swift`
+  (in-memory only, `#Preview` blocks — no real corruption risk, but
+  worth keeping consistent so a preview referencing a newer model
+  doesn't crash the canvas)
+
+Earlier the same session, `StarlingRequestLogEntry` (§5.3's cross-device
+Starling request log) was added to **only the first of these** —
+`WiggleRoomApp.swift`'s `Schema([...])` — because that was the only file
+actually read/edited while wiring up that feature. The other five were
+never touched, and so kept declaring the old, three-entity schema
+(`Tracker`, `ConnectedSource`, `ValueSnapshot`) — while pointed at the
+exact same physical store the main app had already migrated to include a
+fourth entity type.
+
+**Why this is a real corruption mechanism, not just an inconsistency**:
+SwiftData is built on Core Data's `NSPersistentCloudKitContainer`. Every
+process that opens a given persistent store (here, the same SQLite file
+via the shared App Group container, additionally CloudKit-mirrored)
+needs a `Schema` that matches what's actually on disk — Core Data
+performs its own migration/compatibility check on every open, and a
+process opening a store with a model missing an entity type the store
+already has is exactly the kind of "incompatible persistent store"
+situation Core Data's automatic lightweight migration handling is not
+guaranteed to resolve safely, especially layered under CloudKit's own
+independent per-process mirroring/import-export engine. Each of the five
+mismatched processes (widget extension, watch app, watch complication,
+Shortcuts intent handler) could open the shared store at any time —
+a widget re-rendering, a complication updating, a Shortcut running in the
+background — with no user interaction required, which lines up exactly
+with the user's report of changes happening with the app not open on any
+device. The mechanism most consistent with the observed symptoms (a
+spurious duplicate, then a wholesale wipe of multiple entity types) is a
+destructive local migration/reset triggered by one of these mismatched
+processes, which then propagated via CloudKit sync to every device.
+
+**Fix**: every one of the six `Schema([...])` declarations now lists the
+exact same model types (`Tracker.self, ConnectedSource.self,
+ValueSnapshot.self, StarlingRequestLogEntry.self`), with a comment at
+each site explicitly naming every other site that must be kept in sync
+with it. This is a **standing rule for all future work on this project,
+not a one-off fix for this incident**: any new `@Model` type added to
+the schema from now on must be added to all six call sites in the same
+change — `WiggleRoomApp.swift`, `WidgetDataStore.swift`,
+`IntentDataStore.swift`, `WiggleRoomWatchApp.swift`,
+`PreviewSupport.swift`, `SharedPreviewData.swift` — or this exact failure
+mode can recur, this time potentially with real (not test) data.
+
+**Data lost**: the user confirmed everything lost was test data created
+during this session's own feature testing, not anything irreplaceable —
+so no recovery attempt was needed or made. Had this been real data, the
+realistic recovery options would have been limited: Apple does not
+expose end-user-facing CloudKit record history/undelete for a private
+database outside the CloudKit Dashboard (a developer tool, not something
+built into this app), so the practical options would have been checking
+whether any single device's own local App Group store still held a
+pre-wipe copy before it next opened with a (then-still-mismatched) build
+and got wiped/reconciled itself — a race against further app/widget/
+Shortcut launches on any device, which is exactly why the user was asked
+to stop launching the app anywhere while this was being diagnosed.
+
+### Verifying this fix
+
+`xcodebuild build` succeeded for the `WiggleRoom` scheme (which builds
+and embeds the Watch app and widget extension targets as part of the
+same scheme) on both `generic/platform=iOS` and `platform=macOS` —
+confirms every one of the six sites compiles with the now-consistent
+schema. **Not verified against a real multi-device reinstall** — this
+needs the user to rebuild and install the fixed version on every device
+they use, and ideally do so close together in time (quitting the app
+everywhere first) rather than leaving an old mismatched build running on
+one device while a fixed build runs on another, which would recreate the
+exact same mismatch condition during the transition.
