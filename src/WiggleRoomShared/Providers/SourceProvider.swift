@@ -8,7 +8,11 @@ import Foundation
 /// The common interface every data source (Starling, Tesla, manual entry,
 /// and any future source) implements, isolated from tracker/calculation
 /// logic. See spec §5.1.
-protocol SourceProvider {
+///
+/// Class-constrained because every conformer is a `final class` and
+/// `TrackerStore`'s tests rely on `===` identity to confirm `provider(for:)`
+/// resolved to its shared `manualProvider` instance rather than a new one.
+protocol SourceProvider: AnyObject {
     /// Identifies the provider type, e.g. `"starling"`, `"manual"`.
     var providerId: String { get }
 
