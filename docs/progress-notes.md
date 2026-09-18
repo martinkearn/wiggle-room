@@ -3074,3 +3074,28 @@ they use, and ideally do so close together in time (quitting the app
 everywhere first) rather than leaving an old mismatched build running on
 one device while a fixed build runs on another, which would recreate the
 exact same mismatch condition during the transition.
+
+## 2026-09-18 macOS: right-click delete on tracker rows, bypassing selection
+
+Follow-up to the schema-mismatch incident above. While cleaning up the
+corrupted test data left behind by it, the user found two remaining
+trackers in the macOS sidebar that **could not be selected at all** —
+clicking did nothing, so there was no way to open them and use the
+normal Edit Tracker → Delete flow. Consistent with the underlying store
+having been left with ambiguous/duplicate row identity by the earlier
+incident: `MacRootView`'s sidebar `List(trackers, selection: $selection)`
+matches taps to rows via `tracker.id` (`.tag(tracker.id)`), and if two
+rows' `Tracker` objects don't have cleanly distinct identity at the
+SwiftUI diffing level, tap-to-select can silently fail to register for
+either.
+
+Added a `.contextMenu` (right-click) "Delete Tracker" action directly on
+each sidebar row, calling `store.deleteTracker(tracker)` against that
+row's own `Tracker` reference from the `trackers` array — entirely
+independent of `selection`, so it works even for a row selection itself
+can't reach. `xcodebuild build` succeeded on `platform=macOS`.
+
+**Not a fix for the underlying identity ambiguity itself** — just a
+practical way to delete an affected row when it happens. If a tracker
+ever again can't be selected/opened normally, this context menu is the
+way to remove it.

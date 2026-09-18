@@ -37,6 +37,24 @@ struct MacRootView: View {
                     List(trackers, selection: $selection) { tracker in
                         MacTrackerRow(tracker: tracker)
                             .tag(tracker.id)
+                            // A delete path that doesn't depend on
+                            // `selection` at all — operates directly on
+                            // this row's own `tracker` reference from the
+                            // `trackers` array, not on whatever `selection`
+                            // currently holds. Exists specifically for the
+                            // case `List(selection:)`'s own tap-to-select
+                            // silently fails to register (seen in practice
+                            // after a store-level data issue left two rows
+                            // with ambiguous identity — selection could
+                            // never be confirmed for either, so there was
+                            // no other way to remove them from the UI).
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    store.deleteTracker(tracker)
+                                } label: {
+                                    Label("Delete Tracker", systemImage: "trash")
+                                }
+                            }
                     }
                 }
             }
