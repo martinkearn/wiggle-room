@@ -2099,3 +2099,30 @@ succeeded. Not re-confirmed visually in a live menu bar — same
 Accessibility/Screen Recording permission gap as the previous entry — but
 this change only deletes a `View` builder block with no new API surface,
 a much lower-risk change than the `.window`-style switch was.
+
+## 2026-09-18 Menu bar dropdown: left-align the bottom action rows
+
+Another same-day follow-up from the same screenshot: "Show in Menu Bar",
+"Open Wiggle Room", and "Quit Wiggle Room" all rendered centered rather
+than flush-left like a native menu's items would.
+
+**Root cause**: the containing `VStack(alignment: .leading, ...)` only
+controls how its children are positioned *relative to each other* — each
+`Button`/`Menu` still sizes to fit its own label and centers its text
+within that tight-fitting frame, so `alignment: .leading` on the parent
+had nothing to actually push left. This is a `.window`-style-specific gap
+in `MenuBarStatusView`
+(`src/WiggleRoom/Views/MenuBarStatusView.swift`) — the old `.menu`-style
+dropdown didn't have this problem, since real `NSMenuItem`s are always
+flush-left automatically.
+
+**Fix**: added `.frame(maxWidth: .infinity, alignment: .leading)` to the
+`Menu` and each `Button`, stretching each row to the panel's full width
+before left-aligning the label within it.
+
+### Verifying this session's changes
+
+`xcodebuild -scheme WiggleRoom -destination 'platform=macOS' build`
+succeeded. Not re-confirmed visually in a live menu bar — same
+Accessibility/Screen Recording permission gap as the previous two
+entries.
