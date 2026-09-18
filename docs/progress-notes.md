@@ -1,7 +1,20 @@
 # Wiggle Room — Progress Notes
 
-Status snapshot for picking this work back up. **Last updated 2026-09-17**,
-after **2026-09-17 Surface the bound account read-only, in two places** —
+Status snapshot for picking this work back up. **Last updated 2026-09-18**,
+after **2026-09-18 Move Delete Tracker out of the crowded "…" menu** — on
+the dashboard's "…" menu, Edit Tracker and Delete Tracker (destructive) sat
+directly adjacent with no visual separation, a real mis-tap risk on iOS.
+Delete now lives in its own section at the bottom of the Edit Tracker
+screen instead, set apart from the fields above by a deliberately large
+gap (`.listSectionSpacing`), with the same destructive confirmation dialog
+as before. Before that, **2026-09-18 Menu bar tracker is now
+user-configurable** — the macOS
+menu bar item defaulted to whichever tracker started most recently with no
+way to change it; added a "Show in Menu Bar" submenu (shown once there's
+more than one tracker) that pins a specific tracker via `@AppStorage`,
+falling back to the old most-recently-started default when nothing's
+pinned or the pinned tracker gets deleted. Before that, **2026-09-17
+Surface the bound account read-only, in two places** —
 confirmed a tracker's connected source/account is already fully locked
 after creation (only the initializer ever sets those fields), then made
 the binding visible rather than editable: a read-only "Account" row in
@@ -1837,3 +1850,98 @@ needs a real build and a look at an actual Starling tracker's Edit screen
 and dashboard to confirm the caption/row render sensibly and don't
 crowd already-tight layouts (the watch app and small widget families
 were deliberately left untouched — no room for this there).
+
+## 2026-09-18 Menu bar tracker is now user-configurable
+
+**Bug reported by the user**: with more than one tracker, the macOS menu
+bar item always showed the most-recently-started tracker, and there was no
+way to pick a different one — `MenuBarStatusView`/`MenuBarStatusLabel`
+both hard-coded `trackers.first` off a `startDate`-descending `@Query`,
+matching the spec's original "simpler of the two options" decision (§7.2)
+but with no escape hatch once that default wasn't the tracker the user
+actually wanted glanceable.
+
+**Fix** (`MenuBarStatusView.swift`):
+
+- Added a module-private `menuBarTrackerIDKey` (`"menuBarTrackerID"`) and a
+  `resolveMenuBarTracker(pinnedID:in:)` helper shared by both views: looks
+  up a tracker by the stored id string, falling back to `trackers.first`
+  (the old default) if nothing's pinned yet or the pinned tracker was
+  since deleted — so a stale id can never produce a blank menu bar.
+- Both `MenuBarStatusView` and `MenuBarStatusLabel` now read the pin via
+  `@AppStorage(menuBarTrackerIDKey)` — a plain per-Mac UI preference in
+  `UserDefaults.standard`, deliberately **not** routed through
+  SwiftData/CloudKit, since which tracker shows in *this* Mac's menu bar
+  isn't data that should follow the user to their other devices.
+- `MenuBarStatusView`'s dropdown gained a "Show in Menu Bar" submenu
+  (`Menu` with a `Button` per tracker, checkmark on the currently-shown
+  one), shown only once there are 2+ trackers — with a single tracker
+  there's nothing to choose between, matching how the old default already
+  behaved correctly for that case.
+
+No changes to `TrackerPace`, `Tracker`, or any other target — this is
+scoped entirely to the macOS menu bar's own two views.
+
+### Verifying this session's changes
+
+**Not verified by a compiler or the Simulator** — this environment has no
+Xcode/Swift toolchain at all (`xcodebuild`/`swiftc`/`xcode-select` all
+unavailable), consistent with every prior entry in this stretch. The
+change follows an established, already-working pattern in this codebase
+(`@AppStorage` + a plain string key, a `Menu`/`Button` list mirroring the
+one already used elsewhere for pickers) rather than anything novel, but
+build in Xcode and manually confirm before trusting it: create 2+
+trackers, open the menu bar item, pick a non-default tracker from "Show in
+Menu Bar", confirm both the label and dropdown update immediately and
+persist across a relaunch, then delete that tracker and confirm the menu
+bar falls back to the most-recently-started one without crashing.
+
+## 2026-09-18 Move Delete Tracker out of the crowded "…" menu
+
+**Bug reported by the user**: on iOS, the dashboard's "…" menu
+(`TrackerDetailView`) put **Edit Tracker** and the destructive **Delete
+Tracker** right next to each other with no visual gap between them — an
+easy mis-tap, especially one-handed.
+
+**Fix**:
+
+- `TrackerDetailView.swift` — removed the "Delete Tracker" button (and its
+  `confirmationDialog`) from the "…" menu entirely. The menu now only has
+  Edit Tracker and (when the tracker has readings) Update History.
+- `AddTrackerView.swift` (the Edit Tracker screen) — added a new `Section`
+  at the very bottom of the form, shown only in edit mode
+  (`existingTracker != nil`), containing a single centered destructive
+  "Delete Tracker" button and the same confirmation dialog/wording the
+  dashboard used to show. `.listSectionSpacing(.custom(48))` gives this
+  section a deliberately larger gap above it than the default
+  inter-section spacing, so it reads as a clearly separate, "point of no
+  return" zone rather than just the next field in the form.
+- Deleting now happens from inside the Edit Tracker sheet, which meant the
+  dashboard behind it (`TrackerDetailView`) needed to know to close too,
+  since it would otherwise be left showing a tracker that no longer
+  exists. Added `AddTrackerView.onDelete: (() -> Void)?`, called right
+  before the sheet dismisses itself; `TrackerDetailView` passes `{
+  dismiss() }` when presenting the edit sheet, so confirming delete closes
+  both the sheet and the dashboard in one action, same end result as
+  before. `onDelete` is `nil`/unused everywhere `AddTrackerView` is opened
+  for a *new* tracker (`TrackerListView`, `MacRootView`) — nothing changed
+  there.
+- This is a shared view used by both iOS/iPadOS and macOS
+  (`TrackerDetailView`/`AddTrackerView` have no platform-specific code
+  here), so the fix applies on both, even though the bug was reported
+  specifically on iOS — keeping one behavior rather than forking Delete's
+  placement per platform.
+
+### Verifying this session's changes
+
+**Not verified by a compiler or the Simulator** — same standing caveat as
+every entry in this stretch (no Xcode/Swift toolchain in this
+environment). `.listSectionSpacing(_:)` is available well within this
+project's iOS 27/macOS deployment target (introduced iOS 17/macOS 14), so
+it isn't a new-API risk, but build in Xcode and manually confirm: open
+Edit Tracker on an existing tracker, confirm Delete Tracker sits clearly
+separated at the bottom with its own visual gap, confirm the destructive
+confirmation dialog still reads correctly, and confirm deleting closes
+both the Edit sheet and the dashboard behind it (landing back on the
+tracker list). Also confirm the New Tracker flow (`TrackerListView`'s "+"
+and `MacRootView`'s toolbar button) shows no Delete section at all.
