@@ -60,15 +60,21 @@ struct TrackerComplicationEntryView: View {
 
     private func rectangular(_ tracker: Tracker) -> some View {
         let p = pace(for: tracker)
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(tracker.name)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-            Text(p.displayDifference(for: tracker))
-                .font(.wiggleNumber(.caption))
-            Text(tracker.isCompleted(asOf: entry.date) ? "Completed" : p.statusLine(for: tracker))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+        return HStack(spacing: 8) {
+            RingsView(tracker: tracker, now: entry.date, lineWidth: 5, showsCenterContent: false, isAnimated: false)
+                .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tracker.name)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(p.displayDifference(for: tracker))
+                    .font(.wiggleNumber(.title3))
+                    .foregroundStyle(p.status.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            Spacer(minLength: 0)
         }
         .containerBackground(for: .widget) { Color.clear }
     }

@@ -3426,3 +3426,12 @@ spun and reverted). The status word ("JUST OVER BUDGET" etc.) and caption inside
 rings don't fit on the watch face. [WatchTrackerDetailView.swift](src/WiggleRoomWatch/WatchTrackerDetailView.swift)
 now passes `showsStatusLabel: false` to `RingsView`, so only the difference figure shows,
 in its status colour (spec §7.3 updated). Not built or run after this one-line change.
+
+Follow-up, same day: the wide (`.accessoryRectangular`) complication showed a name, figure and
+"Under Budget by" wording that read oddly on the real watch face. Redesigned in
+[TrackerComplicationEntryView.swift](src/WiggleRoomComplication/TrackerComplicationEntryView.swift)
+to the two-ring `RingsView` (44pt, no centre content) beside the tracker name (small, secondary) and
+the difference figure in its status colour. Verified: `xcodebuild build` for the `WiggleRoomWatch`
+scheme (generic watchOS) succeeded. Not verified on the watch face itself, and `RingsView` inside a
+complication (tinted/accented render modes) hasn't been eyeballed.
+
