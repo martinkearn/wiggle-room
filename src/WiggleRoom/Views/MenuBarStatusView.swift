@@ -102,20 +102,6 @@ struct MenuBarStatusView: View {
                     NSApp.activate(ignoringOtherApps: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                // SettingsLink (not a plain Button) opens the app's real
-                // Settings window (⌘,) — the only way to reach it without
-                // the main window already being frontmost, now that
-                // choosing the menu bar tracker lives there instead of in
-                // the submenu this replaced.
-                SettingsLink {
-                    Text("Settings\u{2026}")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.borderless)
-                Button("Quit Wiggle Room") {
-                    NSApp.terminate(nil)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.borderless)
             .padding(8)

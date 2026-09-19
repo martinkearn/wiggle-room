@@ -1,6 +1,6 @@
 # Wiggle Room — Progress Notes
 
-Status snapshot for picking this work back up. **Last updated 2026-09-19** (latest: **2026-09-19 watch rings: number and colour only**, at the bottom),
+Status snapshot for picking this work back up. **Last updated 2026-09-19** (latest: **2026-09-19 macOS: menu bar dropdown trimmed, New Tracker name-field suggestions off**, at the bottom; before that **2026-09-19 watch rings: number and colour only**),
 after **2026-09-19 iOS extensions — Control, interactive widget, final-stretch Live Activity, Spotlight, actionable reminders** (see its section at the bottom) — before that, **2026-09-19 Spec scope trim — zoom levels, Tesla, cross-user sharing removed** (see its section at the bottom) — before that, **2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched** (see its section at the bottom) — before that, **2026-09-18 Add Tracker moved from the toolbar into the list
 itself, at the top** — asked as a design question ("would the button be
 better at the bottom or top of the list, taking the same shape as a
@@ -3520,3 +3520,14 @@ as "Refresh failed". Verified: iOS `xcodebuild` builds. **Not verified on
 device** — if it still fails, the caption will now say whether it's the fetch
 (failed) or nothing changed (checked).
 
+
+## 2026-09-19 macOS: menu bar dropdown trimmed, New Tracker name-field suggestions off
+
+macOS only. (1) [MenuBarStatusView.swift](src/WiggleRoom/Views/MenuBarStatusView.swift):
+the dropdown's nav rows are now just "Open Wiggle Room"; the Settings… and Quit
+rows were removed, since both are reachable from the full app (⌘, / ⌘Q). Spec §7.2
+updated. (2) Reported: an empty glassy box floating beside the Name field on the New
+Tracker sheet. Not reproduced; looks like the macOS system text-suggestion popup, not
+app UI. Best-guess fix in [AddTrackerView.swift](src/WiggleRoom/Views/AddTrackerView.swift):
+`.autocorrectionDisabled()` on the Name field under `#if os(macOS)`. **Not built or run**
+— no xcodebuild/simulator used, so neither change is verified; iOS unaffected.

@@ -106,6 +106,9 @@ struct AddTrackerView: View {
             Form {
                 Section {
                     TextField("Name", text: $name)
+                        #if os(macOS)
+                        .autocorrectionDisabled()
+                        #endif
                     unitPicker
                     Picker("Direction", selection: $direction) {
                         Text("Decreasing").tag(TrackerDirection.decreasing)
