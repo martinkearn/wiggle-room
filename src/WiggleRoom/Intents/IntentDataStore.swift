@@ -10,10 +10,21 @@ import SwiftData
 /// intents can't rely on the live `TrackerStore`/`ModelContainer` the app's
 /// own `WindowGroup` builds — same reasoning as `WidgetDataStore` in the
 /// widget extension. Opens its own container against the same CloudKit
-/// container each time, rather than trying to share the app's in-memory one.
+/// container (once per process, then reused — see `cachedContainer`), rather
+/// than trying to share the app's in-memory one.
 enum IntentDataStore {
+    /// One container kept alive for the life of the process. A `Tracker`
+    /// fetched from a container that has since been deallocated is
+    /// *detached*, and reading any property on it is a hard SwiftData crash
+    /// ("backing data was detached from a context") — which is exactly what
+    /// happened when this was a fresh container per call and callers such as
+    /// `TrackerSpotlightIndexer` read `tracker.id` after it had gone.
+    @MainActor
+    private static var cachedContainer: ModelContainer?
+
     @MainActor
     static func makeContainer() throws -> ModelContainer {
+        if let cachedContainer { return cachedContainer }
         // Must stay identical to every other process's schema for this same
         // store (`WiggleRoomApp`, `WidgetDataStore`, `WiggleRoomWatchApp`) —
         // a mismatched schema between processes sharing one on-disk/CloudKit
@@ -27,7 +38,9 @@ enum IntentDataStore {
             groupContainer: .identifier(AppGroup.identifier),
             cloudKitDatabase: .automatic
         )
-        return try ModelContainer(for: schema, configurations: [configuration])
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        cachedContainer = container
+        return container
     }
 
     @MainActor

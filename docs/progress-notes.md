@@ -3456,3 +3456,15 @@ no-readings hint/button. Supersedes the "chart deliberately left off the watch" 
 follow-up. `xcodebuild build` succeeded for the watch, iOS and macOS schemes; not seen on a real
 watch, so legibility at that size (axis labels, legend) is unchecked.
 
+## 2026-09-19 crash fix: detached Trackers from `IntentDataStore`
+
+Running the phone app after the Spotlight work crashed on launch: `Tracker.id.getter` inside
+`TrackerSpotlightIndexer.reindex()`, called from the `.task` in `WiggleRoomApp.swift`. Root cause:
+[IntentDataStore.swift](src/WiggleRoom/Intents/IntentDataStore.swift) built a **new `ModelContainer` on
+every call** and returned the fetched `Tracker`s; the container was deallocated on return, leaving them
+detached, and reading any property on a detached model is the same hard SwiftData crash documented in
+the spec's deleted-tracker guard. It also affected every other caller (`TrackerEntity`, `fetchTracker`
+for the notification action and Shortcuts). Fix: `makeContainer()` now caches one container per process
+and reuses it, so fetched models stay attached. Both `WiggleRoom` (iOS, macOS) schemes build. Not
+re-run in a simulator/device after the fix — the user needs to confirm the launch crash is gone.
+
