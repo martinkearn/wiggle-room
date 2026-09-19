@@ -31,6 +31,11 @@ struct SettingsView: View {
                     } label: {
                         Label("Connected Sources", systemImage: "point.3.filled.connected.trianglepath.dotted")
                     }
+                    NavigationLink {
+                        SiriPhrasesView()
+                    } label: {
+                        Label("Siri Phrases", systemImage: "waveform")
+                    }
                 }
 
                 Section {

@@ -271,6 +271,7 @@ All glanceable surfaces (widgets, menu bar item) should support four states, col
 - **Trend Chart widget** (`TrackerChartWidget`): the §3.5 chart (`TrendChartView`, with `showsLegend`/`showsAxes` off for the small/medium/Lock Screen sizes) for one configurable tracker, in small, medium, large, extra-large and Lock Screen rectangular. Same picker and timeline as the main tracker widget.
 - **All Trackers widget** (`AllTrackersWidget`, no configuration): a grid of mini rings with each tracker's ahead/behind figure — 4 (small, no names), 4 (medium), 9 (large), 12 (extra-large), plus a 3-line Lock Screen rectangular list, with "+N more" on overflow. Active trackers first, then newest first; medium and up link each cell to its dashboard.
 - **Siri**: `ViewTrackerStatusIntent`'s tracker is now optional. "What's my Wiggle Room" (also "Check my …", "How am I doing in …") summarises every active tracker, or the only one; "How's <tracker> in Wiggle Room" checks one. Phrases must contain the app name, which here is the phrase's own wording.
+- **Siri Phrases settings page** (`SiriPhrasesView`): a reference list of what to say, under Settings (iOS: a row; macOS: a sidebar pane), with a Shortcuts link on iOS. The wording is hand-kept in step with `WiggleRoomShortcuts` — phrases can't be read back at runtime, so adding one there means adding it here.
 - **Not built**: a "log reading" widget button for manual trackers (needs a value entry surface a widget can't host).
 
 ## 9. Out of Scope for v1 (possible future additions)

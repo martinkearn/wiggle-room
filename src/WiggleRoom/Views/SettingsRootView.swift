@@ -10,11 +10,13 @@ import SwiftData
 private enum SettingsPane: String, Hashable {
     case general
     case connectedSources
+    case siri
 
     var label: String {
         switch self {
         case .general: "General"
         case .connectedSources: "Connected Sources"
+        case .siri: "Siri Phrases"
         }
     }
 
@@ -22,6 +24,7 @@ private enum SettingsPane: String, Hashable {
         switch self {
         case .general: "gearshape"
         case .connectedSources: "point.3.filled.connected.trianglepath.dotted"
+        case .siri: "waveform"
         }
     }
 }
@@ -43,7 +46,7 @@ struct SettingsRootView: View {
     var body: some View {
         HStack(spacing: 0) {
             List(selection: $selection) {
-                ForEach([SettingsPane.general, .connectedSources], id: \.self) { pane in
+                ForEach([SettingsPane.general, .connectedSources, .siri], id: \.self) { pane in
                     Label(pane.label, systemImage: pane.systemImage)
                         .tag(pane)
                 }
@@ -70,6 +73,8 @@ struct SettingsRootView: View {
             GeneralSettingsView()
         case .connectedSources:
             ConnectedSourcesView()
+        case .siri:
+            SiriPhrasesView()
         }
     }
 }

@@ -3596,3 +3596,10 @@ and per-tracker phrases. Spec §8.5 updated. Verified: `xcodebuild build` succee
 **Not verified**: how the widgets look at each size (grid/ring sizes are unvisited guesses), and that
 Siri actually resolves the new phrases (needs a device; phrases can take a while to register).
 
+## 2026-09-19 Siri Phrases settings page
+
+Added [SiriPhrasesView.swift](src/WiggleRoom/Views/SiriPhrasesView.swift), linked from iOS Settings and as a macOS
+Settings sidebar pane. Phrase text is duplicated by hand from `WiggleRoomShortcuts` (documented in the file and spec
+§8.5). `ShortcutsLink` doesn't exist on macOS, so that button is iOS-only. Verified: iOS and macOS `xcodebuild`
+builds succeed; page not visually checked.
+
