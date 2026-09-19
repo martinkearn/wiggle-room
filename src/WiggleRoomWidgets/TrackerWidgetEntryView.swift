@@ -43,10 +43,15 @@ struct TrackerWidgetEntryView: View {
     @ViewBuilder
     private func refreshButton(_ tracker: Tracker) -> some View {
         if !tracker.isManualEntry, !tracker.isCompleted(asOf: entry.date) {
-            Button(intent: RefreshTrackerIntent(trackerId: tracker.id)) {
-                Image(systemName: "arrow.clockwise").font(.caption.weight(.semibold))
+            HStack(spacing: 6) {
+                if let caption = RefreshOutcome.caption(for: tracker.id, asOf: entry.date) {
+                    Text(caption).font(.caption2)
+                }
+                Button(intent: RefreshTrackerIntent(trackerId: tracker.id)) {
+                    Image(systemName: "arrow.clockwise").font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .padding(6)
         }

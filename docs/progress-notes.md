@@ -3505,3 +3505,18 @@ animates supported transitions between timeline entries (numeric text, symbol ef
 `Shape` trims, so the rings simply redraw at their new fill. The flip only shows when a number actually
 changes. Widget build succeeds; not seen on a device.
 
+## 2026-09-19 Widget refresh button — visible outcome, faster lookup
+
+Reported: the widget refresh button "does not appear to work." Not reproduced
+(no device run). Two likely causes fixed: (1) `refreshFromSource` only writes
+when the value *changed*, so an unchanged balance looked like a dead button —
+[RefreshTrackerIntent.swift](src/WiggleRoomWidgets/RefreshTrackerIntent.swift)
+now records `RefreshOutcome` (updated / unchanged / failed) in the App Group
+and the widget shows it as a caption by the button; (2) the intent looked the
+tracker up via `WidgetDataStore.fetchTracker`, which can wait on a CloudKit
+import, risking the extension's short execution budget — it now uses
+`fetchAllTrackersImmediately`. Errors were previously swallowed; now surfaced
+as "Refresh failed". Verified: iOS `xcodebuild` builds. **Not verified on
+device** — if it still fails, the caption will now say whether it's the fetch
+(failed) or nothing changed (checked).
+
