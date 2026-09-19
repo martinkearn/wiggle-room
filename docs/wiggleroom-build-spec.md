@@ -223,6 +223,7 @@ A `ConnectedSource` is a configured instance of a provider — e.g. "My Starling
 ### 7.3 watchOS
 
 - Companion app: simple list/detail view mirroring the dashboard (current value, target, ahead/behind) — read-only for auto-fetch sources; manual trackers support quick reading entry directly from the Watch (implemented as a real v1 feature, not left as a stretch goal, since manual entry is the only provider in scope so far). Talks to its own CloudKit-backed `ModelContainer` independently of the phone being nearby.
+- The detail screen's rings show only the difference figure, coloured by pace status — no status word or caption (`showsStatusLabel: false`), since the watch face is too small for the text to fit legibly.
 - Complication: shows the ahead/behind figure for a chosen/default tracker directly on the watch face. **Implemented** as a separate WidgetKit extension (`WiggleRoomComplication` target, embedded inside `WiggleRoomWatch`), covering `.accessoryCircular`/`.accessoryRectangular`/`.accessoryInline` families with its own tracker-picker configuration (App Intents entities aren't shared across extension targets), refreshed hourly with an immediate reload on data changes.
 
 ## 8. Widgets

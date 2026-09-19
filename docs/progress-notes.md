@@ -1,6 +1,6 @@
 # Wiggle Room — Progress Notes
 
-Status snapshot for picking this work back up. **Last updated 2026-09-19**,
+Status snapshot for picking this work back up. **Last updated 2026-09-19** (latest: **2026-09-19 watch rings: number and colour only**, at the bottom),
 after **2026-09-19 iOS extensions — Control, interactive widget, final-stretch Live Activity, Spotlight, actionable reminders** (see its section at the bottom) — before that, **2026-09-19 Spec scope trim — zoom levels, Tesla, cross-user sharing removed** (see its section at the bottom) — before that, **2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched** (see its section at the bottom) — before that, **2026-09-18 Add Tracker moved from the toolbar into the list
 itself, at the top** — asked as a design question ("would the button be
 better at the bottom or top of the list, taking the same shape as a
@@ -3417,3 +3417,12 @@ Verified: `xcodebuild build` succeeded for iOS (generic), macOS and the watch sc
 **Not verified at runtime** (no simulator/device run): control appearance, widget button
 refresh, Live Activity start/update/end, Spotlight results, notification text action.
 Known limitation: a Live Activity can only be *started* in the foreground.
+
+## 2026-09-19 watch rings: number and colour only
+
+First run on a real watch (watchOS 27.0, installed by running the `WiggleRoomWatch`
+scheme from Xcode with the watch as destination, after the Watch app's Install button
+spun and reverted). The status word ("JUST OVER BUDGET" etc.) and caption inside the
+rings don't fit on the watch face. [WatchTrackerDetailView.swift](src/WiggleRoomWatch/WatchTrackerDetailView.swift)
+now passes `showsStatusLabel: false` to `RingsView`, so only the difference figure shows,
+in its status colour (spec §7.3 updated). Not built or run after this one-line change.

@@ -55,6 +55,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2E72304D8C979446738D729C"
             BuildableName = "WiggleRoomWatch.app"
+            BlueprintName = "WiggleRoomWatch"
             ReferencedContainer = "container:WiggleRoom.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -71,6 +72,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2E72304D8C979446738D729C"
             BuildableName = "WiggleRoomWatch.app"
+            BlueprintName = "WiggleRoomWatch"
             ReferencedContainer = "container:WiggleRoom.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

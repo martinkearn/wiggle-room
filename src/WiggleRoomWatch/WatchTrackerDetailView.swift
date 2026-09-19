@@ -52,7 +52,7 @@ struct WatchTrackerDetailView: View {
                         CompletedBadge()
                     }
 
-                    RingsView(tracker: tracker, now: now, lineWidth: 8)
+                    RingsView(tracker: tracker, now: now, lineWidth: 8, showsStatusLabel: false)
                         .frame(width: 120, height: 120)
 
                     if !tracker.isCompleted(asOf: now) {
