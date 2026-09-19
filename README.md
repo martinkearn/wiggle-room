@@ -70,7 +70,8 @@ wiggle-room/
 │   ├── wiggleroom-build-spec.md — the build spec (source of truth)
 │   └── progress-notes.md      — what's actually been built, decisions, gaps
 ├── scripts/                   — one-off Xcode-project-surgery scripts (see
-│                                 progress-notes.md; not part of the app)
+│                                 progress-notes.md; not part of the app), plus
+│                                 generate_app_icon.py (regenerates every icon PNG)
 ├── src/                       — Xcode project & app source
 │   ├── WiggleRoom.xcodeproj
 │   ├── WiggleRoom/                — the iOS/iPadOS/macOS app + Shortcuts intents
