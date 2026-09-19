@@ -3542,3 +3542,7 @@ on macOS. New `ToolbarItemPlacement.sheetCancel`/`.sheetConfirm` in
 `.navigation`/`.primaryAction` on macOS (Cancel leading, Save trailing, native title
 between) and to the original placements on iOS. Used by Add/Edit Tracker, Log Reading and
 Add Source. Verified: macOS `xcodebuild` builds; **not visually checked**. iOS placements unchanged.
+
+## 2026-09-19 Add Source: source-type picker (Starling / Tesla "Coming soon")
+
+"Add Source" went straight to Starling token entry. Now it first offers a type choice: new [AddSourcePickerView.swift](src/WiggleRoom/Views/AddSourcePickerView.swift) (iOS Connected Sources toolbar and Add Tracker's "Add New Source…") lists Starling (→ `AddSourceView`) and Tesla (→ `TeslaComingSoonView`). macOS's inline `NewSourceCard` in [ConnectedSourcesView.swift](src/WiggleRoom/Views/ConnectedSourcesView.swift) gained a segmented Starling/Tesla control; Tesla shows "Coming soon" with only Cancel. Reconnect/edit of an existing source is unchanged. Not built or run — no xcodebuild/simulator used this session.

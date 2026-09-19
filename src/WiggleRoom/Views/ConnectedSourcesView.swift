@@ -158,7 +158,7 @@ struct ConnectedSourcesView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink {
-                    AddSourceView()
+                    AddSourcePickerView()
                 } label: {
                     Label("Add Source", systemImage: "plus")
                 }
@@ -437,6 +437,8 @@ private struct NewSourceCard: View {
     let onCancel: () -> Void
     let onAdd: (ConnectedSource) -> Void
 
+    private enum Kind: String, CaseIterable { case starling = "Starling", tesla = "Tesla" }
+    @State private var kind = Kind.starling
     @State private var displayName = "My Starling Account"
     @State private var token = ""
     @State private var isConnecting = false
@@ -451,6 +453,20 @@ private struct NewSourceCard: View {
             Text("Add Source")
                 .font(.headline)
 
+            Picker("Type", selection: $kind) {
+                ForEach(Kind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            if kind == .tesla {
+                Text("Tesla — Coming soon")
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Spacer()
+                    Button("Cancel") { onCancel() }
+                }
+            } else {
             TextField("Name", text: $displayName)
                 .textFieldStyle(.roundedBorder)
 
@@ -488,6 +504,7 @@ private struct NewSourceCard: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(trimmedToken.isEmpty || isConnecting)
+            }
             }
         }
         .padding(14)

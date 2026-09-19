@@ -310,7 +310,7 @@ struct AddTrackerView: View {
                 }
             }
             .navigationDestination(isPresented: $isShowingAddSource) {
-                AddSourceView()
+                AddSourcePickerView()
             }
             .task(id: selectedSourceId) {
                 await loadAvailableTargetsIfNeeded()
