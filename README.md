@@ -32,6 +32,7 @@ Rough shape of what's implemented vs. still to come:
 - [ ] Tesla and other providers (deferred — not being built right now; spec §9)
 - [x] SwiftData + CloudKit sync
 - [x] iOS dashboard & rings visual, incl. a completed-tracker presentation
+- [x] Settings → Tracker Order (synced custom ordering of the tracker list)
 - [x] Widgets (Home Screen incl. extra-large, Lock Screen — configurable per tracker)
 - [x] macOS UI (sidebar, menu bar item, Dock badge)
 - [x] watchOS companion app (embedded in the iOS app)

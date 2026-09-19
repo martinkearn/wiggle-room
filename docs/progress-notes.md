@@ -1,6 +1,6 @@
 # Wiggle Room — Progress Notes
 
-Status snapshot for picking this work back up. **Last updated 2026-09-19** (latest: **2026-09-19 macOS: sheet titles flush-left**, at the bottom; before that **2026-09-19 macOS: menu bar dropdown trimmed, New Tracker name-field suggestions off**, at the bottom; before that **2026-09-19 watch rings: number and colour only**),
+Status snapshot for picking this work back up. **Last updated 2026-09-19** (latest: **2026-09-19 Docs sync** at the bottom; before that **2026-09-19 macOS: sheet titles flush-left**, at the bottom; before that **2026-09-19 macOS: menu bar dropdown trimmed, New Tracker name-field suggestions off**, at the bottom; before that **2026-09-19 watch rings: number and colour only**),
 after **2026-09-19 iOS extensions — Control, interactive widget, final-stretch Live Activity, Spotlight, actionable reminders** (see its section at the bottom) — before that, **2026-09-19 Spec scope trim — zoom levels, Tesla, cross-user sharing removed** (see its section at the bottom) — before that, **2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched** (see its section at the bottom) — before that, **2026-09-18 Add Tracker moved from the toolbar into the list
 itself, at the top** — asked as a design question ("would the button be
 better at the bottom or top of the list, taking the same shape as a
@@ -3689,3 +3689,7 @@ Reviewed every commit since ~13:30. Findings and fixes:
 - **Watch parity gap.** A separate change moved "Estimated Final Balance" into the Target card as a caption on iOS/macOS; the watch still had its own card. Watch now matches ("Estimated final X" under "Final target X").
 - The earlier note that macOS failed in `ReadingHistoryView` no longer reproduces.
 - **Verified with real builds this time:** `xcodebuild` succeeded for the WiggleRoom scheme on macOS and iOS Simulator and the WiggleRoomWatch scheme (watchOS Simulator). Widgets/Complication schemes, tests and runtime behaviour (incl. CloudKit migration of the new `sortOrder`/`lastCheckedDate` fields) were not exercised.
+
+## 2026-09-19 Docs sync
+
+Rewrote the build spec to match today's behaviour instead of leaving appended HTML comments: §3.5 (time-scaled chart axis, "Final target £X"), §4.1 (`sortOrder`, `lastCheckedDate`), §5.2 (Add Source type picker, two immediate readings for a new connected-source tracker), §7.1/§7.3 (Checked/Changed lines, Tracker Order settings, synced list order incl. watch), §8.2 (rectangular Lock Screen widget mirrors the watch complication), plus new §12 resolved items. README checklist gained Tracker Order. Per instruction, everything was assumed working; docs reflect intended behaviour, and the two new synced fields' CloudKit migration remains unverified.
