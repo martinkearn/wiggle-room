@@ -98,7 +98,7 @@ struct WatchTrackerDetailView: View {
             card(tint: pace.status.color, title: tracker.currentValueLabel,
                  value: pace.currentValue, caption: pace.remainingInAllowanceCaption(for: tracker),
                  showsSourceTiming: true)
-            card(tint: WiggleRoomColors.paceRing, title: "Current Target",
+            card(tint: WiggleRoomColors.paceRing, title: "Current Budget",
                  value: pace.targetValueToday,
                  caption: ["Final target \(tracker.formattedValue(tracker.projectedFinalValue))",
                            tracker.sortedReadings.count > 1 ? tracker.estimatedFinalValue.map { "Estimated final \(tracker.formattedValue($0))" } : nil]

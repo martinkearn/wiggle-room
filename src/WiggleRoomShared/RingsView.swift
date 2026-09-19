@@ -20,7 +20,7 @@ import Foundation
 /// overlay for small indicator-sized uses (e.g. list rows), where there
 /// isn't room for it to be legible. No separate color key is drawn below
 /// the rings — the figure cards elsewhere on screen (Current Balance,
-/// Current Target) already use these exact same two colors, so a legend
+/// Current Budget) already use these exact same two colors, so a legend
 /// here would just be repeating what's already unambiguous at a glance.
 ///
 /// Both rings spring in on first appearance, and fully **re-cycle** — drain

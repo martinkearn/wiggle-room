@@ -76,7 +76,7 @@ struct MenuBarStatusView: View {
                             Text(tracker.formattedValue(pace.currentValue))
                         }
                         HStack {
-                            Text("Current Target")
+                            Text("Current Budget")
                             Spacer()
                             Text(tracker.formattedValue(pace.targetValueToday))
                         }

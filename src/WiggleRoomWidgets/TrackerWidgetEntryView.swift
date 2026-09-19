@@ -195,7 +195,7 @@ struct TrackerWidgetEntryView: View {
 
             HStack(spacing: 12) {
                 widgetFigure(title: tracker.currentValueLabel, value: tracker.formattedValue(p.currentValue), color: p.status.color)
-                widgetFigure(title: "Current Target", value: tracker.formattedValue(p.targetValueToday), color: .primary)
+                widgetFigure(title: "Current Budget", value: tracker.formattedValue(p.targetValueToday), color: .primary)
             }
         }
         .padding()
@@ -267,7 +267,7 @@ struct TrackerWidgetEntryView: View {
                         caption: p.remainingInAllowanceCaption(for: tracker)
                     )
                     widgetFigure(
-                        title: "Current Target",
+                        title: "Current Budget",
                         value: tracker.formattedValue(p.targetValueToday),
                         color: .primary,
                         caption: "Final target \(tracker.formattedValue(tracker.projectedFinalValue))"

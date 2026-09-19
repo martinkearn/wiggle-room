@@ -252,7 +252,7 @@ struct TrackerDetailView: View {
         // that happens outside of appear, since logging a reading (not
         // `refreshFromSourceIfNeeded`) is that tracker's own "update" path.
         // The clock's own tick (every 30s, display-only — never fetches a
-        // balance): advance `now`, and flip the Current Target card only
+        // balance): advance `now`, and flip the Current Budget card only
         // if that figure actually changed at the displayed precision.
         .onChange(of: PaceClock.shared.tickCount) { _, _ in
             let before = tracker.formattedValue(pace.targetValueToday)
@@ -295,7 +295,7 @@ struct TrackerDetailView: View {
     }
 
     /// Two visually separate cards, not one shared row — Current Balance
-    /// and Current Target are different things updated in different ways
+    /// and Current Budget are different things updated in different ways
     /// (one by logging a reading, one automatically by the clock) — but
     /// otherwise identical in shape/weight, since the update action now
     /// lives outside both of them (a pull-to-refresh gesture on iOS, an
@@ -313,7 +313,7 @@ struct TrackerDetailView: View {
             }
 
             card(tint: WiggleRoomColors.paceRing) {
-                figureContent(title: "Current Target", value: pace.targetValueToday, caption: finalBalanceCaption, extraCaption: estimatedFinalCaption)
+                figureContent(title: "Current Budget", value: pace.targetValueToday, caption: finalBalanceCaption, extraCaption: estimatedFinalCaption)
             }
             // A little "just updated" flourish when a new reading lands —
             // a full turn rather than a half-flip so the card never rests
@@ -329,7 +329,7 @@ struct TrackerDetailView: View {
     }
 
     /// Final-state replacement for `figuresRow` once the tracker has
-    /// completed — "Current Target" is a live projection that's no longer
+    /// completed — "Current Budget" is a live projection that's no longer
     /// meaningful, so it's replaced with the stable final figure and status
     /// instead, pinned to `endDate` (see `finalPace`).
     private var completedSummary: some View {
@@ -384,7 +384,7 @@ struct TrackerDetailView: View {
             refreshErrorMessage = Self.errorMessage(for: error)
         }
         // `now` only otherwise moves on appear — refresh it here too so
-        // Current Target/the ring reflect the actual moment this fetch
+        // Current Budget/the ring reflect the actual moment this fetch
         // completed, not whenever the screen happened to be opened.
         now = Date.now
         checkForCompletionCelebration(asOf: now)
@@ -506,7 +506,7 @@ struct TrackerDetailView: View {
         pace.remainingInAllowanceCaption(for: tracker)
     }
 
-    /// The small, subtle line under Current Target's own number — same
+    /// The small, subtle line under Current Budget's own number — same
     /// weight/position as Current Balance's "£X left in this budget" — but
     /// stating the tracker's projected final target instead: where the
     /// number above is landing right now, this is where it's designed to
@@ -515,7 +515,7 @@ struct TrackerDetailView: View {
         "Final target \(tracker.formattedValue(tracker.projectedFinalValue))"
     }
 
-    /// A second subtle line under Current Target: where the trend line
+    /// A second subtle line under Current Budget: where the trend line
     /// (§3.5) says this tracker is actually headed, as opposed to the
     /// target's own final figure above it. Only once there's a trend to
     /// speak of (2+ readings) and while the tracker is still running.

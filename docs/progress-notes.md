@@ -3701,3 +3701,7 @@ The Checked/Changed lines now read "Checked at 14:03" for today (was "Checked 14
 ## 2026-09-19 Detail: connection · account line moved into the header
 
 The "My Starling Account · Personal" caption is no longer body text above the rings; it's a second line of `navigationSubtitle` (after the date range) in [TrackerDetailView.swift](src/WiggleRoom/Views/TrackerDetailView.swift). iOS and macOS builds succeed; not run, so whether the subtitle renders two lines (vs. truncating to one) on each platform is unchecked. If it truncates, the fallback is a custom principal toolbar item. The watch detail never showed this caption.
+
+## 2026-09-19 "Current Target" → "Current Budget"
+
+Renamed the label everywhere in app code (detail screens, watch, widgets, menu bar, rings) and the build spec. "Final target £X", the chart's "Target" line and "Right on target" wording were left as they were — only the "Current Target" label was asked for. Not built or run.
