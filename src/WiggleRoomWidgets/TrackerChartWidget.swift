@@ -86,7 +86,7 @@ struct TrackerChartEntryView: View {
                 Text(pace(tracker).statusLine(for: tracker))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TrendChartView(tracker: tracker, now: entry.date)
+                TrendChartView(tracker: tracker, now: entry.date, showsLegend: false)
             }
             .padding()
             .containerBackground(for: .widget) { Color.widgetBackground }

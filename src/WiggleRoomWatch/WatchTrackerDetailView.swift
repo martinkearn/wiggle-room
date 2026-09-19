@@ -136,7 +136,7 @@ struct WatchTrackerDetailView: View {
                         .multilineTextAlignment(.center)
 
                     if tracker.sortedReadings.count > 1 {
-                        TrendChartView(tracker: tracker, now: now)
+                        TrendChartView(tracker: tracker, now: now, showsLegend: false)
                             .frame(height: 130)
                     }
 
