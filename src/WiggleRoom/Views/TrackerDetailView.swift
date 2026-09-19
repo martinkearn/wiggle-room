@@ -187,10 +187,6 @@ struct TrackerDetailView: View {
                     TrendChartView(tracker: tracker, now: now)
                         .frame(height: 240)
                         .padding(.horizontal)
-
-                    if !isCompleted, let estimatedFinalValue = tracker.estimatedFinalValue {
-                        estimatedFinalBalanceCard(estimatedFinalValue)
-                    }
                 }
             }
             .padding(.bottom, 32)
@@ -320,7 +316,7 @@ struct TrackerDetailView: View {
             }
 
             card(tint: WiggleRoomColors.paceRing) {
-                figureContent(title: "Target Right Now", value: pace.targetValueToday, caption: finalBalanceCaption)
+                figureContent(title: "Target Right Now", value: pace.targetValueToday, caption: finalBalanceCaption, extraCaption: estimatedFinalCaption)
             }
             // A little "just updated" flourish when a new reading lands —
             // a full turn rather than a half-flip so the card never rests
@@ -522,30 +518,14 @@ struct TrackerDetailView: View {
         "Final target will be \(tracker.formattedValue(tracker.projectedFinalValue))"
     }
 
-    /// Where the trend line (§3.5) says this tracker is actually headed,
-    /// as its own labeled figure — detail-screen only, not added to the
-    /// chart itself, which already draws the same trend visually. Colored
-    /// green/red by whether that projection is trending toward or away
-    /// from the tracker's real target, not the three-state amber/red
-    /// `PaceStatus` split used elsewhere — this is a single "which way is
-    /// it leaning" signal, not the live pace-vs-elapsed-time status.
-    private func estimatedFinalBalanceCard(_ estimatedFinalValue: Decimal) -> some View {
-        let difference = tracker.estimatedFinalDifference ?? 0
-        let tint = difference >= 0 ? WiggleRoomColors.good : WiggleRoomColors.bad
-        return card(tint: tint) {
-            figureContent(
-                title: "Estimated Final Balance",
-                value: estimatedFinalValue,
-                caption: estimatedFinalBalanceCaption(difference: difference)
-            )
-        }
-        .padding(.horizontal)
-    }
-
-    private func estimatedFinalBalanceCaption(difference: Decimal) -> String {
-        guard difference != 0 else { return "Right on target" }
-        let verb = difference > 0 ? "under" : "over"
-        return "Trending \(verb) target by \(tracker.formattedValue(abs(difference)))"
+    /// A second subtle line under Target Right Now: where the trend line
+    /// (§3.5) says this tracker is actually headed, as opposed to the
+    /// target's own final figure above it. Only once there's a trend to
+    /// speak of (2+ readings) and while the tracker is still running.
+    private var estimatedFinalCaption: String? {
+        guard !isCompleted, tracker.sortedReadings.count > 1,
+              let estimatedFinalValue = tracker.estimatedFinalValue else { return nil }
+        return "Estimated final \(tracker.formattedValue(estimatedFinalValue))"
     }
 
     /// Subtle "Checked / Changed" lines under the balance for a
@@ -572,7 +552,7 @@ struct TrackerDetailView: View {
             : date.formatted(date: .abbreviated, time: .shortened)
     }
 
-    private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {
+    private func figureContent(title: String, value: Decimal, caption: String? = nil, extraCaption: String? = nil) -> some View {
         VStack(spacing: 4) {
             Text(title)
                 .font(.caption.weight(.medium))
@@ -581,8 +561,8 @@ struct TrackerDetailView: View {
                 .font(.wiggleNumber(size: 24, weight: .bold))
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
-            if let caption {
-                Text(caption)
+            ForEach([caption, extraCaption].compactMap { $0 }, id: \.self) { line in
+                Text(line)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }

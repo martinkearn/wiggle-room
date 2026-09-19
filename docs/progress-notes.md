@@ -3655,3 +3655,13 @@ New settings page ([TrackerOrderView.swift](src/WiggleRoom/Views/TrackerOrderVie
 ## 2026-09-19 Detail screen: "Checked" / "Changed" times on the balance card
 
 Connected-source trackers now show two subtle lines inside the Current Balance card ([TrackerDetailView.swift](src/WiggleRoom/Views/TrackerDetailView.swift)): "Checked <time>" (new synced `Tracker.lastCheckedDate`, set on every successful `refreshFromSource`, changed or not) and "Changed <time>" (the latest reading's date). Time only if today, otherwise date and time. Manual trackers show neither. A tracker never refreshed since this shipped shows only "Changed" until its next check. Not built or run.
+
+## 2026-09-19 Estimated final moved into the Target Right Now card
+
+The standalone "Estimated Final Balance" card is gone; `TrackerDetailView.figureContent` gained an `extraCaption`
+and Target Right Now now shows "Estimated final £X" as a second tertiary caption under "Final target will be…"
+(same conditions as before: 2+ readings, not completed). The card's over/under colouring and "Trending over/under
+target by…" wording were dropped with it. iOS build succeeds. **Known, not from this change**: the macOS build
+currently fails at HEAD in `ReadingHistoryView.swift` ("`ValueSnapshot` doesn't conform to `Identifiable`") — reproduced
+with my change stashed, and it compiled earlier today, so something since then broke it; not yet investigated.
+
