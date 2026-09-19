@@ -16,6 +16,12 @@ struct TrackerComplicationEntryView: View {
     let entry: TrackerComplicationEntry
 
     var body: some View {
+        bodyContent
+            .font(.wiggleText(.body))
+    }
+
+    @ViewBuilder
+    private var bodyContent: some View {
         if let tracker = entry.tracker {
             content(for: tracker)
         } else {

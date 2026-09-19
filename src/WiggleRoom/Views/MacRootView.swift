@@ -75,6 +75,16 @@ struct MacRootView: View {
                 }
             }
             .navigationTitle("Trackers")
+            .toolbar(removing: .title)
+            .navigationSplitViewColumnWidth(min: 240, ideal: 270, max: 340)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Text("Trackers")
+                    .font(WiggleRoomFont.headline(22, weight: 700))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 6)
+            }
         } detail: {
             if let selectedTracker = trackers.first(where: { $0.id == selection }) {
                 TrackerDetailView(tracker: selectedTracker)

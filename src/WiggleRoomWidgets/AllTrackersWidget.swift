@@ -69,6 +69,12 @@ struct AllTrackersEntryView: View {
     let entry: AllTrackersEntry
 
     var body: some View {
+        bodyContent
+            .font(.wiggleText(.body))
+    }
+
+    @ViewBuilder
+    private var bodyContent: some View {
         if entry.trackers.isEmpty {
             VStack(spacing: 6) {
                 EmptyRingsMark(size: 56)

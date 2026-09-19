@@ -21,6 +21,8 @@ struct WatchLogReadingView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 8) {
+                Text("Log \(tracker.unit)")
+                    .font(WiggleRoomFont.headline(18, weight: 700))
                 TextField(tracker.unit, text: $valueText)
                     .focused($isFocused)
                     .font(.wiggleNumber(size: 28, weight: .semibold))
@@ -29,7 +31,7 @@ struct WatchLogReadingView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(Self.parseDecimal(valueText) == nil)
             }
-            .navigationTitle("Log \(tracker.unit)")
+            .navigationTitle("")
             .task { isFocused = true }
         }
     }

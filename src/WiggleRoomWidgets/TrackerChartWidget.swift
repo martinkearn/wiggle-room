@@ -31,6 +31,12 @@ struct TrackerChartEntryView: View {
     let entry: TrackerTimelineEntry
 
     var body: some View {
+        bodyContent
+            .font(.wiggleText(.body))
+    }
+
+    @ViewBuilder
+    private var bodyContent: some View {
         if let tracker = entry.tracker {
             content(for: tracker)
                 .widgetURL(WiggleRoomDeepLink.url(forTrackerId: tracker.id))
