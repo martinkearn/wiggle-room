@@ -56,6 +56,12 @@ struct ReadingHistoryView: View {
                     .onDelete(perform: deleteAction)
                 }
                 .listStyle(.plain)
+                #if os(macOS)
+                // Line the rows up with the sheet's left-aligned title
+                // (`leadingSheetTitle`'s 30pt inset) rather than sitting
+                // almost flush with the sheet edge.
+                .padding(.horizontal, 22)
+                #endif
             }
         }
         // Explicit minimum size — this sheet has no other view establishing
@@ -66,6 +72,7 @@ struct ReadingHistoryView: View {
         // renders its content invisibly small rather than visibly empty.
         .frame(minWidth: 360, minHeight: 320)
         .navigationTitle("Balance History")
+        .leadingSheetTitle("Balance History")
         .inlineNavigationBarIfAvailable()
         .toolbar {
             // This sheet's only other dismissal was swipe-down — not

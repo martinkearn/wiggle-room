@@ -1,6 +1,6 @@
 # Wiggle Room — Progress Notes
 
-Status snapshot for picking this work back up. **Last updated 2026-09-19** (latest: **2026-09-19 macOS: menu bar dropdown trimmed, New Tracker name-field suggestions off**, at the bottom; before that **2026-09-19 watch rings: number and colour only**),
+Status snapshot for picking this work back up. **Last updated 2026-09-19** (latest: **2026-09-19 macOS: sheet titles flush-left**, at the bottom; before that **2026-09-19 macOS: menu bar dropdown trimmed, New Tracker name-field suggestions off**, at the bottom; before that **2026-09-19 watch rings: number and colour only**),
 after **2026-09-19 iOS extensions — Control, interactive widget, final-stretch Live Activity, Spotlight, actionable reminders** (see its section at the bottom) — before that, **2026-09-19 Spec scope trim — zoom levels, Tesla, cross-user sharing removed** (see its section at the bottom) — before that, **2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched** (see its section at the bottom) — before that, **2026-09-18 Add Tracker moved from the toolbar into the list
 itself, at the top** — asked as a design question ("would the button be
 better at the bottom or top of the list, taking the same shape as a
@@ -3546,3 +3546,26 @@ Add Source. Verified: macOS `xcodebuild` builds; **not visually checked**. iOS p
 ## 2026-09-19 Add Source: source-type picker (Starling / Tesla "Coming soon")
 
 "Add Source" went straight to Starling token entry. Now it first offers a type choice: new [AddSourcePickerView.swift](src/WiggleRoom/Views/AddSourcePickerView.swift) (iOS Connected Sources toolbar and Add Tracker's "Add New Source…") lists Starling (→ `AddSourceView`) and Tesla (→ `TeslaComingSoonView`). macOS's inline `NewSourceCard` in [ConnectedSourcesView.swift](src/WiggleRoom/Views/ConnectedSourcesView.swift) gained a segmented Starling/Tesla control; Tesla shows "Coming soon" with only Cancel. Reconnect/edit of an existing source is unchanged. Not built or run — no xcodebuild/simulator used this session.
+
+## 2026-09-19 macOS: sheet titles flush-left
+
+Reported: macOS sheet titles look indented ("tabbed right") against the form. Cause: a
+`NavigationStack` title in a macOS sheet is placed after space reserved for leading
+toolbar items, which sheets don't fill (their Cancel/Save render in a bottom bar). Tried
+and rejected: moving Cancel/Save into the top toolbar with `.navigation`/`.primaryAction`
+(rendered no buttons at all in a sheet — commits 79b9448/37eca06 revert it). Shipped:
+`View.leadingSheetTitle(_:)` in [View+PlatformHelpers.swift](src/WiggleRoom/Views/View+PlatformHelpers.swift)
+(macOS: `.toolbar(removing: .title)` + a left-aligned `.title2` semibold heading in a top
+safe-area inset, 30pt inset to match the form; no-op on iOS), applied to Add/Edit Tracker,
+Log Reading and Balance History. Balance History's plain `List` also got 22pt horizontal
+padding on macOS so rows line up with the title. Add Source is only reachable on macOS as a
+pushed page inside the Add Tracker sheet, so it keeps its native title. Settings window
+already used an inline pane title — unchanged.
+Verified in the running macOS app (screenshots): New Tracker, Edit Tracker, Balance
+History, Settings → General. **Not visually checked**: Update Current Value / Edit Update
+(same helper as New Tracker; couldn't select the second tracker through UI scripting) and
+the Add Source push flow. Gotcha: an incremental `xcodebuild` twice produced a binary
+without the new code while reporting success — `touch` the sources or check the
+`.debug.dylib` timestamp before trusting a visual check. Still open: an empty rounded
+glass box floats beside the Name field on the Add/Edit Tracker sheet (not fixed by
+`.autocorrectionDisabled()`, still there in the latest build). iOS unaffected.
