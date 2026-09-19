@@ -3435,3 +3435,8 @@ the difference figure in its status colour. Verified: `xcodebuild build` for the
 scheme (generic watchOS) succeeded. Not verified on the watch face itself, and `RingsView` inside a
 complication (tinted/accented render modes) hasn't been eyeballed.
 
+Follow-up: the small circular complication showed the tracker's first letter and first three
+letters ("S" / "Sep") — noise at that size. Now the gauge arc (elapsed fraction, status-tinted)
+holds only the difference figure, scaled down to fit (`minimumScaleFactor(0.5)`). Watch scheme
+builds; not viewed on a real watch face — long figures may still truncate.
+
