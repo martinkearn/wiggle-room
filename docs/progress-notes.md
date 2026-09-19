@@ -3635,3 +3635,7 @@ Label was right ("Tracker") but the dropdown *value* showed "Tracker": the syste
 the placeholder now resolves instantly without any fetch, and `typeDisplayRepresentation` itself is "Choose a
 tracker" so any unresolved state reads correctly too. iOS/watchOS builds succeed; not verified on device.
 
+
+## 2026-09-19 New connected-source tracker fetches its live balance immediately
+
+Bug: a new Starling tracker only had the seeded starting-value reading until the next scheduled refresh (and a live balance equal to the starting value was skipped as "unchanged"). Now `AddTrackerView.save()` kicks off `refreshFromSource(_, force: true)` right after seeding reading 1, so the live balance is always reading 2. `force` (new, default false) bypasses the unchanged-value check in [TrackerStore.swift](src/WiggleRoomShared/State/TrackerStore.swift). Fetch failures are silent; the normal refresh cycle retries. Not built or run.

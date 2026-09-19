@@ -707,6 +707,13 @@ struct AddTrackerView: View {
         // readings logged yet" and a blank ring until the user manually logs
         // one, even though the starting value is already a real data point.
         store.logReading(value: startingValue, date: startDate, for: tracker)
+        // A connected-source tracker always gets the live balance as its
+        // second reading straight away (forced, even if it happens to equal
+        // the starting value) so it never sits with only the seed entry.
+        if !tracker.isManualEntry {
+            let store = store
+            Task { _ = try? await store.refreshFromSource(tracker, force: true) }
+        }
         dismiss()
     }
 

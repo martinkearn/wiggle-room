@@ -334,3 +334,5 @@ Resolved (kept here for the record):
 - **Time-driven pace refresh without balance fetches**: Target Right Now / under-over figures refresh every 30s in the foreground and ~5 min in the background via `PaceClock`, with no provider calls; the balance refresh policy is unchanged. See §5.3.
 
 <!-- Lock Screen rectangular widget now mirrors the watch complication: rings, then tracker name above the above/below figure. -->
+
+<!-- Creating a connected-source tracker: reading 1 = user-entered starting value (dated at start); reading 2 = live source balance, fetched immediately (forced, even if equal). -->

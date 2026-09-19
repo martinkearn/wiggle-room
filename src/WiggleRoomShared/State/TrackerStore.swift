@@ -194,14 +194,14 @@ final class TrackerStore {
     /// matters when something's actually moving, and every no-op poll
     /// still spends a real Starling request either way.
     @discardableResult
-    func refreshFromSource(_ tracker: Tracker) async throws -> Bool {
+    func refreshFromSource(_ tracker: Tracker, force: Bool = false) async throws -> Bool {
         guard !tracker.isManualEntry,
               let sourceTargetId = tracker.sourceTargetId,
               let provider = provider(for: tracker)
         else { return false }
         let target = SourceTarget(id: sourceTargetId, displayName: tracker.name)
         let value = try await provider.fetchCurrentValue(target: target)
-        guard value != tracker.latestReading?.value else { return false }
+        guard force || value != tracker.latestReading?.value else { return false }
         logReading(value: value, date: .now, for: tracker)
         return true
     }
