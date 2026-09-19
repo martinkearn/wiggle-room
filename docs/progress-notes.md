@@ -3448,3 +3448,11 @@ single Final card once completed. Deliberately left out: the trend chart (`Trend
 the iOS app's Views folder, not the watch target; moving it into shared code is a separate job) and
 reading history. Watch scheme builds; not viewed on a real watch, so card sizing is unchecked.
 
+Follow-up: trend chart added to the watch detail screen. `TrendChartView` moved from
+`WiggleRoom/Views/` to [WiggleRoomShared/TrendChartView.swift](src/WiggleRoomShared/TrendChartView.swift)
+(the Shared folder is a synchronized group, so every target now compiles it; its `#Preview` switched
+to `SharedPreviewData`). The watch shows it at 130pt tall when there are 2+ readings, above the
+no-readings hint/button. Supersedes the "chart deliberately left off the watch" line in the previous
+follow-up. `xcodebuild build` succeeded for the watch, iOS and macOS schemes; not seen on a real
+watch, so legibility at that size (axis labels, legend) is unchecked.
+

@@ -264,7 +264,7 @@ struct TrendChartView: View {
 }
 
 #Preview {
-    TrendChartView(tracker: PreviewData.makeSampleTracker())
+    TrendChartView(tracker: SharedPreviewData.makeSampleTracker())
         .frame(height: 240)
         .padding()
 }

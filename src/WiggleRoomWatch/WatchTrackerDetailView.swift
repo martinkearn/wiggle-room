@@ -124,6 +124,11 @@ struct WatchTrackerDetailView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
 
+                    if tracker.sortedReadings.count > 1 {
+                        TrendChartView(tracker: tracker, now: now)
+                            .frame(height: 130)
+                    }
+
                     if tracker.latestReading == nil {
                         Text("No readings logged yet — log one to see your pace.")
                             .font(.caption2)
