@@ -12,6 +12,12 @@ import SwiftUI
 struct IconRingShape: Shape {
     enum Ring { case outer, inner }
     var ring: Ring
+    /// `false` (the icon-faithful mapping) places both rings in the same
+    /// 26–172 design box, so the inner ring sits inside the outer as it does
+    /// in the icon. `true` stretches this ring's own outline to fill `rect`
+    /// exactly, the way a `Circle` would — for the live rings, where the
+    /// caller insets the inner ring itself.
+    var fitsRect = false
 
     func path(in rect: CGRect) -> Path {
         let s: [CGFloat] = ring == .outer
@@ -29,7 +35,14 @@ struct IconRingShape: Shape {
         for i in stride(from: 2, to: s.count, by: 6) {
             p.addCurve(to: pt(i + 4), control1: pt(i), control2: pt(i + 2))
         }
-        return p
+        p.closeSubpath()
+        guard fitsRect else { return p }
+        let b = p.boundingRect
+        return p.applying(
+            CGAffineTransform(translationX: -b.minX, y: -b.minY)
+                .concatenating(CGAffineTransform(scaleX: rect.width / b.width, y: rect.height / b.height))
+                .concatenating(CGAffineTransform(translationX: rect.minX, y: rect.minY))
+        )
     }
 }
 

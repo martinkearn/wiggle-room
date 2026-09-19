@@ -138,8 +138,9 @@ private struct AddTrackerRow: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle()
-                        .strokeBorder(WiggleRoomColors.brand.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [3, 2.5]))
+                    IconRingShape(ring: .outer, fitsRect: true)
+                        .stroke(WiggleRoomColors.brand.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [3, 2.5]))
+                        .padding(2/2)
                         .frame(width: 28, height: 28)
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .semibold))

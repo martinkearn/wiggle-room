@@ -27,8 +27,9 @@ import Foundation
 /// back to empty and refill, with a little overshoot bounce at the end —
 /// any time their fraction changes afterwards (a live auto-refresh tick or a
 /// newly logged/edited balance). Motion is where the personality lives; the
-/// rings themselves are precise circles and the numbers are never anything
-/// but exact (§3.4).
+/// rings are hand-wobbled outlines (the app icon's own, `IconRingShape`),
+/// trimmed by arc length so their fill is still exact, and the numbers are
+/// never anything but exact (§3.4).
 struct RingsView: View {
     let tracker: Tracker
     let now: Date
@@ -116,7 +117,7 @@ struct RingsView: View {
     /// sliver proportional to `lineWidth`, matching how close together
     /// Apple's own Fitness rings sit, rather than the flat `lineWidth` of
     /// dead space a naive equal inset leaves behind.
-    private var bandGap: CGFloat { lineWidth * 0.12 }
+    private var bandGap: CGFloat { lineWidth * 0.25 }
     private var ringGap: CGFloat { lineWidth + bandGap }
 
     var body: some View {
@@ -124,8 +125,8 @@ struct RingsView: View {
             GeometryReader { geometry in
                 let side = min(geometry.size.width, geometry.size.height)
                 ZStack {
-                    ring(fraction: isAnimated ? displayedPaceFraction : paceFraction, color: WiggleRoomColors.paceRing)
-                    ring(fraction: isAnimated ? displayedActualFraction : actualFraction, color: statusColor)
+                    ring(.outer, fraction: isAnimated ? displayedPaceFraction : paceFraction, color: WiggleRoomColors.paceRing)
+                    ring(.inner, fraction: isAnimated ? displayedActualFraction : actualFraction, color: statusColor)
                         .padding(ringGap)
 
                     if showsCenterContent {
@@ -273,24 +274,25 @@ struct RingsView: View {
     /// Double conversion.
     private let closureThreshold = 0.98
 
-    private func ring(fraction: Double, color: Color) -> some View {
+    private func ring(_ kind: IconRingShape.Ring, fraction: Double, color: Color) -> some View {
         let opacity = progressOpacity(for: fraction)
         let isClosed = fraction >= closureThreshold
+        let shape = IconRingShape(ring: kind, fitsRect: true)
+        let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
         return ZStack {
-            Circle()
-                .stroke(color.opacity(0.18), lineWidth: lineWidth)
-            Circle()
+            shape
+                .stroke(color.opacity(0.18), style: style)
+            shape
                 .trim(from: 0, to: fraction)
-                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(color, style: style)
                 .opacity(opacity)
             if isClosed {
-                Circle()
+                shape
                     .trim(from: 0, to: closureOverlapFraction)
-                    .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .stroke(color, style: style)
                     .opacity(opacity)
             }
         }
-        .rotationEffect(.degrees(-90))
     }
 }
 

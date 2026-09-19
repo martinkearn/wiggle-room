@@ -49,7 +49,7 @@ struct CelebrationView: View {
 
             VStack(spacing: 18) {
                 ZStack {
-                    Circle()
+                    IconRingShape(ring: .outer, fitsRect: true)
                         .fill(WiggleRoomColors.good.opacity(0.16))
                         .frame(width: 132, height: 132)
                         .scaleEffect(isAnimating ? 1 : 0.4)

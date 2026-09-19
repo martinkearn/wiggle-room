@@ -47,16 +47,12 @@ struct TrackerComplicationEntryView: View {
     private func circular(_ tracker: Tracker) -> some View {
         let p = pace(for: tracker)
         let fraction = p.periodHours > 0 ? min(max(p.hoursElapsed / p.periodHours, 0), 1) : 0
-        return Gauge(value: fraction) {
-            EmptyView()
-        } currentValueLabel: {
+        return WobblyGauge(fraction: fraction, color: p.status.color) {
             Text(p.displayDifference(for: tracker))
                 .font(.wiggleNumber(.caption2))
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
         }
-        .gaugeStyle(.accessoryCircular)
-        .tint(p.status.color)
         .containerBackground(for: .widget) { Color.clear }
     }
 
