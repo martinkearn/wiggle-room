@@ -102,6 +102,7 @@ struct AllTrackersEntryView: View {
                         Text(tracker.name)
                             .font(WiggleRoomFont.headline(12, weight: 650))
                             .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                         Spacer(minLength: 4)
                         Text(pace(tracker).displayDifference(for: tracker))
                             .font(.wiggleNumber(.caption, weight: .bold))

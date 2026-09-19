@@ -317,9 +317,10 @@ struct TrackerWidgetEntryView: View {
                 .frame(width: 44, height: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(tracker.name)
-                    .font(.wiggleText(.caption2))
+                    .font(WiggleRoomFont.headline(12, weight: 650))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 Text(p.displayDifference(for: tracker))
                     .font(.wiggleNumber(.title3))
                     .foregroundStyle(p.status.color)

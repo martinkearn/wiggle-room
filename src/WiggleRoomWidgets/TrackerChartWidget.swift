@@ -68,6 +68,7 @@ struct TrackerChartEntryView: View {
                 HStack(spacing: 6) {
                     Text(tracker.name)
                         .font(WiggleRoomFont.headline(13, weight: 650))
+                        .minimumScaleFactor(0.6)
                     Text(pace(tracker).displayDifference(for: tracker))
                         .font(.wiggleNumber(.caption, weight: .bold))
                 }

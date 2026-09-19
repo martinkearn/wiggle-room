@@ -72,6 +72,7 @@ struct TrackerComplicationEntryView: View {
                     .font(WiggleRoomFont.headline(12, weight: 650))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 Text(p.displayDifference(for: tracker))
                     .font(.wiggleNumber(.title3))
                     .foregroundStyle(p.status.color)
