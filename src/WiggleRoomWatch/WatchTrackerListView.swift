@@ -11,7 +11,8 @@ import SwiftData
 /// list (no rings here — they belong to the detail view; a list of rings
 /// at watch width would be too small to read).
 struct WatchTrackerListView: View {
-    @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
+    @Query(sort: \Tracker.startDate, order: .reverse) private var allTrackers: [Tracker]
+    private var trackers: [Tracker] { TrackerOrdering.ordered(allTrackers) }
 
     var body: some View {
         NavigationStack {

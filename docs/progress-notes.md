@@ -3681,3 +3681,11 @@ Dropped "will be" from the Current Target card caption on iOS/macOS detail, the 
 ## 2026-09-19 Watch detail: Checked/Changed lines
 
 Audit of the recent detail-screen changes across apps: the "Current Target" rename, "Final target X" caption and time-scaled chart axis were already on every surface (iOS/macOS share `TrackerDetailView`; the watch uses the shared `TrendChartView`). Only "Checked / Changed" was missing on the watch, so [WatchTrackerDetailView.swift](src/WiggleRoomWatch/WatchTrackerDetailView.swift)'s balance card now shows them too (connected-source trackers only). Widgets are not detail screens and were left alone. Not built or run.
+
+## 2026-09-19 Review of the last few hours; tracker order now syncs; watch estimated-final parity
+
+Reviewed every commit since ~13:30. Findings and fixes:
+- **Tracker order didn't replicate.** The sort *option* was a per-device `@AppStorage`, so a chosen order only applied on one device. Reworked: the order is now solely the synced `Tracker.sortOrder`. Settings → Tracker Order has an "Arrange By…" menu (Newest/Oldest First, Ending Soonest, Name A–Z/Z–A) that rewrites `sortOrder` once, plus drag-to-reorder; both sync via CloudKit. Unarranged trackers (all 0) fall back to newest-first. The **watch list now uses the synced order too**. See [TrackerOrdering.swift](src/WiggleRoomShared/State/TrackerOrdering.swift), [TrackerOrderView.swift](src/WiggleRoom/Views/TrackerOrderView.swift). Supersedes the earlier "Tracker Order" entry (per-device sort option, watch unchanged).
+- **Watch parity gap.** A separate change moved "Estimated Final Balance" into the Target card as a caption on iOS/macOS; the watch still had its own card. Watch now matches ("Estimated final X" under "Final target X").
+- The earlier note that macOS failed in `ReadingHistoryView` no longer reproduces.
+- **Verified with real builds this time:** `xcodebuild` succeeded for the WiggleRoom scheme on macOS and iOS Simulator and the WiggleRoomWatch scheme (watchOS Simulator). Widgets/Complication schemes, tests and runtime behaviour (incl. CloudKit migration of the new `sortOrder`/`lastCheckedDate` fields) were not exercised.

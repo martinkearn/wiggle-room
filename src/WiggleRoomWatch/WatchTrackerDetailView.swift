@@ -100,18 +100,9 @@ struct WatchTrackerDetailView: View {
                  showsSourceTiming: true)
             card(tint: WiggleRoomColors.paceRing, title: "Current Target",
                  value: pace.targetValueToday,
-                 caption: "Final target \(tracker.formattedValue(tracker.projectedFinalValue))")
-            if tracker.sortedReadings.count > 1, let estimated = tracker.estimatedFinalValue {
-                let difference = tracker.estimatedFinalDifference ?? 0
-                card(
-                    tint: difference >= 0 ? WiggleRoomColors.good : WiggleRoomColors.bad,
-                    title: "Estimated Final Balance",
-                    value: estimated,
-                    caption: difference == 0
-                        ? "Right on target"
-                        : "Trending \(difference > 0 ? "under" : "over") target by \(tracker.formattedValue(abs(difference)))"
-                )
-            }
+                 caption: ["Final target \(tracker.formattedValue(tracker.projectedFinalValue))",
+                           tracker.sortedReadings.count > 1 ? tracker.estimatedFinalValue.map { "Estimated final \(tracker.formattedValue($0))" } : nil]
+                    .compactMap { $0 }.joined(separator: "\n"))
         }
     }
 

@@ -20,8 +20,7 @@ struct TrackerListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(DeepLinkRouter.self) private var deepLinkRouter
     @Query(sort: \Tracker.startDate, order: .reverse) private var allTrackers: [Tracker]
-    @AppStorage(trackerSortOptionKey) private var sortOption = TrackerSortOption.newestFirst.rawValue
-    private var trackers: [Tracker] { (TrackerSortOption(rawValue: sortOption) ?? .newestFirst).sorted(allTrackers) }
+    private var trackers: [Tracker] { TrackerOrdering.ordered(allTrackers) }
 
     @State private var isPresentingAddTracker = false
     @State private var isPresentingSettings = false
