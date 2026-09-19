@@ -3709,3 +3709,7 @@ Renamed the label everywhere in app code (detail screens, watch, widgets, menu b
 ## 2026-09-19 "Target" → "Budget" throughout
 
 The concept of a tracker's target is now called its budget in everything user-facing: "Final budget £X", "difference from budget" (rings, widget), the chart's "Budget" reference line/legend, "Right on budget", "over or under budget" (Control, Siri intent descriptions), the celebration copy and the empty-state text. Spec prose updated to match. Deliberately **not** renamed: code identifiers (`targetValueToday`, `targetEndValue`, `sourceTargetId`, `SourceTarget` — the latter two mean a provider *account/target*, an unrelated concept) and the Tesla-era/architecture uses of "target" in the spec. iOS, macOS and Widgets schemes build.
+
+## 2026-09-19 "Total budget" on the Current Budget card
+
+The Current Budget card (iOS/macOS detail, watch detail) now shows "Total budget £X" (`Tracker.totalAllowance`) as the first subtle caption, above "Final budget £X" and "Estimated final £X". Not shown on widgets. iOS, macOS and watch schemes build; not run.

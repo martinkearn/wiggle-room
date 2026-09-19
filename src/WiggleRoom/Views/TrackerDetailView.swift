@@ -313,7 +313,7 @@ struct TrackerDetailView: View {
             }
 
             card(tint: WiggleRoomColors.paceRing) {
-                figureContent(title: "Current Budget", value: pace.targetValueToday, caption: finalBalanceCaption, extraCaption: estimatedFinalCaption)
+                figureContent(title: "Current Budget", value: pace.targetValueToday, caption: "\(totalBudgetCaption)\n\(finalBalanceCaption)", extraCaption: estimatedFinalCaption)
             }
             // A little "just updated" flourish when a new reading lands —
             // a full turn rather than a half-flip so the card never rests
@@ -511,6 +511,10 @@ struct TrackerDetailView: View {
     /// stating the tracker's projected final target instead: where the
     /// number above is landing right now, this is where it's designed to
     /// land by the very end of the period.
+    private var totalBudgetCaption: String {
+        "Total budget \(tracker.formattedValue(tracker.totalAllowance))"
+    }
+
     private var finalBalanceCaption: String {
         "Final budget \(tracker.formattedValue(tracker.projectedFinalValue))"
     }
