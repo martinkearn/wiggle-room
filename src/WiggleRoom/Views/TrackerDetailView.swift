@@ -159,7 +159,7 @@ struct TrackerDetailView: View {
                     CompletedBadge()
                 }
 
-                RingsView(tracker: tracker, now: now)
+                RingsView(tracker: tracker, now: now, animatesOnAppear: false)
                     .frame(width: 260, height: 260)
                     .padding(.vertical, 18)
                     .frame(maxWidth: .infinity)

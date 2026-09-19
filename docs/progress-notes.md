@@ -3780,3 +3780,7 @@ Audit of fonts against the design rule (Fraunces names things, Nunito everything
 ## 2026-09-19 Glyph set doubled to 24
 
 `TrackerPalette.glyphs` grew from 12 to 24 SF Symbols, grouped: money (£, $, €, banknote, card), getting around (car, bicycle, bus, fuel pump, plane), leisure (run, dumbbell, gamepad, popcorn, beach umbrella, coffee, fork-and-knife) and everyday (cart, drop, bag, house, star, heart, bolt). The 12 existing glyph names are unchanged, so saved trackers are unaffected. Every new name was checked to exist as an SF Symbol. iOS build succeeds; the picker wasn't re-screenshotted.
+
+## 2026-09-19 Detail screen: rings animate once on open, not twice
+
+The tracker detail screen refreshes itself when opened, and the refresh's drain-and-refill animation played on top of the rings' own spring-in, so opening looked like two animations. `RingsView` gained `animatesOnAppear` (default `true`, so list rows and the menu bar are unchanged); `TrackerDetailView` passes `false`, so the rings draw at their real values immediately and only the refresh animation plays. Consequence: if the open-time refresh finds the value unchanged, there is no animation at all on open. iOS and macOS builds succeed; not run.

@@ -57,12 +57,27 @@ struct RingsView: View {
     /// animation — a plain, correct ring rather than a blank one.
     var isAnimated: Bool = true
 
+    /// Whether the rings spring in from empty when the view first appears.
+    /// The tracker detail screen turns this off: it refreshes itself on open,
+    /// and that refresh's own drain-and-refill animation is the one intended
+    /// "arrival" effect, so also animating the initial draw played it twice.
+    var animatesOnAppear: Bool = true
+
     /// The fractions actually drawn on screen — deliberately separate from
     /// `paceFraction`/`actualFraction` (the real, current values) so the
     /// re-cycle animation can drive them through 0 and back up rather than
     /// just interpolating from old value to new.
-    @State private var displayedPaceFraction: Double = 0
-    @State private var displayedActualFraction: Double = 0
+    @State private var displayedPaceFractionState: Double?
+    @State private var displayedActualFractionState: Double?
+
+    /// Until the first appear-animation runs these fall back to empty (when
+    /// animating in) or straight to the real value (when not).
+    private var displayedPaceFraction: Double {
+        displayedPaceFractionState ?? (animatesOnAppear ? 0 : paceFraction)
+    }
+    private var displayedActualFraction: Double {
+        displayedActualFractionState ?? (animatesOnAppear ? 0 : actualFraction)
+    }
 
     /// True once the initial spring-in has run — guards against treating
     /// that first fill as a "change" that triggers a drain/refill cycle.
@@ -143,6 +158,10 @@ struct RingsView: View {
         }
         .onAppear {
             guard isAnimated else { return }
+            guard animatesOnAppear else {
+                hasAppeared = true
+                return
+            }
             // Deferred by a beat rather than animating immediately: a plain
             // `withAnimation` called from `onAppear` during a cold launch or
             // a programmatic push (e.g. opening straight into this screen
@@ -157,8 +176,8 @@ struct RingsView: View {
             let actualTarget = actualFraction
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 withAnimation(.spring(response: 0.85, dampingFraction: 0.68)) {
-                    displayedPaceFraction = paceTarget
-                    displayedActualFraction = actualTarget
+                    displayedPaceFractionState = paceTarget
+                    displayedActualFractionState = actualTarget
                 }
                 hasAppeared = true
             }
@@ -179,16 +198,16 @@ struct RingsView: View {
         let token = UUID()
         recycleToken = token
         withAnimation(.easeIn(duration: 0.4)) {
-            displayedPaceFraction = 0
-            displayedActualFraction = 0
+            displayedPaceFractionState = 0
+            displayedActualFractionState = 0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             // A newer change may have arrived and scheduled its own refill
             // while this one's drain was still playing — don't stomp on it.
             guard recycleToken == token else { return }
             withAnimation(.spring(response: 1.1, dampingFraction: 0.62)) {
-                displayedPaceFraction = paceTarget
-                displayedActualFraction = actualTarget
+                displayedPaceFractionState = paceTarget
+                displayedActualFractionState = actualTarget
             }
         }
     }
