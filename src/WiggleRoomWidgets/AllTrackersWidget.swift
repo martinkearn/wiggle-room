@@ -72,9 +72,11 @@ struct AllTrackersEntryView: View {
         if entry.trackers.isEmpty {
             VStack(spacing: 6) {
                 EmptyRingsMark(size: 56)
-                Text(entry.isLoading ? "Loading data…" : "No Trackers")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if !(entry.isLoading && family.isLockScreen) {
+                    Text(entry.isLoading ? "Loading data…" : "No Trackers")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .unredacted()
             .containerBackground(for: .widget) { Color.widgetBackground }

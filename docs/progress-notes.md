@@ -3639,3 +3639,11 @@ tracker" so any unresolved state reads correctly too. iOS/watchOS builds succeed
 ## 2026-09-19 New connected-source tracker fetches its live balance immediately
 
 Bug: a new Starling tracker only had the seeded starting-value reading until the next scheduled refresh (and a live balance equal to the starting value was skipped as "unchanged"). Now `AddTrackerView.save()` kicks off `refreshFromSource(_, force: true)` right after seeding reading 1, so the live balance is always reading 2. `force` (new, default false) bypasses the unchanged-value check in [TrackerStore.swift](src/WiggleRoomShared/State/TrackerStore.swift). Fetch failures are silent; the normal refresh cycle retries. Not built or run.
+
+## 2026-09-19 Lock Screen loading state: rings only
+
+The "Loading data…" caption is now hidden on Lock Screen (accessory) widgets — the rings mark alone shows
+(`WidgetFamily.isLockScreen`, [WidgetFamily+LockScreen.swift](src/WiggleRoomWidgets/WidgetFamily+LockScreen.swift);
+applied in the tracker, chart and all-trackers widgets). Home Screen sizes keep the caption. iOS and macOS builds
+succeed; not seen on a device.
+

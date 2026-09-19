@@ -37,7 +37,7 @@ struct TrackerChartEntryView: View {
         } else if entry.isLoading {
             VStack(spacing: 6) {
                 EmptyRingsMark(size: 56)
-                Text("Loading data…").font(.caption).foregroundStyle(.secondary)
+                if !family.isLockScreen { Text("Loading data…").font(.caption).foregroundStyle(.secondary) }
             }
             .unredacted()
             .containerBackground(for: .widget) { Color.widgetBackground }
