@@ -23,7 +23,7 @@ struct WatchLogReadingView: View {
             VStack(spacing: 8) {
                 TextField(tracker.unit, text: $valueText)
                     .focused($isFocused)
-                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .font(.wiggleNumber(size: 28, weight: .semibold))
                     .multilineTextAlignment(.center)
                 Button("Save") { save() }
                     .buttonStyle(.borderedProminent)

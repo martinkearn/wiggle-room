@@ -21,23 +21,40 @@ struct WatchTrackerListView: View {
                     VStack(spacing: 8) {
                         EmptyRingsMark(size: 64)
                         Text("No Trackers")
-                            .font(.headline)
+                            .font(WiggleRoomFont.headline(17, weight: 650))
                         Text("Add a tracker on your iPhone.")
-                            .font(.footnote)
+                            .font(.wiggleText(.footnote))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
                 } else {
-                    List(trackers) { tracker in
-                        NavigationLink {
-                            WatchTrackerDetailView(tracker: tracker)
-                        } label: {
-                            WatchTrackerRow(tracker: tracker)
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            Text("Trackers")
+                                .font(WiggleRoomFont.headline(24, weight: 700))
+                                .foregroundStyle(WiggleRoomColors.brand)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 4)
+                            ForEach(trackers) { tracker in
+                                NavigationLink {
+                                    WatchTrackerDetailView(tracker: tracker)
+                                } label: {
+                                    WatchTrackerRow(tracker: tracker)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            WobblyCard.shape(0, scale: 0.7)
+                                                .fill(tracker.accentColor.opacity(0.24))
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
             }
-            .navigationTitle("Trackers")
+            .navigationTitle("")
         }
     }
 }
@@ -50,10 +67,17 @@ private struct WatchTrackerRow: View {
     }
 
     var body: some View {
+        HStack(spacing: 8) {
+            TrackerBadge(tracker: tracker, size: 32)
+            rowText
+        }
+    }
+
+    private var rowText: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Text(tracker.name)
-                    .font(.headline)
+                    .font(WiggleRoomFont.headline(17, weight: 650))
                     .lineLimit(1)
                 if tracker.isCompleted() {
                     CompletedBadge()
@@ -61,11 +85,11 @@ private struct WatchTrackerRow: View {
             }
             if tracker.latestReading != nil {
                 Text(pace.displayDifference(for: tracker))
-                    .font(.subheadline.weight(.semibold))
+                    .font(.wiggleText(.subheadline, weight: .semibold))
                     .foregroundStyle(pace.status.color)
             } else {
                 Text("No data yet")
-                    .font(.subheadline)
+                    .font(.wiggleText(.subheadline))
                     .foregroundStyle(.secondary)
             }
         }

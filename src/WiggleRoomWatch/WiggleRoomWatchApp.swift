@@ -41,7 +41,8 @@ struct WiggleRoomWatchApp: App {
             }
             modelContainer = localContainer
         }
-        _store = State(initialValue: TrackerStore(modelContext: modelContainer.mainContext))
+        let trackerStore = TrackerStore(modelContext: modelContainer.mainContext)
+        _store = State(initialValue: trackerStore)
         CloudSyncWidgetRefresher.start()
     }
 
@@ -49,6 +50,8 @@ struct WiggleRoomWatchApp: App {
         WindowGroup {
             WatchTrackerListView()
                 .environment(store)
+                .tint(WiggleRoomColors.brand)
+                .font(.wiggleText(.body))
         }
         .modelContainer(modelContainer)
     }

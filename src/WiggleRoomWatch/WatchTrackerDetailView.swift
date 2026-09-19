@@ -58,10 +58,10 @@ struct WatchTrackerDetailView: View {
         ].compactMap { $0 }
     }
 
-    private func card(tint: Color, title: String, value: Decimal, captions: [String]) -> some View {
+    private func card(tint: Color, title: String, value: Decimal, captions: [String], variant: Int = 0) -> some View {
         VStack(spacing: 2) {
             Text(title)
-                .font(.caption2.weight(.medium))
+                .font(WiggleRoomFont.fraunces(size: 12, weight: 600, opticalSize: 20, soft: 70))
                 .foregroundStyle(.secondary)
             Text(tracker.formattedValue(value))
                 .font(.wiggleNumber(size: 22, weight: .bold))
@@ -71,7 +71,7 @@ struct WatchTrackerDetailView: View {
             VStack(spacing: 2) {
                 ForEach(captions, id: \.self) { line in
                     Text(line)
-                        .font(.caption2)
+                        .font(.wiggleText(.caption2))
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
                 }
@@ -79,7 +79,7 @@ struct WatchTrackerDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(10)
-        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(tint.opacity(0.14), in: WobblyCard.shape(variant, scale: 0.7))
     }
 
     @ViewBuilder
@@ -96,12 +96,13 @@ struct WatchTrackerDetailView: View {
             card(tint: pace.status.color, title: tracker.currentValueLabel,
                  value: pace.currentValue,
                  captions: [pace.remainingInAllowanceCaption(for: tracker)].compactMap { $0 } + sourceTimingCaptions)
-            card(tint: WiggleRoomColors.paceRing, title: "Current Budget",
+            card(tint: tracker.accentColor, title: "Current Budget",
                  value: pace.targetValueToday,
                  captions: ["Total budget \(tracker.formattedValue(tracker.totalAllowance))",
                            "Final budget \(tracker.formattedValue(tracker.projectedFinalValue))",
                            tracker.sortedReadings.count > 1 ? tracker.estimatedFinalValue.map { "Estimated final \(tracker.formattedValue($0))" } : nil]
-                    .compactMap { $0 })
+                    .compactMap { $0 },
+                 variant: 1)
         }
     }
 
@@ -121,17 +122,27 @@ struct WatchTrackerDetailView: View {
         } else {
             ScrollView {
                 VStack(spacing: 12) {
+                    Text(tracker.name)
+                        .font(WiggleRoomFont.headline(20, weight: 700))
+                        .multilineTextAlignment(.center)
                     if tracker.isCompleted(asOf: now) {
                         CompletedBadge()
                     }
 
                     RingsView(tracker: tracker, now: now, lineWidth: 8, showsStatusLabel: false)
                         .frame(width: 120, height: 120)
+                        .padding(10)
+                        .background(
+                            Circle().fill(RadialGradient(
+                                colors: [tracker.accentColor.opacity(0.30), .clear],
+                                center: .center, startRadius: 10, endRadius: 90
+                            ))
+                        )
 
                     figureCards
 
                     Text(tracker.periodRemainingText(asOf: now))
-                        .font(.caption2)
+                        .font(.wiggleText(.caption2))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
 
@@ -142,7 +153,7 @@ struct WatchTrackerDetailView: View {
 
                     if tracker.latestReading == nil {
                         Text("No readings logged yet — log one to see your pace.")
-                            .font(.caption2)
+                            .font(.wiggleText(.caption2))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
@@ -168,7 +179,7 @@ struct WatchTrackerDetailView: View {
                 }
                 .padding(.vertical, 8)
             }
-            .navigationTitle(tracker.name)
+            .navigationTitle("")
             .onAppear {
                 now = Date.now
                 // Always refresh once when a tracker is first opened, even
