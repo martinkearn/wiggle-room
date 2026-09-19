@@ -85,9 +85,12 @@ struct MenuBarStatusView: View {
                 }
                 .padding(16)
             } else {
-                Text("No trackers yet")
-                    .foregroundStyle(.secondary)
-                    .padding(16)
+                VStack(spacing: 10) {
+                    EmptyRingsMark(size: 72)
+                    Text("No trackers yet")
+                        .foregroundStyle(.secondary)
+                }
+                .padding(16)
             }
 
             Divider()

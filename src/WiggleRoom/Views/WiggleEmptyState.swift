@@ -6,7 +6,7 @@
 import SwiftUI
 
 /// A shared "nothing here yet" visual for every empty list in the app —
-/// a ring standing in for the SF Symbol a plain `ContentUnavailableView`
+/// the app icon's two rings (`EmptyRingsMark`) standing in for the SF Symbol a plain `ContentUnavailableView`
 /// would use, so even a blank screen still reads as Wiggle Room rather than
 /// generic system chrome. The symbol sits inside the ring exactly where a
 /// tracker's own status color would go, tinted the brand color rather than
@@ -23,9 +23,7 @@ struct WiggleEmptyState: View {
             Spacer()
 
             ZStack {
-                Circle()
-                    .stroke(WiggleRoomColors.brand.opacity(0.3), lineWidth: 10)
-                    .frame(width: 120, height: 120)
+                EmptyRingsMark(size: 120)
                 Image(systemName: symbol)
                     .font(.system(size: 34, weight: .medium))
                     .foregroundStyle(WiggleRoomColors.brand)

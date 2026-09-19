@@ -183,6 +183,12 @@ struct TrackerDetailView: View {
                 }
             }
             .padding(.bottom, 32)
+            #if os(macOS)
+            // The three-line header (name / range / source) is taller than
+            // the toolbar's own safe-area allowance, so without this the
+            // rings' top edge slid underneath it.
+            .padding(.top, 32)
+            #endif
         }
         #if !os(macOS)
         .refreshable {

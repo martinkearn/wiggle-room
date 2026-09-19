@@ -18,11 +18,15 @@ struct WatchTrackerListView: View {
         NavigationStack {
             Group {
                 if trackers.isEmpty {
-                    ContentUnavailableView(
-                        "No Trackers",
-                        systemImage: "circle.circle",
-                        description: Text("Add a tracker on your iPhone.")
-                    )
+                    VStack(spacing: 8) {
+                        EmptyRingsMark(size: 64)
+                        Text("No Trackers")
+                            .font(.headline)
+                        Text("Add a tracker on your iPhone.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 } else {
                     List(trackers) { tracker in
                         NavigationLink {

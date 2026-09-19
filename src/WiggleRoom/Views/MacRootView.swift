@@ -26,10 +26,12 @@ struct MacRootView: View {
         NavigationSplitView {
             Group {
                 if trackers.isEmpty {
-                    ContentUnavailableView(
-                        "No Trackers Yet",
-                        systemImage: "circle.circle",
-                        description: Text("Add a tracker to start tracking pace against a budget.")
+                    WiggleEmptyState(
+                        symbol: "plus",
+                        title: "No Trackers Yet",
+                        message: "Add a tracker to start tracking pace against a budget.",
+                        actionTitle: "Add a Tracker",
+                        action: { isPresentingAddTracker = true }
                     )
                 } else {
                     // Explicit `List(selection:) { ... }` content rather
@@ -77,10 +79,10 @@ struct MacRootView: View {
             if let selectedTracker = trackers.first(where: { $0.id == selection }) {
                 TrackerDetailView(tracker: selectedTracker)
             } else {
-                ContentUnavailableView(
-                    "No Tracker Selected",
-                    systemImage: "circle.circle",
-                    description: Text("Choose a tracker from the sidebar.")
+                WiggleEmptyState(
+                    symbol: "sidebar.left",
+                    title: "No Tracker Selected",
+                    message: "Choose a tracker from the sidebar."
                 )
             }
         }

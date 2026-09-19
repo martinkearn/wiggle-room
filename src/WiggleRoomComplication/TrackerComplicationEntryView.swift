@@ -36,7 +36,7 @@ struct TrackerComplicationEntryView: View {
     }
 
     private var emptyState: some View {
-        Image(systemName: "circle.dashed")
+        EmptyRingsMark(size: 32)
             .containerBackground(for: .widget) { Color.clear }
     }
 

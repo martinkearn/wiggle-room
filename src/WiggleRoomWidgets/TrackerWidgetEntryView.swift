@@ -64,8 +64,7 @@ struct TrackerWidgetEntryView: View {
 
     private var emptyState: some View {
         VStack(spacing: 4) {
-            Image(systemName: "circle.dashed")
-                .foregroundStyle(.secondary)
+            EmptyRingsMark(size: 40)
             Text("No Tracker")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
