@@ -28,7 +28,7 @@ struct WatchTrackerDetailView: View {
         guard !tracker.isManualEntry, !tracker.isCompleted(asOf: now), !isRefreshingFromSource else { return }
         isRefreshingFromSource = true
         defer { isRefreshingFromSource = false }
-        try? await store.refreshFromSource(tracker)
+        _ = try? await store.refreshFromSource(tracker)
         now = Date.now
     }
 

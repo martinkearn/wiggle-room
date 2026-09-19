@@ -132,7 +132,7 @@ enum BackgroundRefreshScheduler {
             // source doesn't get retried every single wake-up instead of
             // waiting out its own band like everything else.
             tracker.lastAutoFetchAttempt = now
-            try? await store.refreshFromSource(tracker)
+            _ = try? await store.refreshFromSource(tracker)
         }
         try? context.save()
     }
