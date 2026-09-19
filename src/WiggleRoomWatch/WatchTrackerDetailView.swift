@@ -77,7 +77,7 @@ struct WatchTrackerDetailView: View {
         } else {
             card(tint: pace.status.color, title: tracker.currentValueLabel,
                  value: pace.currentValue, caption: pace.remainingInAllowanceCaption(for: tracker))
-            card(tint: WiggleRoomColors.paceRing, title: "Target Right Now",
+            card(tint: WiggleRoomColors.paceRing, title: "Current Target",
                  value: pace.targetValueToday,
                  caption: "Final target will be \(tracker.formattedValue(tracker.projectedFinalValue))")
             if tracker.sortedReadings.count > 1, let estimated = tracker.estimatedFinalValue {

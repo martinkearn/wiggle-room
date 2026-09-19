@@ -3665,3 +3665,7 @@ target by…" wording were dropped with it. iOS build succeeds. **Known, not fro
 currently fails at HEAD in `ReadingHistoryView.swift` ("`ValueSnapshot` doesn't conform to `Identifiable`") — reproduced
 with my change stashed, and it compiled earlier today, so something since then broke it; not yet investigated.
 
+
+## 2026-09-19 "Target Right Now" → "Current Target"; tighter Checked/Changed spacing
+
+Renamed the label everywhere in app code (detail, watch, widgets, menu bar, rings) and the build spec; earlier progress-note entries keep the old wording as history. The Checked/Changed lines now sit in the same tight stack as the balance caption instead of being spaced like a separate card row. Not built or run.

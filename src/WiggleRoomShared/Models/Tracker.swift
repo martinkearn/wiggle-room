@@ -250,7 +250,7 @@ extension Tracker {
     /// How much would be left over at the end of the tracker's period, worded
     /// for display — `nil` exactly when `projectedRemainder` is (i.e. the
     /// "spend it all" case needs no extra explanation). Shared by the
-    /// dashboard's Target Right Now card and the extra-large widget, which
+    /// dashboard's Current Target card and the extra-large widget, which
     /// mirrors that dashboard layout as closely as a widget's static
     /// rendering allows.
     var remainingAtEndCaption: String? {
