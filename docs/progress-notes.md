@@ -1,7 +1,7 @@
 # Wiggle Room — Progress Notes
 
-Status snapshot for picking this work back up. **Last updated 2026-09-18**,
-after **2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched** (see its section at the bottom) — before that, **2026-09-18 Add Tracker moved from the toolbar into the list
+Status snapshot for picking this work back up. **Last updated 2026-09-19**,
+after **2026-09-19 Spec scope trim — zoom levels, Tesla, cross-user sharing removed** (see its section at the bottom) — before that, **2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched** (see its section at the bottom) — before that, **2026-09-18 Add Tracker moved from the toolbar into the list
 itself, at the top** — asked as a design question ("would the button be
 better at the bottom or top of the list, taking the same shape as a
 tracker?"); recommended bottom first (a common pattern, e.g. Reminders/
@@ -3372,3 +3372,25 @@ flip animation, widget reload, background 5-min tick on macOS) — no
 simulator/screen automation used this session. watchOS detail view is
 unchanged (still updates on open/refresh); the complication gets its
 5-min timeline reload only.
+
+## 2026-09-19 Spec scope trim — zoom levels, Tesla, cross-user sharing removed
+
+Docs-only session; no app code changed. At the user's direction, the build
+spec was trimmed to what is actually being built:
+
+- **Zoom levels**: §4.5 deleted outright (it was a "removed, needs a rethink"
+  stub), plus every reference to it (§5.3 refresh-cadence note, §8.1 widget
+  note, §9, §12). The history stays in the older progress-notes entries
+  ("Zoom levels removed"); the timestamped-snapshot storage rule in §6 is
+  unchanged.
+- **Tesla / other sources**: §5.4 (Tesla provider) deleted; the overview (§1)
+  and provider-abstraction intro (§5.1) now say two providers ship (Starling,
+  manual). Tesla, other banks, aggregators and HealthKit are a single
+  deferred item in §9. Manual entry renumbered §5.5 → §5.4. README's Tesla
+  checklist item now reads "deferred", and its Tesla-developer-account
+  prerequisite was removed.
+- **Cross-user sharing**: removed from §9.
+- **§12**: dropped the "Starling never compiled" item (Starling is built and
+  working, confirmed by the user) and the Tesla endpoint / zoom open items.
+
+Not verified: nothing to build or run; no code touched.

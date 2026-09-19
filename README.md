@@ -8,7 +8,7 @@ time elapsed, an inner ring for how much of the allowance has actually
 been used.
 
 This is a private household project, not intended for public
-distribution — see the spec for why (Starling/Tesla API access is
+distribution — see the spec for why (Starling API access is
 scoped to personal use, not a public multi-user product).
 
 ## Documentation
@@ -29,7 +29,7 @@ Rough shape of what's implemented vs. still to come:
 - [x] Core Tracker model & pace/consumption calculations
 - [x] Starling provider (implemented — accounts, balances, and Spaces (savings goals + spending spaces) as tracker targets; token stored on the synced ConnectedSource record (CloudKit, not Keychain); flat 45s foreground refresh, time-of-day-banded + per-tracker-burst background refresh with a cross-tracker balance cache and a rate-limit insight panel in Settings; edit/remove in Settings. Build-verified on both iOS and macOS as of 2026-09-18 — see progress-notes.md's 2026-09-18 entries)
 - [x] Manual entry provider
-- [ ] Tesla provider (not started — deliberately out of scope so far)
+- [ ] Tesla and other providers (deferred — not being built right now; spec §9)
 - [x] SwiftData + CloudKit sync
 - [x] iOS dashboard & rings visual, incl. a completed-tracker presentation
 - [x] Widgets (Home Screen incl. extra-large, Lock Screen — configurable per tracker)
@@ -38,7 +38,6 @@ Rough shape of what's implemented vs. still to come:
 - [x] watchOS complication
 - [x] Siri/Shortcuts (log a reading, check a tracker's status)
 - [ ] Live Activities (deliberately skipped — see progress notes for why)
-- [ ] §4.5 zoom levels (This year/This month/This week sub-periods) — built, then removed pending a redesign; see progress-notes.md
 - [ ] visionOS / Mac Catalyst (deliberately removed — iOS and macOS only, see progress notes)
 
 ## Requirements
@@ -49,8 +48,6 @@ Rough shape of what's implemented vs. still to come:
   distribution — not required to build and run locally
 - A Starling personal access token (developer.starlingbank.com) for
   testing the Starling provider
-- A Tesla developer account (developer.tesla.com) for testing the
-  Tesla provider
 
 ## Getting started
 
