@@ -3480,3 +3480,12 @@ From hands-on use of the phone/widgets:
 
 Verified: `xcodebuild build` succeeded for WiggleRoom (iOS + macOS) and WiggleRoomWidgets. **Not verified at runtime**: the refresh dimming/feedback, the Loading state, and the back-arrow navigation — all need a device/simulator look.
 
+Follow-up: the tracker picker on the Home/Lock Screen widget, watch complication and Control used the label
+"Tracker" (its `@Parameter` title and the intent's title). Both now read "Choose a tracker" / "Choose a
+Tracker" in [SelectTrackerIntent.swift](src/WiggleRoomWidgets/SelectTrackerIntent.swift),
+[the complication's copy](src/WiggleRoomComplication/SelectTrackerIntent.swift) and
+[TrackerStatusControl.swift](src/WiggleRoomWidgets/TrackerStatusControl.swift). Shortcuts intents
+(Log a Reading, Check a Tracker, Open Tracker) keep "Tracker" — there it's a required field, not a
+prompt on an empty widget. Builds for the widgets (iOS) and watch schemes succeed; the wording itself
+hasn't been viewed on a device.
+

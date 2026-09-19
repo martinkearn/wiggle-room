@@ -50,9 +50,9 @@ struct TrackerEntityQuery: EntityQuery {
 /// instances can each be configured independently, per the overnight brief —
 /// e.g. one widget pinned to a money tracker, another to a mileage tracker.
 struct SelectTrackerIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "Tracker"
+    static var title: LocalizedStringResource = "Choose a Tracker"
     static var description = IntentDescription("Choose which tracker this widget shows.")
 
-    @Parameter(title: "Tracker")
+    @Parameter(title: "Choose a tracker")
     var tracker: TrackerEntity?
 }

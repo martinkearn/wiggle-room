@@ -45,9 +45,9 @@ struct TrackerEntityQuery: EntityQuery {
 /// user place multiple instances of this complication, each independently
 /// configured, same idea as the phone/Mac widgets (§8.1).
 struct SelectTrackerIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "Tracker"
+    static var title: LocalizedStringResource = "Choose a Tracker"
     static var description = IntentDescription("Choose which tracker this complication shows.")
 
-    @Parameter(title: "Tracker")
+    @Parameter(title: "Choose a tracker")
     var tracker: TrackerEntity?
 }

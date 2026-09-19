@@ -9,10 +9,10 @@ import SwiftUI
 import WidgetKit
 
 struct SelectTrackerControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Tracker"
+    static var title: LocalizedStringResource = "Choose a Tracker"
     static var description = IntentDescription("Choose which tracker this control shows.")
 
-    @Parameter(title: "Tracker")
+    @Parameter(title: "Choose a tracker")
     var tracker: TrackerEntity?
 }
 
