@@ -37,13 +37,13 @@ struct TrackerChartEntryView: View {
         } else if entry.isLoading {
             VStack(spacing: 6) {
                 EmptyRingsMark(size: 56)
-                if !family.isLockScreen { Text("Loading data…").font(.caption).foregroundStyle(.secondary) }
+                if !family.isLockScreen { Text("Loading data…").font(.wiggleText(.caption)).foregroundStyle(.secondary) }
             }
             .unredacted()
             .containerBackground(for: .widget) { Color.widgetBackground }
         } else {
             Text("No Tracker")
-                .font(.caption2)
+                .font(.wiggleText(.caption2))
                 .foregroundStyle(.secondary)
                 .containerBackground(for: .widget) { Color.clear }
         }
@@ -59,9 +59,13 @@ struct TrackerChartEntryView: View {
         #if !os(macOS)
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(tracker.name)  \(pace(tracker).displayDifference(for: tracker))")
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(tracker.name)
+                        .font(WiggleRoomFont.headline(13, weight: 650))
+                    Text(pace(tracker).displayDifference(for: tracker))
+                        .font(.wiggleNumber(.caption, weight: .bold))
+                }
+                .lineLimit(1)
                 TrendChartView(tracker: tracker, now: entry.date, showsLegend: false, showsAxes: false)
             }
             .containerBackground(for: .widget) { Color.clear }
@@ -72,24 +76,24 @@ struct TrackerChartEntryView: View {
                 TrendChartView(tracker: tracker, now: entry.date, showsLegend: false, showsAxes: false)
             }
             .padding()
-            .containerBackground(for: .widget) { Color.widgetBackground }
+            .containerBackground(for: .widget) { TrackerWidgetBackground(tracker: tracker) }
         case .systemMedium:
             VStack(alignment: .leading, spacing: 8) {
                 header(tracker, nameSize: 16, figure: .title3)
                 TrendChartView(tracker: tracker, now: entry.date, showsLegend: false, showsAxes: false)
             }
             .padding()
-            .containerBackground(for: .widget) { Color.widgetBackground }
+            .containerBackground(for: .widget) { TrackerWidgetBackground(tracker: tracker) }
         default:
             VStack(alignment: .leading, spacing: 12) {
                 header(tracker, nameSize: 20, figure: .title2)
                 Text(pace(tracker).statusLine(for: tracker))
-                    .font(.caption)
+                    .font(.wiggleText(.caption))
                     .foregroundStyle(.secondary)
                 TrendChartView(tracker: tracker, now: entry.date, showsLegend: false)
             }
             .padding()
-            .containerBackground(for: .widget) { Color.widgetBackground }
+            .containerBackground(for: .widget) { TrackerWidgetBackground(tracker: tracker) }
         }
     }
 

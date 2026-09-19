@@ -63,7 +63,7 @@ struct TrackerComplicationEntryView: View {
                 .frame(width: 44, height: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(tracker.name)
-                    .font(.caption2)
+                    .font(WiggleRoomFont.headline(12, weight: 650))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Text(p.displayDifference(for: tracker))

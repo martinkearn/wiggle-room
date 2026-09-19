@@ -24,6 +24,7 @@ struct TrackerStatusControl: ControlWidget {
         var url: URL
         var name: String
         var status: String
+        var glyph: String = "chart.line.uptrend.xyaxis"
     }
 
     struct Provider: AppIntentControlValueProvider {
@@ -40,7 +41,8 @@ struct TrackerStatusControl: ControlWidget {
             return Value(
                 url: WiggleRoomDeepLink.url(forTrackerId: tracker.id),
                 name: tracker.name,
-                status: pace.displayDifference(for: tracker)
+                status: pace.displayDifference(for: tracker),
+                glyph: tracker.glyphSymbol
             )
         }
     }
@@ -48,7 +50,7 @@ struct TrackerStatusControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(kind: "TrackerStatusControl", provider: Provider()) { value in
             ControlWidgetButton(action: OpenURLIntent(value.url)) {
-                Label("\(value.name): \(value.status)", systemImage: "chart.line.uptrend.xyaxis")
+                Label("\(value.name): \(value.status)", systemImage: value.glyph)
             }
         }
         .displayName("Tracker Status")

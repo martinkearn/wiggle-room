@@ -74,7 +74,7 @@ struct AllTrackersEntryView: View {
                 EmptyRingsMark(size: 56)
                 if !(entry.isLoading && family.isLockScreen) {
                     Text(entry.isLoading ? "Loading data…" : "No Trackers")
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -93,24 +93,26 @@ struct AllTrackersEntryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(entry.trackers.prefix(3)) { tracker in
                     HStack {
-                        Text(tracker.name).lineLimit(1)
+                        Text(tracker.name)
+                            .font(WiggleRoomFont.headline(12, weight: 650))
+                            .lineLimit(1)
                         Spacer(minLength: 4)
                         Text(pace(tracker).displayDifference(for: tracker))
+                            .font(.wiggleNumber(.caption, weight: .bold))
                     }
-                    .font(.caption)
                 }
             }
             .containerBackground(for: .widget) { Color.clear }
         #endif
         case .systemSmall:
             // A small widget takes a single tap target, so no per-tracker links.
-            grid(columns: 2, maxCount: 4, ringSize: 44, showsName: false, linksEach: false)
+            grid(columns: 2, maxCount: 4, ringSize: 40, showsName: false, linksEach: false)
         case .systemMedium:
-            grid(columns: 4, maxCount: 4, ringSize: 56, showsName: true, linksEach: true)
+            grid(columns: 4, maxCount: 4, ringSize: 50, showsName: true, linksEach: true)
         case .systemLarge:
-            grid(columns: 3, maxCount: 9, ringSize: 70, showsName: true, linksEach: true)
+            grid(columns: 3, maxCount: 9, ringSize: 62, showsName: true, linksEach: true)
         default:
-            grid(columns: 6, maxCount: 12, ringSize: 80, showsName: true, linksEach: true)
+            grid(columns: 6, maxCount: 12, ringSize: 70, showsName: true, linksEach: true)
         }
     }
 
@@ -134,7 +136,7 @@ struct AllTrackersEntryView: View {
                 }
             }
             if overflow > 0 {
-                Text("+\(overflow) more").font(.caption2).foregroundStyle(.secondary)
+                Text("+\(overflow) more").font(.wiggleText(.caption2)).foregroundStyle(.secondary)
             }
         }
         .padding()
@@ -160,5 +162,7 @@ struct AllTrackersEntryView: View {
                 .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(tracker.accentColor.opacity(0.14), in: WobblyCard.shape(tracker.resolvedColorIndex, scale: 0.7))
     }
 }

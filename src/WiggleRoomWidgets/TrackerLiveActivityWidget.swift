@@ -13,28 +13,33 @@ import WidgetKit
 struct TrackerLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: TrackerActivityAttributes.self) { context in
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    badge(context.attributes, size: 30)
                     Text(context.attributes.name)
                         .font(WiggleRoomFont.headline(16, weight: 650))
                     Spacer()
                     Text(context.attributes.endDate, style: .relative)
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 }
                 Text(context.state.statusLine)
-                    .font(.caption)
+                    .font(.wiggleText(.caption))
                     .foregroundStyle(.secondary)
                 Text(context.state.difference)
                     .font(.wiggleNumber(.title2, weight: .bold))
                     .foregroundStyle(color(context.state))
             }
             .padding()
+            .activityBackgroundTint(TrackerPalette.color(at: context.attributes.colorIndex ?? 0).opacity(0.18))
             .widgetURL(WiggleRoomDeepLink.url(forTrackerId: context.attributes.trackerId))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Text(context.attributes.name).font(.headline).lineLimit(1)
+                    HStack(spacing: 8) {
+                        badge(context.attributes, size: 26)
+                        Text(context.attributes.name).font(WiggleRoomFont.headline(17, weight: 650)).lineLimit(1)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(context.state.difference)
@@ -47,24 +52,34 @@ struct TrackerLiveActivityWidget: Widget {
                         Spacer()
                         Text(context.attributes.endDate, style: .relative)
                     }
-                    .font(.caption)
+                    .font(.wiggleText(.caption))
                     .foregroundStyle(.secondary)
                 }
             } compactLeading: {
-                Image(systemName: "circle.circle").foregroundStyle(color(context.state))
+                badge(context.attributes, size: 20)
             } compactTrailing: {
                 Text(context.state.difference)
                     .font(.wiggleNumber(.caption, weight: .bold))
                     .foregroundStyle(color(context.state))
             } minimal: {
-                Image(systemName: "circle.circle").foregroundStyle(color(context.state))
+                badge(context.attributes, size: 20)
             }
             .widgetURL(WiggleRoomDeepLink.url(forTrackerId: context.attributes.trackerId))
         }
     }
 
     private func color(_ state: TrackerActivityAttributes.ContentState) -> Color {
-        state.isOnPace ? .green : .orange
+        state.isOnPace ? WiggleRoomColors.good : WiggleRoomColors.warning
+    }
+
+    private func badge(_ attributes: TrackerActivityAttributes, size: CGFloat) -> some View {
+        let index = attributes.colorIndex ?? 0
+        return WobblyBadge(
+            color: TrackerPalette.color(at: index),
+            symbol: attributes.glyph ?? "circle.circle",
+            seed: Double(index) * 1.3,
+            size: size
+        )
     }
 }
 #endif

@@ -32,7 +32,7 @@ struct TrackerWidgetEntryView: View {
             EmptyRingsMark(size: 56)
             if !family.isLockScreen {
                 Text("Loading data…")
-                    .font(.caption)
+                    .font(.wiggleText(.caption))
                     .foregroundStyle(.secondary)
             }
         }
@@ -66,7 +66,7 @@ struct TrackerWidgetEntryView: View {
         VStack(spacing: 4) {
             EmptyRingsMark(size: 40)
             Text("No Tracker")
-                .font(.caption2)
+                .font(.wiggleText(.caption2))
                 .foregroundStyle(.secondary)
         }
         .containerBackground(for: .widget) { Color.clear }
@@ -110,7 +110,7 @@ struct TrackerWidgetEntryView: View {
                 .minimumScaleFactor(0.7)
         }
         .padding()
-        .containerBackground(for: .widget) { Color.widgetBackground }
+        .containerBackground(for: .widget) { TrackerWidgetBackground(tracker: tracker) }
     }
 
     private func mediumHomeScreen(_ tracker: Tracker) -> some View {
@@ -119,6 +119,7 @@ struct TrackerWidgetEntryView: View {
                 .frame(width: 70, height: 70)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
+                    TrackerBadge(tracker: tracker, size: 22)
                     Text(tracker.name)
                         .font(WiggleRoomFont.headline(16, weight: 650))
                         .lineLimit(1)
@@ -129,7 +130,7 @@ struct TrackerWidgetEntryView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Text(pace(for: tracker).statusLine(for: tracker))
-                    .font(.caption)
+                    .font(.wiggleText(.caption))
                     .foregroundStyle(.secondary)
                 Text(pace(for: tracker).displayDifference(for: tracker))
                 .contentTransition(.numericText())
@@ -143,7 +144,7 @@ struct TrackerWidgetEntryView: View {
         .overlay(alignment: .topTrailing) {
             brandMark.frame(width: 18, height: 18).padding(6)
         }
-        .containerBackground(for: .widget) { Color.widgetBackground }
+        .containerBackground(for: .widget) { TrackerWidgetBackground(tracker: tracker) }
     }
 
     /// The large widget has real room to work with, but `RingsView`'s
@@ -157,7 +158,8 @@ struct TrackerWidgetEntryView: View {
     private func largeHomeScreen(_ tracker: Tracker) -> some View {
         let p = pace(for: tracker)
         return VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
+                TrackerBadge(tracker: tracker, size: 30)
                 Text(tracker.name)
                     .font(WiggleRoomFont.headline(20, weight: 650))
                     .lineLimit(1)
@@ -174,7 +176,7 @@ struct TrackerWidgetEntryView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(p.statusLine(for: tracker).uppercased())
-                        .font(.caption.weight(.bold))
+                        .font(.wiggleText(.caption, weight: .bold))
                         .tracking(0.5)
                         .foregroundStyle(p.status.color)
                     Text(p.displayDifference(for: tracker))
@@ -184,7 +186,7 @@ struct TrackerWidgetEntryView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                     Text("difference from budget")
-                        .font(.caption2)
+                        .font(.wiggleText(.caption2))
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -202,14 +204,18 @@ struct TrackerWidgetEntryView: View {
         .overlay(alignment: .topTrailing) {
             brandMark.frame(width: 20, height: 20).padding(6)
         }
-        .containerBackground(for: .widget) { Color.widgetBackground }
+        .containerBackground(for: .widget) { TrackerWidgetBackground(tracker: tracker) }
     }
 
     private func widgetFigure(title: String, value: String, color: Color, caption: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.caption2)
+                // No SOFT axis here: widgets are rendered out of process and
+                // measured without it, which truncated the label.
+                .font(WiggleRoomFont.fraunces(size: 11, weight: 600, opticalSize: 18))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(value)
                 .contentTransition(.numericText())
                 .font(.wiggleNumber(.subheadline))
@@ -218,7 +224,7 @@ struct TrackerWidgetEntryView: View {
                 .minimumScaleFactor(0.7)
             if let caption {
                 Text(caption)
-                    .font(.caption2)
+                    .font(.wiggleText(.caption2))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -236,7 +242,8 @@ struct TrackerWidgetEntryView: View {
         let p = pace(for: tracker)
         let isCompleted = tracker.isCompleted(asOf: entry.date)
         return VStack(spacing: 20) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
+                TrackerBadge(tracker: tracker, size: 36)
                 Text(tracker.name)
                     .font(WiggleRoomFont.headline(24, weight: 650))
                     .lineLimit(1)
@@ -275,7 +282,7 @@ struct TrackerWidgetEntryView: View {
             }
 
             Text(tracker.periodRemainingText(asOf: entry.date))
-                .font(.subheadline)
+                .font(.wiggleText(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .padding()
@@ -283,7 +290,7 @@ struct TrackerWidgetEntryView: View {
         .overlay(alignment: .topTrailing) {
             brandMark.frame(width: 24, height: 24).padding(8)
         }
-        .containerBackground(for: .widget) { Color.widgetBackground }
+        .containerBackground(for: .widget) { TrackerWidgetBackground(tracker: tracker) }
     }
 
     #if !os(macOS)
@@ -292,7 +299,7 @@ struct TrackerWidgetEntryView: View {
         let fraction = p.periodHours > 0 ? min(max(p.hoursElapsed / p.periodHours, 0), 1) : 0
         return WobblyGauge(fraction: fraction, color: .primary) {
             Text(tracker.name.prefix(3))
-                .font(.system(size: 10))
+                .font(.wiggleText(size: 10))
         }
         .containerBackground(for: .widget) { Color.clear }
     }
@@ -304,7 +311,7 @@ struct TrackerWidgetEntryView: View {
                 .frame(width: 44, height: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(tracker.name)
-                    .font(.caption2)
+                    .font(.wiggleText(.caption2))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Text(p.displayDifference(for: tracker))
