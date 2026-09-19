@@ -56,3 +56,12 @@ progress-notes.md entry (`swiftc -parse` syntax checks are not a substitute
 for a real build, and should never be reported as if they were). Don't
 claim something was verified in a simulator or on-device unless it actually
 was.
+
+## Siri phrases
+
+Whenever a phrase is added, removed or reworded in
+`src/WiggleRoom/Intents/WiggleRoomShortcuts.swift`, update
+`src/WiggleRoom/Views/SiriPhrasesView.swift` (Settings → Siri Phrases) in the
+same change — it's a hand-kept list, since App Shortcut phrases can't be read
+back at runtime.
+
