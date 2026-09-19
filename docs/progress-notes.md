@@ -3531,3 +3531,14 @@ Tracker sheet. Not reproduced; looks like the macOS system text-suggestion popup
 app UI. Best-guess fix in [AddTrackerView.swift](src/WiggleRoom/Views/AddTrackerView.swift):
 `.autocorrectionDisabled()` on the Name field under `#if os(macOS)`. **Not built or run**
 — no xcodebuild/simulator used, so neither change is verified; iOS unaffected.
+
+## 2026-09-19 macOS: sheet titles flush-left
+
+Reported: titles of macOS sheets ("Edit Tracker" etc.) looked indented/"tabbed right"
+against the left-aligned form. Cause: a `NavigationStack` title in a macOS sheet is
+placed after space reserved for leading toolbar items. Fix: new
+`View.leadingSheetTitle(_:)` in [View+PlatformHelpers.swift](src/WiggleRoom/Views/View+PlatformHelpers.swift)
+(macOS: `.toolbar(removing: .title)` + a flush-left headline in a top safe-area inset;
+no-op on iOS), applied to Add/Edit Tracker, Log Reading and Add Source sheets. Not
+applied to Balance History (pushed, not a sheet). Verified: macOS `xcodebuild` builds;
+**not visually checked** in the running app. iOS unaffected.

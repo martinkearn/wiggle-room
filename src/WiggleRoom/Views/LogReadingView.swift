@@ -47,6 +47,7 @@ struct LogReadingView: View {
             }
             .formStyle(.grouped)
             .navigationTitle(existingReading == nil ? "Update Current Value" : "Edit Update")
+            .leadingSheetTitle(existingReading == nil ? "Update Current Value" : "Edit Update")
             .inlineNavigationBarIfAvailable()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

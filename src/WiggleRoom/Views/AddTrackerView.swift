@@ -278,6 +278,7 @@ struct AddTrackerView: View {
             }
             .formStyle(.grouped)
             .navigationTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
+            .leadingSheetTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
