@@ -3693,3 +3693,7 @@ Reviewed every commit since ~13:30. Findings and fixes:
 ## 2026-09-19 Docs sync
 
 Rewrote the build spec to match today's behaviour instead of leaving appended HTML comments: §3.5 (time-scaled chart axis, "Final target £X"), §4.1 (`sortOrder`, `lastCheckedDate`), §5.2 (Add Source type picker, two immediate readings for a new connected-source tracker), §7.1/§7.3 (Checked/Changed lines, Tracker Order settings, synced list order incl. watch), §8.2 (rectangular Lock Screen widget mirrors the watch complication), plus new §12 resolved items. README checklist gained Tracker Order. Per instruction, everything was assumed working; docs reflect intended behaviour, and the two new synced fields' CloudKit migration remains unverified.
+
+## 2026-09-19 "Checked at 14:03"
+
+The Checked/Changed lines now read "Checked at 14:03" for today (was "Checked 14:03"); other days keep the date-and-time form, which the locale already renders with its own "at". iOS/macOS and watch. Not built or run.

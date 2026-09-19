@@ -46,7 +46,7 @@ struct WatchTrackerDetailView: View {
     /// Time only when it's today, otherwise date and time.
     private static func timingText(_ date: Date) -> String {
         Calendar.current.isDateInToday(date)
-            ? date.formatted(date: .omitted, time: .shortened)
+            ? "at " + date.formatted(date: .omitted, time: .shortened)
             : date.formatted(date: .abbreviated, time: .shortened)
     }
 
