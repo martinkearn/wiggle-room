@@ -55,6 +55,7 @@ struct WiggleRoomApp: App {
 
         _store = State(initialValue: TrackerStore(modelContext: modelContainer.mainContext))
         CloudSyncWidgetRefresher.start()
+        NotificationActionHandler.shared.register()
         StarlingRequestLogger.configure(container: modelContainer)
 
         #if os(iOS)
@@ -74,6 +75,7 @@ struct WiggleRoomApp: App {
                 .environment(deepLinkRouter)
                 .environment(appCommands)
                 .tint(WiggleRoomColors.brand)
+                .task { TrackerSpotlightIndexer.reindex() }
                 .onOpenURL { url in
                     deepLinkRouter.handle(url)
                 }
@@ -85,6 +87,13 @@ struct WiggleRoomApp: App {
                     // covers the very first background after launch.
                     if newPhase == .background {
                         BackgroundRefreshScheduler.scheduleNext()
+                        TrackerSpotlightIndexer.reindex()
+                    }
+                    // A tracker entering its final stretch by time alone has
+                    // no reading to trigger its Live Activity (§8.5).
+                    if newPhase == .active {
+                        let trackers = (try? modelContainer.mainContext.fetch(FetchDescriptor<Tracker>())) ?? []
+                        TrackerLiveActivity.syncAll(trackers)
                     }
                 }
                 #endif

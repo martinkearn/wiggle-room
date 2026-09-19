@@ -115,6 +115,9 @@ final class TrackerStore {
         modelContext.insert(reading)
         try? modelContext.save()
         reloadWidgets()
+        #if os(iOS) && canImport(ActivityKit)
+        TrackerLiveActivity.sync(tracker)
+        #endif
     }
 
     /// Removes a single previously-logged reading (manual trackers only —

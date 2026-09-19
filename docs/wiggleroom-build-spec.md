@@ -257,13 +257,21 @@ All glanceable surfaces (widgets, menu bar item) should support four states, col
 
 - **Implementation note**: nothing tells WidgetKit a tracker's figures changed for free — an explicit reload trigger is required on every mutation path. In-app changes (any edit that goes through `TrackerStore`) call `WidgetCenter.shared.reloadAllTimelines()` directly; changes that arrive via CloudKit sync from another device while the app is simply open (never touching `TrackerStore`) need a separate observer on the store's remote-change notification to trigger the same reload. Both paths are needed — one alone leaves a real staleness gap. As of the App Group migration (§6), the reload itself is now fast to actually reflect once triggered — the widget's re-fetch reads the same on-disk file the app just wrote, rather than waiting on its own separate CloudKit sync — so the remaining staleness is bounded by the periodic reload policy (`TrackerUpdateScheduling.nextWidgetReloadDate`, §8.1) between explicit triggers, not by cross-process sync latency.
 
+### 8.5 Other iOS extensions (added 2026-09-19)
+
+- **Interactive widget**: the medium Home Screen widget shows a refresh button for a connected-source (non-manual), uncompleted tracker. It runs `RefreshTrackerIntent` in the widget's own process (`TrackerStore.refreshFromSource`) — a one-tap fetch without opening the app. Manual trackers have no source to fetch, so no button.
+- **Control** (iOS only): `TrackerStatusControl` — a Control Center / Lock Screen button for a configurable tracker (`SelectTrackerControlIntent`), labelled with its name and ahead/behind figure; tapping deep-links to its dashboard.
+- **Live Activity — final stretch only** (iOS only): `TrackerLiveActivity` shows a Lock Screen / Dynamic Island activity for a tracker during the last 10% of its period (`finalStretchFraction`), with status line, ahead/behind figure and time left. It is updated on every logged reading (`TrackerStore.logReading`) and started/ended when the app becomes active. **Limitation**: ActivityKit only allows starting an activity from the foreground, so a tracker that enters its final stretch while the app is closed gets its activity the next time the app is opened.
+- **Spotlight**: `TrackerEntity` is an `IndexedEntity`; `TrackerSpotlightIndexer` replaces the index on launch and on backgrounding. Tapping a result runs `OpenTrackerIntent` (deep link into the dashboard), which is also usable from Shortcuts / the Action Button. Siri phrases and Shortcuts already existed (`WiggleRoomShortcuts`).
+- **Actionable reminder notification**: a manual tracker's reminder (§5.4) carries an inline "Log Reading" text-input action (`NotificationActionHandler`), logging the value without opening the app.
+- **StandBy** uses the existing widgets unchanged; **CloudKit silent-push refresh** already existed (`remote-notification` background mode + `CloudSyncWidgetRefresher`).
+- **Not built**: a "log reading" widget button for manual trackers (needs a value entry surface a widget can't host).
+
 ## 9. Out of Scope for v1 (possible future additions)
 
 - Additional source providers beyond Starling and manual entry — Tesla (OAuth2 Fleet API, cached odometer read; Fleet Telemetry streaming is unlikely to be needed), another bank, an aggregator-backed provider, HealthKit, etc. Deliberately deferred, not cancelled; the provider interface (§5.1) is designed to make these additive later without reworking the core app.
 - Domains beyond money and mileage (e.g. weight/health tracking) — parked for now; would likely need extra consideration around data smoothing (raw readings are noisier than a bank balance or an odometer) if revisited later.
-- Spotlight surfacing via App Intents.
 - Handoff between the user's own devices.
-- Live Activities / Dynamic Island — evaluated explicitly and skipped by design, not just left aside: the API is built for short, bounded events (a ride, a delivery) with a clear start/end held open on the Lock Screen for that duration, which doesn't fit a tracker running for weeks or months. A narrower version — surfacing one only in a tracker's final 24 hours — could be worth it later, but that's a distinct, smaller feature.
 - Transaction-level detail or spending categorization for money trackers.
 - Payment initiation (Starling access is read-only; no `payment:create` or similar scopes needed).
 

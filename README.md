@@ -37,7 +37,7 @@ Rough shape of what's implemented vs. still to come:
 - [x] watchOS companion app (embedded in the iOS app)
 - [x] watchOS complication
 - [x] Siri/Shortcuts (log a reading, check a tracker's status)
-- [ ] Live Activities (deliberately skipped — see progress notes for why)
+- [x] Extensions: Control, interactive widget refresh button, final-10% Live Activity, Spotlight, actionable reminder notification (built, not runtime-verified — spec §8.5)
 - [ ] visionOS / Mac Catalyst (deliberately removed — iOS and macOS only, see progress notes)
 
 ## Requirements

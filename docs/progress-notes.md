@@ -1,7 +1,7 @@
 # Wiggle Room — Progress Notes
 
 Status snapshot for picking this work back up. **Last updated 2026-09-19**,
-after **2026-09-19 Spec scope trim — zoom levels, Tesla, cross-user sharing removed** (see its section at the bottom) — before that, **2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched** (see its section at the bottom) — before that, **2026-09-18 Add Tracker moved from the toolbar into the list
+after **2026-09-19 iOS extensions — Control, interactive widget, final-stretch Live Activity, Spotlight, actionable reminders** (see its section at the bottom) — before that, **2026-09-19 Spec scope trim — zoom levels, Tesla, cross-user sharing removed** (see its section at the bottom) — before that, **2026-09-18 PaceClock — Target Right Now / under-over refresh on a timer, balance untouched** (see its section at the bottom) — before that, **2026-09-18 Add Tracker moved from the toolbar into the list
 itself, at the top** — asked as a design question ("would the button be
 better at the bottom or top of the list, taking the same shape as a
 tracker?"); recommended bottom first (a common pattern, e.g. Reminders/
@@ -3394,3 +3394,26 @@ spec was trimmed to what is actually being built:
   working, confirmed by the user) and the Tesla endpoint / zoom open items.
 
 Not verified: nothing to build or run; no code touched.
+
+## 2026-09-19 iOS extensions — Control, interactive widget, final-stretch Live Activity, Spotlight, actionable reminders
+
+New: `RefreshTrackerIntent` + refresh button on the medium widget
+([TrackerWidgetEntryView.swift](../src/WiggleRoomWidgets/TrackerWidgetEntryView.swift));
+`TrackerStatusControl` ([file](../src/WiggleRoomWidgets/TrackerStatusControl.swift));
+Live Activity for a tracker's last 10% ([attributes/logic](../src/WiggleRoomShared/TrackerLiveActivity.swift),
+[UI](../src/WiggleRoomWidgets/TrackerLiveActivityWidget.swift), `NSSupportsLiveActivities` in the app Info.plist,
+synced from `TrackerStore.logReading` and on scene-active); Spotlight indexing + `OpenTrackerIntent`
+([TrackerSpotlightIndexer.swift](../src/WiggleRoom/Intents/TrackerSpotlightIndexer.swift));
+inline "Log Reading" action on manual reminders ([NotificationActionHandler.swift](../src/WiggleRoom/NotificationActionHandler.swift)).
+Spec §8.5 describes each; §9's Spotlight and Live Activity items removed. Siri phrases,
+StandBy and CloudKit push refresh already existed, so no work there. ActivityKit code is
+`#if os(iOS)`-guarded (macOS/watch compile the shared files).
+
+Key gotcha: `controlWidgetStatus` doesn't exist on `ControlWidgetButton`, so the status
+figure lives in the label text. Spotlight's `indexAppEntities` needs `import AppIntents`
+(MemberImportVisibility is on).
+
+Verified: `xcodebuild build` succeeded for iOS (generic), macOS and the watch scheme.
+**Not verified at runtime** (no simulator/device run): control appearance, widget button
+refresh, Live Activity start/update/end, Spotlight results, notification text action.
+Known limitation: a Live Activity can only be *started* in the foreground.

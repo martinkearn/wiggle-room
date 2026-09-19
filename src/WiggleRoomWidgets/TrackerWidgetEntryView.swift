@@ -125,6 +125,19 @@ struct TrackerWidgetEntryView: View {
         .overlay(alignment: .topTrailing) {
             brandMark.frame(width: 18, height: 18).padding(10)
         }
+        .overlay(alignment: .bottomTrailing) {
+            // Interactive widget: fetch a connected tracker's value now,
+            // without opening the app. Manual trackers have no source to
+            // fetch from, so they get no button.
+            if !tracker.isManualEntry, !tracker.isCompleted(asOf: entry.date) {
+                Button(intent: RefreshTrackerIntent(trackerId: tracker.id)) {
+                    Image(systemName: "arrow.clockwise").font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .padding(10)
+            }
+        }
         .containerBackground(for: .widget) { Color.widgetBackground }
     }
 

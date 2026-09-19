@@ -21,6 +21,12 @@ enum ReminderScheduler {
     /// sits right at the limit rather than under it.
     private static let minimumIntervalSeconds: TimeInterval = 60
 
+    /// Category/action ids for the reminder's inline "Log Reading" text-input
+    /// action, registered and handled by the app (`NotificationActionHandler`).
+    static let categoryIdentifier = "TRACKER_REMINDER"
+    static let logActionIdentifier = "LOG_READING"
+    static let trackerIdKey = "trackerId"
+
     private static func identifier(for tracker: Tracker) -> String {
         "reminder-\(tracker.id.uuidString)"
     }
@@ -44,6 +50,8 @@ enum ReminderScheduler {
             content.title = tracker.name
             content.body = "Time to update your current value."
             content.sound = .default
+            content.categoryIdentifier = categoryIdentifier
+            content.userInfo = [trackerIdKey: tracker.id.uuidString]
 
             // A calendar trigger can't express an arbitrary "every N minutes"
             // cadence (only regular calendar-component repeats like daily/

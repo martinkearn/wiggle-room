@@ -10,6 +10,10 @@ import WidgetKit
 struct WiggleRoomWidgetsBundle: WidgetBundle {
     var body: some Widget {
         TrackerWidget()
+        #if os(iOS)
+        TrackerStatusControl()
+        TrackerLiveActivityWidget()
+        #endif
     }
 }
 

@@ -10,7 +10,7 @@ import AppIntents
 /// extension (different module, same idea) — App Intents entities aren't
 /// shared across extension boundaries, so each target that needs one
 /// defines its own thin wrapper around the same underlying `Tracker` model.
-struct TrackerEntity: AppEntity {
+struct TrackerEntity: AppEntity, IndexedEntity {
     let id: UUID
     let name: String
 
