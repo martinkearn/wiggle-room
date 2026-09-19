@@ -340,3 +340,5 @@ Resolved (kept here for the record):
 <!-- Tracker list order: Settings → Tracker Order (Newest/Oldest, Ending Soonest, Name A–Z/Z–A, Custom drag-reorder via synced Tracker.sortOrder). Per-device sort option; watch/menu bar unchanged. -->
 
 <!-- Detail screen, connected-source trackers: Current Balance card shows subtle "Checked" (Tracker.lastCheckedDate, any successful source fetch) and "Changed" (latest reading date) times; date included only when not today. -->
+
+<!-- Trend chart x-axis: hourly ≤1 day, daily ≤7 days, weekly ≤~3 months, monthly beyond; ≤~6 labels. -->

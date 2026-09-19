@@ -3673,3 +3673,7 @@ Renamed the label everywhere in app code (detail, watch, widgets, menu bar, ring
 ## 2026-09-19 Caption: "Final target will be X" → "Final target X"
 
 Dropped "will be" from the Current Target card caption on iOS/macOS detail, the watch detail and the extra-large widget. Not built or run.
+
+## 2026-09-19 Trend chart: time-scaled bottom axis
+
+[TrendChartView.swift](src/WiggleRoomShared/TrendChartView.swift)'s x-axis was just start/end dates. It now ticks in hours (tracker ≤ 1 day), days (≤ 7 days), weeks (≤ ~3 months) or months (longer), starting at the tracker's start and thinned to ≤ ~6 labels. Tick spacing was my reading of "weeks or month depending on duration" — the 92-day threshold is a judgement call. Not built or run.

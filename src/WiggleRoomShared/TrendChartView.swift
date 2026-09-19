@@ -30,6 +30,42 @@ struct TrendChartView: View {
         DateInterval(start: tracker.startDate, end: tracker.endDate)
     }
 
+    /// Bottom-axis ticks scaled to the tracker's length: hours up to a day,
+    /// days up to a week, then weeks (up to ~3 months) or months beyond
+    /// that. Ticks start at the tracker's own start and are thinned to at
+    /// most ~6 so labels never collide.
+    private var xAxisTicks: (dates: [Date], format: Date.FormatStyle) {
+        let cal = Calendar.current
+        let start = window.start, end = window.end
+        let days = window.duration / 86_400
+        let component: Calendar.Component
+        let format: Date.FormatStyle
+        var step = 1
+        if days <= 1 {
+            component = .hour
+            format = .dateTime.hour()
+        } else if days <= 7 {
+            component = .day
+            format = .dateTime.weekday(.abbreviated).day()
+        } else if days <= 92 {
+            component = .day
+            step = 7
+            format = .dateTime.month(.abbreviated).day()
+        } else {
+            component = .month
+            format = .dateTime.month(.abbreviated)
+        }
+        var all: [Date] = []
+        var i = 0
+        while let d = cal.date(byAdding: component, value: i * step, to: start), d <= end, all.count < 500 {
+            all.append(d)
+            i += 1
+        }
+        let thin = max(1, Int((Double(all.count) / 6).rounded(.up)))
+        let dates = all.enumerated().filter { $0.offset % thin == 0 }.map(\.element)
+        return (dates.isEmpty ? [start, end] : dates, format)
+    }
+
     private var latestReading: ValueSnapshot? {
         tracker.sortedReadings.last
     }
@@ -257,8 +293,10 @@ struct TrendChartView: View {
         }
         .chartXAxis {
             if showsAxes {
-                AxisMarks(values: [window.start, window.end]) { value in
-                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                AxisMarks(values: xAxisTicks.dates) { _ in
+                    AxisGridLine()
+                    AxisTick()
+                    AxisValueLabel(format: xAxisTicks.format)
                 }
             }
         }
