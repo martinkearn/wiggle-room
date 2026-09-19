@@ -178,6 +178,38 @@ struct TrendChartView: View {
         }
     }
 
+    /// Points along a straight line from `a` to `b`, nudged sideways by a
+    /// small, deterministic wobble that fades to exactly zero at both ends —
+    /// so the line still starts and finishes on its real values, but wanders
+    /// a touch in between like a hand-drawn stroke, matching the rings and
+    /// icon. Amplitude is ~1.8% of the visible Y range. Drawn with
+    /// `.catmullRom` so the wander is smooth, not jagged. Data points
+    /// (`PointMark`s, the trend line) are never displaced; only the
+    /// connecting strokes are.
+    private func wobbly(
+        from a: (date: Date, value: Double),
+        to b: (date: Date, value: Double),
+        seed: Double,
+        cycles: Double = 1.5
+    ) -> [(date: Date, value: Double)] {
+        let domain = yDomain
+        let amplitude = (domain.upperBound - domain.lowerBound) * 0.018
+        let steps = 8
+        return (0...steps).map { i in
+            let t = Double(i) / Double(steps)
+            let base = a.value + (b.value - a.value) * t
+            let offset = amplitude * sin(.pi * t) * sin(2 * .pi * cycles * t + seed)
+            return (
+                a.date.addingTimeInterval(b.date.timeIntervalSince(a.date) * t),
+                min(max(base + offset, domain.lowerBound), domain.upperBound)
+            )
+        }
+    }
+
+    private func double(_ value: Decimal) -> Double {
+        (value as NSDecimalNumber).doubleValue
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             chart
@@ -210,36 +242,37 @@ struct TrendChartView: View {
         Chart {
             // Target reference line — the strongest line on the chart, since
             // it's the fixed yardstick everything else is read against.
-            LineMark(
-                x: .value("Date", window.start),
-                y: .value("Budget", tracker.startingValue),
-                series: .value("Series", "Budget")
-            )
-            .foregroundStyle(WiggleRoomColors.paceRing)
-            .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round))
-            LineMark(
-                x: .value("Date", window.end),
-                y: .value("Budget", targetEndValue),
-                series: .value("Series", "Budget")
-            )
-            .foregroundStyle(WiggleRoomColors.paceRing)
-            .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round))
+            ForEach(Array(wobbly(
+                from: (window.start, double(tracker.startingValue)),
+                to: (window.end, double(targetEndValue)),
+                seed: 0.7
+            ).enumerated()), id: \.offset) { _, point in
+                LineMark(
+                    x: .value("Date", point.date),
+                    y: .value("Budget", point.value),
+                    series: .value("Series", "Budget")
+                )
+                .foregroundStyle(WiggleRoomColors.paceRing)
+                .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
+                .interpolationMethod(.catmullRom)
+            }
 
-            ForEach(segments, id: \.id) { segment in
-                LineMark(
-                    x: .value("Date", segment.start.date),
-                    y: .value("Actual", segment.start.value),
-                    series: .value("Segment", segment.id)
-                )
-                .foregroundStyle(segment.isAhead ? WiggleRoomColors.good : WiggleRoomColors.bad)
-                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                LineMark(
-                    x: .value("Date", segment.end.date),
-                    y: .value("Actual", segment.end.value),
-                    series: .value("Segment", segment.id)
-                )
-                .foregroundStyle(segment.isAhead ? WiggleRoomColors.good : WiggleRoomColors.bad)
-                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
+                ForEach(Array(wobbly(
+                    from: (segment.start.date, double(segment.start.value)),
+                    to: (segment.end.date, double(segment.end.value)),
+                    seed: 1.9 + Double(index) * 2.3,
+                    cycles: 1
+                ).enumerated()), id: \.offset) { _, point in
+                    LineMark(
+                        x: .value("Date", point.date),
+                        y: .value("Actual", point.value),
+                        series: .value("Segment", segment.id)
+                    )
+                    .foregroundStyle(segment.isAhead ? WiggleRoomColors.good : WiggleRoomColors.bad)
+                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    .interpolationMethod(.catmullRom)
+                }
             }
 
             ForEach(tracker.sortedReadings) { reading in
@@ -294,7 +327,7 @@ struct TrendChartView: View {
         .chartXAxis {
             if showsAxes {
                 AxisMarks(values: xAxisTicks.dates) { _ in
-                    AxisGridLine()
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, lineCap: .round, dash: [2, 4]))
                     AxisTick()
                     AxisValueLabel(format: xAxisTicks.format)
                 }
@@ -302,7 +335,10 @@ struct TrendChartView: View {
         }
         .chartYAxis {
             if showsAxes {
-                AxisMarks(position: .leading)
+                AxisMarks(position: .leading) { _ in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, lineCap: .round, dash: [2, 4]))
+                    AxisValueLabel()
+                }
             }
         }
         .chartYScale(domain: yDomain)
