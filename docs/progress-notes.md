@@ -3603,3 +3603,11 @@ Settings sidebar pane. Phrase text is duplicated by hand from `WiggleRoomShortcu
 §8.5). `ShortcutsLink` doesn't exist on macOS, so that button is iOS-only. Verified: iOS and macOS `xcodebuild`
 builds succeed; page not visually checked.
 
+## 2026-09-19 Tracker picker reads "Tracker: <value>"
+
+The widget, complication and control configuration intents (`SelectTrackerIntent` ×2, `SelectTrackerControlIntent`)
+now declare `parameterSummary` = "Tracker: \(\.$tracker)", with the parameter titled "Choose a tracker" — so the
+row should read "Tracker: Choose a tracker" until one is picked, then "Tracker: <name>". Verified: iOS and watchOS
+builds succeed. **Not verified visually** — relies on the system showing the parameter title as the unset
+placeholder; if it shows something else, the fix is in those three intents.
+

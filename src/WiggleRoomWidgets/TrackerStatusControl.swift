@@ -14,6 +14,13 @@ struct SelectTrackerControlIntent: ControlConfigurationIntent {
 
     @Parameter(title: "Choose a tracker")
     var tracker: TrackerEntity?
+
+    /// Renders the picker row as "Tracker: <name>" — or "Tracker: Choose a
+    /// tracker" while nothing's selected (the parameter's own title is what
+    /// the system shows as the unset placeholder).
+    static var parameterSummary: some ParameterSummary {
+        Summary("Tracker: \(\.$tracker)")
+    }
 }
 
 /// A Control Center / Lock Screen control: the tracker's name with its
