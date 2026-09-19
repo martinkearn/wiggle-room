@@ -8,12 +8,15 @@ import WidgetKit
 struct TrackerTimelineEntry: TimelineEntry {
     let date: Date
     let tracker: Tracker?
+    /// True while there's no data to show *yet* (placeholder / first fetch
+    /// after a resize), as opposed to genuinely having no tracker.
+    var isLoading = false
 }
 
 struct TrackerTimelineProvider: AppIntentTimelineProvider {
     @MainActor
     func placeholder(in context: Context) -> TrackerTimelineEntry {
-        TrackerTimelineEntry(date: .now, tracker: try? WidgetDataStore.fetchAllTrackersImmediately().first)
+        TrackerTimelineEntry(date: .now, tracker: nil, isLoading: true)
     }
 
     /// `snapshot` is what WidgetKit shows immediately while the user is
@@ -32,7 +35,7 @@ struct TrackerTimelineProvider: AppIntentTimelineProvider {
     func snapshot(for configuration: SelectTrackerIntent, in context: Context) async -> TrackerTimelineEntry {
         let trackers = (try? WidgetDataStore.fetchAllTrackersImmediately()) ?? []
         let tracker = configuration.tracker.flatMap { id in trackers.first { $0.id == id.id } } ?? trackers.first
-        return TrackerTimelineEntry(date: .now, tracker: tracker)
+        return TrackerTimelineEntry(date: .now, tracker: tracker, isLoading: tracker == nil)
     }
 
     /// A tracker's pace figures drift continuously, but they only need to be

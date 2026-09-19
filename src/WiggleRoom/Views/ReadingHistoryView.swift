@@ -65,7 +65,7 @@ struct ReadingHistoryView: View {
         // with no size hint at all can size a sheet down to something that
         // renders its content invisibly small rather than visibly empty.
         .frame(minWidth: 360, minHeight: 320)
-        .navigationTitle("Update History")
+        .navigationTitle("Balance History")
         .inlineNavigationBarIfAvailable()
         .toolbar {
             // This sheet's only other dismissal was swipe-down — not

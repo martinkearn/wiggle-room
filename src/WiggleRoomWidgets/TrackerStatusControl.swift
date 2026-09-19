@@ -17,7 +17,7 @@ struct SelectTrackerControlIntent: ControlConfigurationIntent {
 }
 
 /// A Control Center / Lock Screen control: the tracker's name with its
-/// ahead/behind figure in the label; tapping opens its dashboard.
+/// under/over figure in the label; tapping opens its dashboard.
 struct TrackerStatusControl: ControlWidget {
     struct Value {
         var url: URL
@@ -47,11 +47,11 @@ struct TrackerStatusControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(kind: "TrackerStatusControl", provider: Provider()) { value in
             ControlWidgetButton(action: OpenURLIntent(value.url)) {
-                Label("\(value.name): \(value.status)", systemImage: "circle.circle")
+                Label("\(value.name): \(value.status)", systemImage: "chart.line.uptrend.xyaxis")
             }
         }
-        .displayName("Tracker")
-        .description("Shows a tracker's pace; tap to open it.")
+        .displayName("Tracker Status")
+        .description("Shows how far over or under target a tracker is. Tap it to open that tracker in Wiggle Room.")
     }
 }
 #endif

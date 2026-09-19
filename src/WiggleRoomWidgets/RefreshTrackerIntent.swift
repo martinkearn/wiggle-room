@@ -5,6 +5,7 @@
 
 import AppIntents
 import Foundation
+import WidgetKit
 
 /// The tap action behind the refresh button on a Home Screen widget
 /// (interactive widget) for a connected-source tracker: fetches its current
@@ -29,6 +30,7 @@ struct RefreshTrackerIntent: AppIntent {
         let store = TrackerStore(modelContext: try WidgetDataStore.makeContainer().mainContext)
         // A rate-limit/network failure just leaves the old value showing.
         _ = try? await store.refreshFromSource(tracker)
+        WidgetCenter.shared.reloadAllTimelines()
         return .result()
     }
 }

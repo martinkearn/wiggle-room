@@ -89,13 +89,9 @@ struct TrackerListView: View {
             .sheet(isPresented: $isPresentingAddTracker) {
                 AddTrackerView()
             }
-            .sheet(isPresented: $isPresentingSettings) {
-                // `TrackerListView` itself is iOS/iPadOS-only at runtime
-                // (`ContentView` routes macOS to `MacRootView` instead,
-                // §7.2), but this file still compiles for macOS since it
-                // isn't `#if os`-gated at the file level — `SettingsView`
-                // is iOS-only (§7.1), so this branch only exists to keep
-                // the macOS compile happy; it's never actually reached.
+            .navigationDestination(isPresented: $isPresentingSettings) {
+                // `SettingsView` is iOS-only (§7.1); this file still compiles
+                // for macOS, where this destination is never reached.
                 #if !os(macOS)
                 SettingsView()
                 #else

@@ -215,7 +215,7 @@ struct TrackerDetailView: View {
                         Button {
                             isPresentingReadingHistory = true
                         } label: {
-                            Label("Update History", systemImage: "clock")
+                            Label("Balance History", systemImage: "clock")
                         }
                     }
                 } label: {

@@ -15,14 +15,15 @@ import SwiftData
 /// Connected Sources is now one row within this screen rather than the
 /// screen itself, matching macOS's own General/Connected Sources split.
 ///
-/// Presented via `.sheet` from `TrackerListView`'s toolbar gear icon.
+/// Pushed (not a sheet) from `TrackerListView`'s toolbar gear icon, so it
+/// gets the standard back arrow like the deeper Settings screens.
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(TrackerStore.self) private var store
     @State private var isPresentingResetConfirmation = false
 
     var body: some View {
-        NavigationStack {
+        Group {
             List {
                 Section {
                     NavigationLink {
@@ -58,11 +59,6 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .inlineNavigationBarIfAvailable()
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
         }
         .confirmationDialog(
             "Reset All App Data?",

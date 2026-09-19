@@ -17,9 +17,41 @@ struct TrackerWidgetEntryView: View {
     var body: some View {
         if let tracker = entry.tracker {
             content(for: tracker)
+                // Dims the figures while a Refresh button's intent is
+                // running, so a tap visibly "takes".
+                .invalidatableContent()
                 .widgetURL(WiggleRoomDeepLink.url(forTrackerId: tracker.id))
+        } else if entry.isLoading {
+            loadingState
         } else {
             emptyState
+        }
+    }
+
+    /// A tracker fetch can take a while after a widget is resized or
+    /// reconfigured — say so rather than showing something that looks broken.
+    private var loadingState: some View {
+        VStack(spacing: 6) {
+            ProgressView()
+            Text("Loading data…")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .unredacted()
+        .containerBackground(for: .widget) { Color.widgetBackground }
+    }
+
+    /// Bottom-trailing refresh button for connected-source trackers (manual
+    /// trackers have nothing to fetch, so they get none).
+    @ViewBuilder
+    private func refreshButton(_ tracker: Tracker) -> some View {
+        if !tracker.isManualEntry, !tracker.isCompleted(asOf: entry.date) {
+            Button(intent: RefreshTrackerIntent(trackerId: tracker.id)) {
+                Image(systemName: "arrow.clockwise").font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .padding(6)
         }
     }
 
@@ -123,21 +155,9 @@ struct TrackerWidgetEntryView: View {
         }
         .padding()
         .overlay(alignment: .topTrailing) {
-            brandMark.frame(width: 18, height: 18).padding(10)
+            brandMark.frame(width: 18, height: 18).padding(6)
         }
-        .overlay(alignment: .bottomTrailing) {
-            // Interactive widget: fetch a connected tracker's value now,
-            // without opening the app. Manual trackers have no source to
-            // fetch from, so they get no button.
-            if !tracker.isManualEntry, !tracker.isCompleted(asOf: entry.date) {
-                Button(intent: RefreshTrackerIntent(trackerId: tracker.id)) {
-                    Image(systemName: "arrow.clockwise").font(.caption.weight(.semibold))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .padding(10)
-            }
-        }
+        .overlay(alignment: .bottomTrailing) { refreshButton(tracker) }
         .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
@@ -194,7 +214,10 @@ struct TrackerWidgetEntryView: View {
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay(alignment: .topTrailing) {
-            brandMark.frame(width: 20, height: 20).padding(12)
+            brandMark.frame(width: 20, height: 20).padding(6)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            refreshButton(tracker)
         }
         .containerBackground(for: .widget) { Color.widgetBackground }
     }
@@ -274,7 +297,10 @@ struct TrackerWidgetEntryView: View {
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topTrailing) {
-            brandMark.frame(width: 24, height: 24).padding(14)
+            brandMark.frame(width: 24, height: 24).padding(8)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            refreshButton(tracker)
         }
         .containerBackground(for: .widget) { Color.widgetBackground }
     }

@@ -3468,3 +3468,15 @@ for the notification action and Shortcuts). Fix: `makeContainer()` now caches on
 and reuses it, so fetched models stay attached. Both `WiggleRoom` (iOS, macOS) schemes build. Not
 re-run in a simulator/device after the fix — the user needs to confirm the launch crash is gone.
 
+## 2026-09-19 UI tweaks: history name, Settings back arrow, widget refresh/loading, Control clarity
+
+From hands-on use of the phone/widgets:
+- **"Update History" → "Balance History"** (button label and screen title, [TrackerDetailView.swift](src/WiggleRoom/Views/TrackerDetailView.swift), [ReadingHistoryView.swift](src/WiggleRoom/Views/ReadingHistoryView.swift)).
+- **Starling requests caption** ([StarlingRequestBudget.swift](src/WiggleRoomShared/Providers/StarlingRequestBudget.swift)) cut from a long paragraph to "Counts requests from all your devices. Resets at midnight."
+- **iOS Settings** is now *pushed* from the gear icon ([TrackerListView.swift](src/WiggleRoom/Views/TrackerListView.swift), [SettingsView.swift](src/WiggleRoom/Views/SettingsView.swift)) instead of a sheet with a "Done" button, so it gets the standard back arrow like deeper screens. (The Balance History sheet still has "Done" — it *is* a sheet; say if that should change too.)
+- **Widgets** ([TrackerWidgetEntryView.swift](src/WiggleRoomWidgets/TrackerWidgetEntryView.swift)): refresh button is now a shared helper and also on the Large and Extra Large widgets (it was Medium-only; manual trackers still have none — nothing to fetch). Brand mark and refresh button moved closer to the corners. `.invalidatableContent()` dims the widget while a refresh intent runs, and `RefreshTrackerIntent` now calls `WidgetCenter.reloadAllTimelines()` when done — the likely reason taps looked like they did nothing (a re-fetch returning an unchanged value redrew nothing).
+- **Blank widget while resizing**: the placeholder and an empty first fetch now show a spinner and "Loading data…" (`TrackerTimelineEntry.isLoading`). This only changes what's shown during the wait — the 20s+ delay itself (CloudKit-backed container spin-up) is **not** fixed.
+- **Control**: renamed "Tracker Status", new description ("Shows how far over or under target a tracker is. Tap it to open that tracker in Wiggle Room."), and a meaningful icon instead of a plain circle.
+
+Verified: `xcodebuild build` succeeded for WiggleRoom (iOS + macOS) and WiggleRoomWidgets. **Not verified at runtime**: the refresh dimming/feedback, the Loading state, and the back-arrow navigation — all need a device/simulator look.
+

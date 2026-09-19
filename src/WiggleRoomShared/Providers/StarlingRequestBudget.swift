@@ -50,7 +50,7 @@ actor StarlingRequestBudget {
     /// all there — iOS has no equivalent Settings scene, §7.2) — kept here
     /// rather than on either view so both platforms can reference it
     /// without one platform-gated view depending on the other.
-    static let requestCaption = "Counts every request made by this app on any of your devices signed into the same iCloud account, since it's synced like the rest of your data. Resets at midnight. Requests made by any other app or script using this same token aren't included — Starling doesn't expose that to any client."
+    static let requestCaption = "Counts requests from all your devices. Resets at midnight."
 
     private let dailyLimit: Int
     private let warningThreshold: Int
