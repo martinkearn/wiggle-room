@@ -133,20 +133,13 @@ struct TrackerDetailView: View {
     private var dashboardScrollView: some View {
         ScrollView {
             VStack(spacing: 28) {
-                if let sourceCaption {
-                    Text(sourceCaption)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 4)
-                }
-
                 // No more live countdown here — figures are fully manual
                 // now (see `now`'s own doc comment) — just the pull-gesture
                 // hint on iOS, above the rings alongside everything else
                 // that's static context for this screen.
                 #if !os(macOS)
                 pullToUpdateHint
-                    .padding(.top, sourceCaption == nil ? 4 : 0)
+                    .padding(.top, 4)
                 #endif
 
                 if isCompleted {
@@ -197,7 +190,9 @@ struct TrackerDetailView: View {
         }
         #endif
         .navigationTitle(tracker.name)
-        .navigationSubtitle(periodRangeText)
+        // Header: title, date range, then (connected sources only) the
+        // "connection · account" line beneath the range.
+        .navigationSubtitle(sourceCaption.map { "\(periodRangeText)\n\($0)" } ?? periodRangeText)
         .inlineNavigationBarIfAvailable()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

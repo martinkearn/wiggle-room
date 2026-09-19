@@ -3697,3 +3697,7 @@ Rewrote the build spec to match today's behaviour instead of leaving appended HT
 ## 2026-09-19 "Checked at 14:03"
 
 The Checked/Changed lines now read "Checked at 14:03" for today (was "Checked 14:03"); other days keep the date-and-time form, which the locale already renders with its own "at". iOS/macOS and watch. Not built or run.
+
+## 2026-09-19 Detail: connection · account line moved into the header
+
+The "My Starling Account · Personal" caption is no longer body text above the rings; it's a second line of `navigationSubtitle` (after the date range) in [TrackerDetailView.swift](src/WiggleRoom/Views/TrackerDetailView.swift). iOS and macOS builds succeed; not run, so whether the subtitle renders two lines (vs. truncating to one) on each platform is unchecked. If it truncates, the fallback is a custom principal toolbar item. The watch detail never showed this caption.
