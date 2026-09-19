@@ -62,6 +62,10 @@ final class Tracker {
     /// `TrackerDetailView`.
     var hasCelebratedCompletion: Bool = false
 
+    /// Position in the All Trackers list when the sort setting is Custom
+    /// (Settings → Tracker Order). Synced like the rest of the record.
+    var sortOrder: Int = 0
+
     /// Every reading ever logged for this tracker (§4.6 — timestamped
     /// history, not a single overwritten current value). Optional array for
     /// CloudKit compatibility; use `sortedReadings`/`latestReading` rather

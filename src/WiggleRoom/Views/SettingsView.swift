@@ -32,6 +32,11 @@ struct SettingsView: View {
                         Label("Connected Sources", systemImage: "point.3.filled.connected.trianglepath.dotted")
                     }
                     NavigationLink {
+                        TrackerOrderView()
+                    } label: {
+                        Label("Tracker Order", systemImage: "arrow.up.arrow.down")
+                    }
+                    NavigationLink {
                         SiriPhrasesView()
                     } label: {
                         Label("Siri Phrases", systemImage: "waveform")

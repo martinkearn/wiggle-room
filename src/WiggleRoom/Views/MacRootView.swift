@@ -16,7 +16,9 @@ import AppKit
 struct MacRootView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(AppCommands.self) private var appCommands
-    @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
+    @Query(sort: \Tracker.startDate, order: .reverse) private var allTrackers: [Tracker]
+    @AppStorage(trackerSortOptionKey) private var sortOption = TrackerSortOption.newestFirst.rawValue
+    private var trackers: [Tracker] { (TrackerSortOption(rawValue: sortOption) ?? .newestFirst).sorted(allTrackers) }
 
     @State private var selection: Tracker.ID?
     @State private var isPresentingAddTracker = false
