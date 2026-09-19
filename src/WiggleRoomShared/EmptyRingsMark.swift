@@ -18,11 +18,19 @@ struct IconRingShape: Shape {
     /// exactly, the way a `Circle` would — for the live rings, where the
     /// caller insets the inner ring itself.
     var fitsRect = false
+    /// A more exaggerated wobble, for small, faint uses (the empty and
+    /// loading marks) where the icon's own subtle outline reads as plain
+    /// circles at ~50pt.
+    var pronounced = false
 
     func path(in rect: CGRect) -> Path {
-        let s: [CGFloat] = ring == .outer
-            ? [100, 32, 144, 26, 172, 60, 168, 102, 166, 148, 130, 176, 96, 170, 54, 168, 26, 138, 32, 96, 34, 56, 60, 30, 100, 32]
-            : [100, 56, 128, 52, 148, 76, 144, 102, 142, 130, 120, 150, 96, 146, 70, 144, 54, 126, 56, 98, 58, 72, 76, 54, 100, 56]
+        let s: [CGFloat]
+        switch (ring, pronounced) {
+        case (.outer, false): s = [100, 32, 144, 26, 172, 60, 168, 102, 166, 148, 130, 176, 96, 170, 54, 168, 26, 138, 32, 96, 34, 56, 60, 30, 100, 32]
+        case (.inner, false): s = [100, 56, 128, 52, 148, 76, 144, 102, 142, 130, 120, 150, 96, 146, 70, 144, 54, 126, 56, 98, 58, 72, 76, 54, 100, 56]
+        case (.outer, true): s = [100, 30, 150, 20, 176, 58, 170, 104, 168, 154, 128, 182, 92, 172, 46, 170, 22, 140, 30, 92, 34, 48, 58, 34, 100, 30]
+        case (.inner, true): s = [100, 54, 132, 46, 152, 74, 146, 104, 144, 134, 118, 154, 92, 148, 64, 146, 50, 126, 54, 94, 58, 66, 74, 56, 100, 54]
+        }
         // Both rings share the outer ring's bounds so the pair stays in
         // the same relationship as in the icon.
         let (minX, minY, span): (CGFloat, CGFloat, CGFloat) = (26, 26, 146)
@@ -48,7 +56,7 @@ struct IconRingShape: Shape {
 
 /// The "nothing here yet" ring graphic — the app icon's two wobbly,
 /// partly closed rings (outer pace ring ~75%, inner actual ring ~68%),
-/// drawn faint. Shared so the tracker list's empty state, the other empty
+/// drawn faint and with a deliberately stronger wobble than the icon's. Shared so the tracker list's empty state, the other empty
 /// states and the widgets' "Loading data…" state all show the same picture
 /// as the icon. `size` is the outer diameter; stroke widths scale with it.
 struct EmptyRingsMark: View {
@@ -56,13 +64,15 @@ struct EmptyRingsMark: View {
 
     var body: some View {
         let line = size * 0.09
+        let style = StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round)
         ZStack {
-            IconRingShape(ring: .outer)
+            IconRingShape(ring: .outer, fitsRect: true, pronounced: true)
                 .trim(from: 0, to: 0.75)
-                .stroke(WiggleRoomColors.brand.opacity(0.35), style: StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round))
-            IconRingShape(ring: .inner)
+                .stroke(WiggleRoomColors.brand.opacity(0.5), style: style)
+            IconRingShape(ring: .inner, fitsRect: true, pronounced: true)
                 .trim(from: 0, to: 0.68)
-                .stroke(WiggleRoomColors.good.opacity(0.55), style: StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round))
+                .stroke(WiggleRoomColors.good.opacity(0.7), style: style)
+                .padding(size * 0.17)
         }
         .padding(line / 2)
         .frame(width: size, height: size)
