@@ -17,9 +17,6 @@ struct TrackerWidgetEntryView: View {
     var body: some View {
         if let tracker = entry.tracker {
             content(for: tracker)
-                // Dims the figures while a Refresh button's intent is
-                // running, so a tap visibly "takes".
-                .invalidatableContent()
                 .widgetURL(WiggleRoomDeepLink.url(forTrackerId: tracker.id))
         } else if entry.isLoading {
             loadingState
@@ -119,6 +116,7 @@ struct TrackerWidgetEntryView: View {
             }
             .frame(maxWidth: .infinity)
             Text(pace(for: tracker).displayDifference(for: tracker))
+                .contentTransition(.numericText())
                 .font(.wiggleNumber(.caption, weight: .bold))
                 .foregroundStyle(pace(for: tracker).status.color)
                 .lineLimit(1)
@@ -147,6 +145,7 @@ struct TrackerWidgetEntryView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(pace(for: tracker).displayDifference(for: tracker))
+                .contentTransition(.numericText())
                     .font(.wiggleNumber(.title3, weight: .bold))
                     .foregroundStyle(pace(for: tracker).status.color)
                     .lineLimit(1)
@@ -193,6 +192,7 @@ struct TrackerWidgetEntryView: View {
                         .tracking(0.5)
                         .foregroundStyle(p.status.color)
                     Text(p.displayDifference(for: tracker))
+                        .contentTransition(.numericText())
                         .font(.wiggleNumber(size: 30, weight: .bold))
                         .foregroundStyle(p.status.color)
                         .lineLimit(1)
@@ -228,6 +228,7 @@ struct TrackerWidgetEntryView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Text(value)
+                .contentTransition(.numericText())
                 .font(.wiggleNumber(.subheadline))
                 .foregroundStyle(color)
                 .lineLimit(1)

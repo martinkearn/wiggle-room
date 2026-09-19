@@ -3496,3 +3496,12 @@ and, at 56pt, by the widgets' "Loading data…" state (replacing the generic spi
 `WiggleEmptyState` (one ring around an SF Symbol), is unchanged. iOS, macOS and widget builds succeed; not
 viewed on a device.
 
+Follow-up: removed `.invalidatableContent()` from the widgets ([TrackerWidgetEntryView.swift](src/WiggleRoomWidgets/TrackerWidgetEntryView.swift)),
+added in the tweaks entry above as tap feedback. It made the whole widget flash/shimmer for as long as the
+refresh intent ran, and on a real device that never visibly ended — worse than no feedback. Replaced with
+`.contentTransition(.numericText())` on the difference/balance/target figures, so a changed number flips like
+the main screen's. **Not possible in a widget:** the main screen's ring drain-and-refill — WidgetKit only
+animates supported transitions between timeline entries (numeric text, symbol effects), not arbitrary
+`Shape` trims, so the rings simply redraw at their new fill. The flip only shows when a number actually
+changes. Widget build succeeds; not seen on a device.
+
