@@ -32,6 +32,68 @@ struct WatchTrackerDetailView: View {
         now = Date.now
     }
 
+    private var pace: TrackerPace {
+        tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
+    }
+
+    /// Pace pinned to the tracker's end date using the last logged reading —
+    /// the stable final figure once completed (same as the phone's `finalPace`).
+    private var finalPace: TrackerPace? {
+        guard let latest = tracker.latestReading else { return nil }
+        return tracker.pace(actualValue: latest.value, asOf: tracker.endDate)
+    }
+
+    private func card(tint: Color, title: String, value: Decimal, caption: String?) -> some View {
+        VStack(spacing: 2) {
+            Text(title)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text(tracker.formattedValue(value))
+                .font(.wiggleNumber(size: 22, weight: .bold))
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+            if let caption {
+                Text(caption)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(10)
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var figureCards: some View {
+        if tracker.isCompleted(asOf: now) {
+            let final = finalPace
+            card(
+                tint: (final?.status ?? .warning).color,
+                title: "Final \(tracker.currentValueLabel)",
+                value: final?.currentValue ?? tracker.startingValue,
+                caption: final.map { "\($0.statusLine(for: tracker)) \($0.displayDifference(for: tracker))" }
+            )
+        } else {
+            card(tint: pace.status.color, title: tracker.currentValueLabel,
+                 value: pace.currentValue, caption: pace.remainingInAllowanceCaption(for: tracker))
+            card(tint: WiggleRoomColors.paceRing, title: "Target Right Now",
+                 value: pace.targetValueToday,
+                 caption: "Final target will be \(tracker.formattedValue(tracker.projectedFinalValue))")
+            if tracker.sortedReadings.count > 1, let estimated = tracker.estimatedFinalValue {
+                let difference = tracker.estimatedFinalDifference ?? 0
+                card(
+                    tint: difference >= 0 ? WiggleRoomColors.good : WiggleRoomColors.bad,
+                    title: "Estimated Final Balance",
+                    value: estimated,
+                    caption: difference == 0
+                        ? "Right on target"
+                        : "Trending \(difference > 0 ? "under" : "over") target by \(tracker.formattedValue(abs(difference)))"
+                )
+            }
+        }
+    }
+
     var body: some View {
         // Same guard as the phone/Mac dashboard (`TrackerDetailView`) —
         // `tracker` is a direct object reference, and SwiftData's own
@@ -54,6 +116,20 @@ struct WatchTrackerDetailView: View {
 
                     RingsView(tracker: tracker, now: now, lineWidth: 8, showsStatusLabel: false)
                         .frame(width: 120, height: 120)
+
+                    figureCards
+
+                    Text(tracker.periodRemainingText(asOf: now))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    if tracker.latestReading == nil {
+                        Text("No readings logged yet — log one to see your pace.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
 
                     if !tracker.isCompleted(asOf: now) {
                         if tracker.isManualEntry {

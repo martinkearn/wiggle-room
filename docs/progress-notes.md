@@ -3440,3 +3440,11 @@ letters ("S" / "Sep") — noise at that size. Now the gauge arc (elapsed fractio
 holds only the difference figure, scaled down to fit (`minimumScaleFactor(0.5)`). Watch scheme
 builds; not viewed on a real watch face — long figures may still truncate.
 
+Follow-up: the watch detail screen ([WatchTrackerDetailView.swift](src/WiggleRoomWatch/WatchTrackerDetailView.swift))
+was just rings plus a button. It now scrolls through the same figure cards as the iPhone —
+Current Balance (with remaining-in-allowance caption), Target Right Now (with final-target caption),
+Estimated Final Balance (2+ readings), the period-remaining line, and a no-readings hint — or a
+single Final card once completed. Deliberately left out: the trend chart (`TrendChartView` lives in
+the iOS app's Views folder, not the watch target; moving it into shared code is a separate job) and
+reading history. Watch scheme builds; not viewed on a real watch, so card sizing is unchecked.
+
