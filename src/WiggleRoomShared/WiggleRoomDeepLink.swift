@@ -11,8 +11,8 @@ import Foundation
 /// the main app's `.onOpenURL`. Kept in one place so the two sides can never
 /// drift out of sync on the scheme/host/path shape.
 enum WiggleRoomDeepLink {
-    private static let scheme = "wiggleroom"
-    private static let trackerHost = "tracker"
+    private nonisolated static let scheme = "wiggleroom"
+    private nonisolated static let trackerHost = "tracker"
 
     nonisolated static func url(forTrackerId id: UUID) -> URL {
         URL(string: "\(scheme)://\(trackerHost)/\(id.uuidString)")!
