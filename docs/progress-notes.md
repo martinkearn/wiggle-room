@@ -3677,3 +3677,7 @@ Dropped "will be" from the Current Target card caption on iOS/macOS detail, the 
 ## 2026-09-19 Trend chart: time-scaled bottom axis
 
 [TrendChartView.swift](src/WiggleRoomShared/TrendChartView.swift)'s x-axis was just start/end dates. It now ticks in hours (tracker ≤ 1 day), days (≤ 7 days), weeks (≤ ~3 months) or months (longer), starting at the tracker's start and thinned to ≤ ~6 labels. Tick spacing was my reading of "weeks or month depending on duration" — the 92-day threshold is a judgement call. Not built or run.
+
+## 2026-09-19 Watch detail: Checked/Changed lines
+
+Audit of the recent detail-screen changes across apps: the "Current Target" rename, "Final target X" caption and time-scaled chart axis were already on every surface (iOS/macOS share `TrackerDetailView`; the watch uses the shared `TrendChartView`). Only "Checked / Changed" was missing on the watch, so [WatchTrackerDetailView.swift](src/WiggleRoomWatch/WatchTrackerDetailView.swift)'s balance card now shows them too (connected-source trackers only). Widgets are not detail screens and were left alone. Not built or run.

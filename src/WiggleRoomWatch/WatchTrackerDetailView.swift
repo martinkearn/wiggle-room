@@ -43,7 +43,14 @@ struct WatchTrackerDetailView: View {
         return tracker.pace(actualValue: latest.value, asOf: tracker.endDate)
     }
 
-    private func card(tint: Color, title: String, value: Decimal, caption: String?) -> some View {
+    /// Time only when it's today, otherwise date and time.
+    private static func timingText(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date)
+            ? date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func card(tint: Color, title: String, value: Decimal, caption: String?, showsSourceTiming: Bool = false) -> some View {
         VStack(spacing: 2) {
             Text(title)
                 .font(.caption2.weight(.medium))
@@ -57,6 +64,19 @@ struct WatchTrackerDetailView: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
+            }
+            if showsSourceTiming, !tracker.isManualEntry {
+                // Same "Checked / Changed" lines as the phone/Mac balance card.
+                VStack(spacing: 1) {
+                    if let checked = tracker.lastCheckedDate {
+                        Text("Checked \(Self.timingText(checked))")
+                    }
+                    if let changed = tracker.latestReading?.date {
+                        Text("Changed \(Self.timingText(changed))")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
             }
         }
         .frame(maxWidth: .infinity)
@@ -76,7 +96,8 @@ struct WatchTrackerDetailView: View {
             )
         } else {
             card(tint: pace.status.color, title: tracker.currentValueLabel,
-                 value: pace.currentValue, caption: pace.remainingInAllowanceCaption(for: tracker))
+                 value: pace.currentValue, caption: pace.remainingInAllowanceCaption(for: tracker),
+                 showsSourceTiming: true)
             card(tint: WiggleRoomColors.paceRing, title: "Current Target",
                  value: pace.targetValueToday,
                  caption: "Final target \(tracker.formattedValue(tracker.projectedFinalValue))")
