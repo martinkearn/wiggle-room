@@ -3611,3 +3611,9 @@ row should read "Tracker: Choose a tracker" until one is picked, then "Tracker: 
 builds succeed. **Not verified visually** — relies on the system showing the parameter title as the unset
 placeholder; if it shows something else, the fix is in those three intents.
 
+## 2026-09-19 More Siri phrases with a tracker name
+
+Added "What is/What's my <tracker> Wiggle Room" and "What is/What's my Wiggle Room in <tracker>" to
+`WiggleRoomShortcuts` and the Siri Phrases page. The app name is "Wiggle Room", so it doubles as the phrase's
+tail. iOS build succeeds; Siri resolution not tested on a device.
+

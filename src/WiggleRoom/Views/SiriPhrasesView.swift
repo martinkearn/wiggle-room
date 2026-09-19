@@ -33,6 +33,8 @@ struct SiriPhrasesView: View {
             title: "Check one tracker",
             footer: "Say the tracker's name exactly as it appears in the app.",
             phrases: [
+                "What is my Groceries Wiggle Room?",
+                "What is my Wiggle Room in Groceries?",
                 "How's Groceries in Wiggle Room?",
                 "Check Mileage in Wiggle Room",
             ]
