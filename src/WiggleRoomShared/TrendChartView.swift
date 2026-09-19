@@ -19,6 +19,10 @@ import Charts
 struct TrendChartView: View {
     let tracker: Tracker
     var now: Date = .now
+    /// Widgets are too small for the legend and axis labels; the shape is the
+    /// point there (§3.5), so they turn both off.
+    var showsLegend = true
+    var showsAxes = true
 
     private static let liveContinuationLineStyle = StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 4])
 
@@ -141,7 +145,7 @@ struct TrendChartView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             chart
-            if trendPoints != nil {
+            if showsLegend, trendPoints != nil {
                 legend
             }
         }
@@ -252,12 +256,16 @@ struct TrendChartView: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: [window.start, window.end]) { value in
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+            if showsAxes {
+                AxisMarks(values: [window.start, window.end]) { value in
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                }
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading)
+            if showsAxes {
+                AxisMarks(position: .leading)
+            }
         }
         .chartYScale(domain: yDomain)
     }

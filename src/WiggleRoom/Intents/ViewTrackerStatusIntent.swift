@@ -6,23 +6,35 @@
 import AppIntents
 import Foundation
 
-/// A quick, spoken/read status check via Siri/Shortcuts — "how am I doing
-/// on my mileage tracker?" — without opening the app. Read-only, unlike
-/// `LogReadingIntent`.
+/// A quick, spoken/read status check via Siri/Shortcuts — "what's my Wiggle
+/// Room?" — without opening the app. Read-only, unlike `LogReadingIntent`.
+/// With no tracker named it summarises every active tracker (or just the one,
+/// if there's only one); naming one ("how's Groceries in Wiggle Room") checks
+/// just that.
 struct ViewTrackerStatusIntent: AppIntent {
     static var title: LocalizedStringResource = "Check a Tracker"
-    static var description = IntentDescription("Reports a tracker's current pace against its target.")
+    static var description = IntentDescription("Reports how a tracker — or all of them — is doing against its target.")
 
     @Parameter(title: "Tracker")
-    var tracker: TrackerEntity
+    var tracker: TrackerEntity?
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let liveTracker = try IntentDataStore.fetchTracker(id: tracker.id) else {
-            return .result(dialog: "I couldn't find that tracker.")
+        let trackers: [Tracker]
+        if let tracker {
+            trackers = try IntentDataStore.fetchTracker(id: tracker.id).map { [$0] } ?? []
+        } else {
+            let all = try IntentDataStore.fetchAllTrackers()
+            let active = all.filter { !$0.isCompleted() }
+            trackers = active.isEmpty ? all : active
         }
-        let pace = liveTracker.pace(actualValue: liveTracker.latestReading?.value ?? liveTracker.startingValue)
-        let dialog = "\(liveTracker.name): \(pace.statusLine(for: liveTracker)) \(pace.displayDifference(for: liveTracker))."
-        return .result(dialog: IntentDialog(stringLiteral: dialog))
+        guard !trackers.isEmpty else {
+            return .result(dialog: "You don't have any trackers yet.")
+        }
+        let lines = trackers.map { tracker -> String in
+            let pace = tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue)
+            return "\(tracker.name): \(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))."
+        }
+        return .result(dialog: IntentDialog(stringLiteral: lines.joined(separator: " ")))
     }
 }

@@ -23,8 +23,13 @@ struct WiggleRoomShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: ViewTrackerStatusIntent(),
             phrases: [
-                "Check my tracker in \(.applicationName)",
+                "What's my \(.applicationName)",
+                "What is my \(.applicationName)",
+                "Check my \(.applicationName)",
                 "How am I doing in \(.applicationName)",
+                "Check my tracker in \(.applicationName)",
+                "How's \(\.$tracker) in \(.applicationName)",
+                "Check \(\.$tracker) in \(.applicationName)",
             ],
             shortTitle: "Check a Tracker",
             systemImageName: "circle.circle"

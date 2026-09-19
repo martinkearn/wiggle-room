@@ -3583,3 +3583,16 @@ cause not confirmed, no app-side fix shipped. Revisit if it reproduces on a rele
 ## 2026-09-19 Widget refresh button removed; Lock Screen rectangular widget copies the watch's
 
 The Home Screen widget refresh button wasn't working and isn't needed, so it's gone: `RefreshTrackerIntent.swift` (with `RefreshOutcome`) deleted, and the button/caption overlays removed from [TrackerWidgetEntryView.swift](src/WiggleRoomWidgets/TrackerWidgetEntryView.swift). The iOS wide Lock Screen (`accessoryRectangular`) widget now copies the watch's wide complication: rings on the left, tracker name (small) over the coloured above/below figure — priority rings, figure, name. Spec §8.5 interactive-widget bullet and README checklist updated. Not built or run — no xcodebuild/simulator this session.
+
+## 2026-09-19 Chart + All Trackers widgets, Siri "what's my Wiggle Room"
+
+New widgets in [TrackerChartWidget.swift](src/WiggleRoomWidgets/TrackerChartWidget.swift) and
+[AllTrackersWidget.swift](src/WiggleRoomWidgets/AllTrackersWidget.swift), registered in the bundle;
+`TrendChartView` gained `showsLegend`/`showsAxes` (defaults unchanged, so the app is unaffected).
+Siri: [ViewTrackerStatusIntent.swift](src/WiggleRoom/Intents/ViewTrackerStatusIntent.swift) now takes an
+optional tracker (nil = all active trackers, spoken as one summary) and
+[WiggleRoomShortcuts.swift](src/WiggleRoom/Intents/WiggleRoomShortcuts.swift) adds "What's my \(.applicationName)"
+and per-tracker phrases. Spec §8.5 updated. Verified: `xcodebuild build` succeeded for iOS and macOS.
+**Not verified**: how the widgets look at each size (grid/ring sizes are unvisited guesses), and that
+Siri actually resolves the new phrases (needs a device; phrases can take a while to register).
+
