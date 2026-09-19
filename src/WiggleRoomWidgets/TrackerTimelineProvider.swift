@@ -34,7 +34,7 @@ struct TrackerTimelineProvider: AppIntentTimelineProvider {
     @MainActor
     func snapshot(for configuration: SelectTrackerIntent, in context: Context) async -> TrackerTimelineEntry {
         let trackers = (try? WidgetDataStore.fetchAllTrackersImmediately()) ?? []
-        let tracker = configuration.tracker.flatMap { id in trackers.first { $0.id == id.id } } ?? trackers.first
+        let tracker = TrackerEntity.selectedId(configuration.tracker).flatMap { id in trackers.first { $0.id == id } } ?? trackers.first
         return TrackerTimelineEntry(date: .now, tracker: tracker, isLoading: tracker == nil)
     }
 
@@ -61,7 +61,7 @@ struct TrackerTimelineProvider: AppIntentTimelineProvider {
 
     @MainActor
     private func resolvedTracker(for configuration: SelectTrackerIntent) async -> Tracker? {
-        guard let id = configuration.tracker?.id else {
+        guard let id = TrackerEntity.selectedId(configuration.tracker) else {
             return try? await WidgetDataStore.fetchAllTrackers().first
         }
         return try? await WidgetDataStore.fetchTracker(id: id)

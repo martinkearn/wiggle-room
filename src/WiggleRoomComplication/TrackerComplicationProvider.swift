@@ -38,7 +38,7 @@ struct TrackerComplicationProvider: AppIntentTimelineProvider {
 
     @MainActor
     private func resolvedTracker(for configuration: SelectTrackerIntent) async -> Tracker? {
-        guard let id = configuration.tracker?.id else {
+        guard let id = TrackerEntity.selectedId(configuration.tracker) else {
             return try? await WidgetDataStore.fetchAllTrackers().first
         }
         return try? await WidgetDataStore.fetchTracker(id: id)

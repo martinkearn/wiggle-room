@@ -12,15 +12,9 @@ struct SelectTrackerControlIntent: ControlConfigurationIntent {
     static var title: LocalizedStringResource = "Choose a Tracker"
     static var description = IntentDescription("Choose which tracker this control shows.")
 
-    @Parameter(title: "Choose a tracker")
+    @Parameter(title: "Tracker", default: TrackerEntity.placeholder)
     var tracker: TrackerEntity?
 
-    /// Renders the picker row as "Tracker: <name>" — or "Tracker: Choose a
-    /// tracker" while nothing's selected (the parameter's own title is what
-    /// the system shows as the unset placeholder).
-    static var parameterSummary: some ParameterSummary {
-        Summary("Tracker: \(\.$tracker)")
-    }
 }
 
 /// A Control Center / Lock Screen control: the tracker's name with its
@@ -40,7 +34,7 @@ struct TrackerStatusControl: ControlWidget {
         @MainActor
         func currentValue(configuration: SelectTrackerControlIntent) async throws -> Value {
             let trackers = (try? WidgetDataStore.fetchAllTrackersImmediately()) ?? []
-            let tracker = configuration.tracker.flatMap { entity in trackers.first { $0.id == entity.id } } ?? trackers.first
+            let tracker = TrackerEntity.selectedId(configuration.tracker).flatMap { id in trackers.first { $0.id == id } } ?? trackers.first
             guard let tracker else { return previewValue(configuration: configuration) }
             let pace = tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue)
             return Value(

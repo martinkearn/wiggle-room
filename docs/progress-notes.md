@@ -3617,3 +3617,13 @@ Added "What is/What's my <tracker> Wiggle Room" and "What is/What's my Wiggle Ro
 `WiggleRoomShortcuts` and the Siri Phrases page. The app name is "Wiggle Room", so it doubles as the phrase's
 tail. iOS build succeeds; Siri resolution not tested on a device.
 
+## 2026-09-19 Tracker picker label is "Tracker" (supersedes the previous entry)
+
+The `parameterSummary` approach didn't change the row label — it's the parameter title, which was "Choose a
+tracker". The three configuration intents now title it "Tracker" and default it to
+`TrackerEntity.placeholder` (a zero-UUID entity named "Choose a tracker"), so an unset row should read
+"Tracker: Choose a tracker". `TrackerEntity.selectedId(_:)` maps the placeholder to "no selection" in the widget,
+control and complication providers (they fall back to the first tracker as before), and `entities(for:)` resolves
+the placeholder so the sheet doesn't show it blank. iOS and watchOS builds succeed; **not verified visually** — if
+the default doesn't render as hoped, the label is at least "Tracker" now.
+

@@ -15,6 +15,15 @@ struct TrackerEntity: AppEntity {
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "Tracker"
     static var defaultQuery = TrackerEntityQuery()
 
+    /// Stands in for "nothing chosen yet" so the picker row reads "Tracker:
+    /// Choose a tracker" — the row's label is the parameter title, which has
+    /// to be plain "Tracker". Never matches a real tracker; providers treat it
+    /// like no selection (`selectedId`).
+    static let placeholder = TrackerEntity(id: UUID(uuidString: "00000000-0000-0000-0000-000000000000")!, name: "Choose a tracker")
+    static func selectedId(_ entity: TrackerEntity?) -> UUID? {
+        entity.flatMap { $0.id == placeholder.id ? nil : $0.id }
+    }
+
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(name)")
     }
@@ -34,9 +43,10 @@ struct TrackerEntityQuery: EntityQuery {
     /// falling back to the unresolved placeholder instead.
     @MainActor
     func entities(for identifiers: [TrackerEntity.ID]) async throws -> [TrackerEntity] {
-        try await WidgetDataStore.fetchAllTrackersForConfiguration()
+        let real = try await WidgetDataStore.fetchAllTrackersForConfiguration()
             .filter { identifiers.contains($0.id) }
             .map { TrackerEntity(id: $0.id, name: $0.name) }
+        return identifiers.contains(TrackerEntity.placeholder.id) ? [TrackerEntity.placeholder] + real : real
     }
 
     @MainActor
@@ -53,13 +63,7 @@ struct SelectTrackerIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Choose a Tracker"
     static var description = IntentDescription("Choose which tracker this widget shows.")
 
-    @Parameter(title: "Choose a tracker")
+    @Parameter(title: "Tracker", default: TrackerEntity.placeholder)
     var tracker: TrackerEntity?
 
-    /// Renders the picker row as "Tracker: <name>" — or "Tracker: Choose a
-    /// tracker" while nothing's selected (the parameter's own title is what
-    /// the system shows as the unset placeholder).
-    static var parameterSummary: some ParameterSummary {
-        Summary("Tracker: \(\.$tracker)")
-    }
 }
