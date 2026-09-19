@@ -97,11 +97,11 @@ struct AddSourceView: View {
             // already has a free back button, so an explicit Cancel here
             // would just be redundant with it.
             #if os(macOS)
-            ToolbarItem(placement: .sheetCancel) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
             }
             #endif
-            ToolbarItem(placement: .sheetConfirm) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button {
                     Task { await connect() }
                 } label: {

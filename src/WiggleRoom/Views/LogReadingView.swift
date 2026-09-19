@@ -49,10 +49,10 @@ struct LogReadingView: View {
             .navigationTitle(existingReading == nil ? "Update Current Value" : "Edit Update")
             .inlineNavigationBarIfAvailable()
             .toolbar {
-                ToolbarItem(placement: .sheetCancel) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .sheetConfirm) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .disabled(Self.parseDecimal(valueText) == nil)
                 }
