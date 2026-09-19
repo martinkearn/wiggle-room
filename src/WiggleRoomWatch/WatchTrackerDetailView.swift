@@ -79,7 +79,7 @@ struct WatchTrackerDetailView: View {
                  value: pace.currentValue, caption: pace.remainingInAllowanceCaption(for: tracker))
             card(tint: WiggleRoomColors.paceRing, title: "Current Target",
                  value: pace.targetValueToday,
-                 caption: "Final target will be \(tracker.formattedValue(tracker.projectedFinalValue))")
+                 caption: "Final target \(tracker.formattedValue(tracker.projectedFinalValue))")
             if tracker.sortedReadings.count > 1, let estimated = tracker.estimatedFinalValue {
                 let difference = tracker.estimatedFinalDifference ?? 0
                 card(

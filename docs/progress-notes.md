@@ -3669,3 +3669,7 @@ with my change stashed, and it compiled earlier today, so something since then b
 ## 2026-09-19 "Target Right Now" → "Current Target"; tighter Checked/Changed spacing
 
 Renamed the label everywhere in app code (detail, watch, widgets, menu bar, rings) and the build spec; earlier progress-note entries keep the old wording as history. The Checked/Changed lines now sit in the same tight stack as the balance caption instead of being spaced like a separate card row. Not built or run.
+
+## 2026-09-19 Caption: "Final target will be X" → "Final target X"
+
+Dropped "will be" from the Current Target card caption on iOS/macOS detail, the watch detail and the extra-large widget. Not built or run.
