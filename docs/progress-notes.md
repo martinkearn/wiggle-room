@@ -3732,3 +3732,12 @@ Audit of every static/placeholder asset after the icon change. Only three asset 
 
 Caveat worth knowing: the inner ring in these empty states is faint green, a status colour, because it matches the icon; it doesn't imply pace here. Verified: iOS, macOS and watchOS schemes build (`CODE_SIGNING_ALLOWED=NO`). Not verified: none of the new empty states were run or screenshotted (in particular the macOS sidebar pane is narrow and the message wraps in `WiggleEmptyState`'s 40pt padding; the 32pt complication mark under watch tinting) — check those first. The widgets and complication extensions were built as dependencies only where their schemes embed them.
 
+
+## 2026-09-19 macOS: tracker rings no longer slide under the header
+
+Reported (screenshot): on macOS the top of the rings was clipped under the window header.
+Cause: the header is now three lines (name / date range / "connection · account"), taller
+than the toolbar safe-area allowance the dashboard `ScrollView` assumes. Fix, without
+touching the header: 32pt extra top padding on the dashboard `VStack` under `#if os(macOS)`
+in [TrackerDetailView.swift](src/WiggleRoom/Views/TrackerDetailView.swift). Verified in the
+running macOS app (screenshot: ring clear of the header). iOS unaffected.
