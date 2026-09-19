@@ -12,7 +12,10 @@ struct TrackerEntity: AppEntity {
     let id: UUID
     let name: String
 
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Tracker"
+    /// What the system falls back to showing in the picker's value while it
+    /// hasn't (or can't yet) resolve the selected entity — so "Choose a
+    /// tracker", never the bare type name.
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Choose a tracker"
     static var defaultQuery = TrackerEntityQuery()
 
     /// Stands in for "nothing chosen yet" so the picker row reads "Tracker:
@@ -43,6 +46,10 @@ struct TrackerEntityQuery: EntityQuery {
     /// falling back to the unresolved placeholder instead.
     @MainActor
     func entities(for identifiers: [TrackerEntity.ID]) async throws -> [TrackerEntity] {
+        // The placeholder needs no fetch — return it immediately so the picker
+        // never waits on (or fails with) a CloudKit-backed lookup just to
+        // say "Choose a tracker".
+        if identifiers == [TrackerEntity.placeholder.id] { return [TrackerEntity.placeholder] }
         let real = try await WidgetDataStore.fetchAllTrackersForConfiguration()
             .filter { identifiers.contains($0.id) }
             .map { TrackerEntity(id: $0.id, name: $0.name) }

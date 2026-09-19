@@ -3627,3 +3627,11 @@ control and complication providers (they fall back to the first tracker as befor
 the placeholder so the sheet doesn't show it blank. iOS and watchOS builds succeed; **not verified visually** — if
 the default doesn't render as hoped, the label is at least "Tracker" now.
 
+## 2026-09-19 Tracker picker value — third pass
+
+Label was right ("Tracker") but the dropdown *value* showed "Tracker": the system shows the entity's
+`typeDisplayRepresentation` whenever it can't resolve the selected entity, and the placeholder wasn't resolving
+(its lookup went through the slow CloudKit-backed fetch). Two fixes in both `SelectTrackerIntent.swift` files:
+the placeholder now resolves instantly without any fetch, and `typeDisplayRepresentation` itself is "Choose a
+tracker" so any unresolved state reads correctly too. iOS/watchOS builds succeed; not verified on device.
+
