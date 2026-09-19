@@ -3776,3 +3776,7 @@ Bugs found and fixed on the way: `ValueSnapshot` needed an explicit `Identifiabl
 ## 2026-09-19 Font/heading audit follow-up
 
 Audit of fonts against the design rule (Fraunces names things, Nunito everything else): widgets and the complication don't inherit the app's default font, so each entry view now sets Nunito itself; macOS window/toolbar titles can't take Fraunces, so the Mac tracker detail and sidebar now hide the toolbar title and draw Fraunces headings in the content (sidebar widened so names aren't truncated); the watch log screen got a Fraunces heading. Remaining OS-controlled exceptions: watchOS nav bar, system alerts, and SF Symbol glyphs. Builds succeed on iOS, macOS, watchOS, widgets and complication; Mac UI checked on the real Mac before the sidebar-width tweak.
+
+## 2026-09-19 Glyph set doubled to 24
+
+`TrackerPalette.glyphs` grew from 12 to 24 SF Symbols, grouped: money (£, $, €, banknote, card), getting around (car, bicycle, bus, fuel pump, plane), leisure (run, dumbbell, gamepad, popcorn, beach umbrella, coffee, fork-and-knife) and everyday (cart, drop, bag, house, star, heart, bolt). The 12 existing glyph names are unchanged, so saved trackers are unaffected. Every new name was checked to exist as an SF Symbol. iOS build succeeds; the picker wasn't re-screenshotted.

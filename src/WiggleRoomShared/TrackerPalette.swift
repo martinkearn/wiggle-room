@@ -47,9 +47,14 @@ enum TrackerPalette {
 
     /// Glyphs a tracker can wear on its badge (SF Symbols).
     static let glyphs: [String] = [
-        "cart.fill", "drop.fill", "cup.and.saucer.fill", "car.fill",
-        "airplane", "bag.fill", "fork.knife", "creditcard.fill",
-        "star.fill", "heart.fill", "house.fill", "bolt.fill",
+        // Money
+        "sterlingsign.circle.fill", "dollarsign.circle.fill", "eurosign.circle.fill", "banknote.fill", "creditcard.fill",
+        // Getting around
+        "car.fill", "bicycle", "bus.fill", "fuelpump.fill", "airplane",
+        // Leisure
+        "figure.run", "dumbbell.fill", "gamecontroller.fill", "popcorn.fill", "beach.umbrella.fill", "cup.and.saucer.fill", "fork.knife",
+        // Everyday
+        "cart.fill", "drop.fill", "bag.fill", "house.fill", "star.fill", "heart.fill", "bolt.fill",
     ]
 }
 
