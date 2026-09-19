@@ -338,3 +338,5 @@ Resolved (kept here for the record):
 <!-- Creating a connected-source tracker: reading 1 = user-entered starting value (dated at start); reading 2 = live source balance, fetched immediately (forced, even if equal). -->
 
 <!-- Tracker list order: Settings → Tracker Order (Newest/Oldest, Ending Soonest, Name A–Z/Z–A, Custom drag-reorder via synced Tracker.sortOrder). Per-device sort option; watch/menu bar unchanged. -->
+
+<!-- Detail screen, connected-source trackers: Current Balance card shows subtle "Checked" (Tracker.lastCheckedDate, any successful source fetch) and "Changed" (latest reading date) times; date included only when not today. -->

@@ -55,6 +55,12 @@ final class Tracker {
     /// than its neighbors — is independent of every other tracker's.
     var lastAutoFetchAttempt: Date?
 
+    /// When the source was last successfully asked for this tracker's
+    /// balance (by any refresh path), whether or not the value changed —
+    /// shown on the detail screen as "Checked". Set by
+    /// `TrackerStore.refreshFromSource`.
+    var lastCheckedDate: Date?
+
     /// Whether the "closed under budget/on track" celebration has already
     /// been shown for this tracker's completion — a one-shot flag so
     /// re-opening a long-finished tracker's dashboard doesn't replay the

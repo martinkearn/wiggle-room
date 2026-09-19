@@ -3651,3 +3651,7 @@ succeed; not seen on a device.
 ## 2026-09-19 Settings → Tracker Order
 
 New settings page ([TrackerOrderView.swift](src/WiggleRoom/Views/TrackerOrderView.swift); iOS Settings row, macOS Settings sidebar pane) to choose how the All Trackers list is sorted: Newest/Oldest First, Ending Soonest, Name A–Z/Z–A, or Custom (drag to reorder). Sorting lives in [TrackerOrdering.swift](src/WiggleRoomShared/State/TrackerOrdering.swift); `TrackerListView` and `MacRootView` sort in memory from the (renamed) `allTrackers` query. Custom order is a new synced `Tracker.sortOrder` (default 0, so new trackers tie with the first and land on top by start date); the chosen sort *option* is a per-device `@AppStorage`. The watch list and menu bar still use newest-first. Not built or run — a new SwiftData attribute with a default should migrate lightweight, but that is unverified.
+
+## 2026-09-19 Detail screen: "Checked" / "Changed" times on the balance card
+
+Connected-source trackers now show two subtle lines inside the Current Balance card ([TrackerDetailView.swift](src/WiggleRoom/Views/TrackerDetailView.swift)): "Checked <time>" (new synced `Tracker.lastCheckedDate`, set on every successful `refreshFromSource`, changed or not) and "Changed <time>" (the latest reading's date). Time only if today, otherwise date and time. Manual trackers show neither. A tracker never refreshed since this shipped shows only "Changed" until its next check. Not built or run.

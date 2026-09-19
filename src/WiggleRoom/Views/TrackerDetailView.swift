@@ -314,6 +314,9 @@ struct TrackerDetailView: View {
         HStack(alignment: .top, spacing: 12) {
             card(tint: pace.status.color) {
                 figureContent(title: tracker.currentValueLabel, value: pace.currentValue, caption: remainingInAllowanceCaption)
+                if !tracker.isManualEntry {
+                    sourceTimingLines
+                }
             }
 
             card(tint: WiggleRoomColors.paceRing) {
@@ -543,6 +546,30 @@ struct TrackerDetailView: View {
         guard difference != 0 else { return "Right on target" }
         let verb = difference > 0 ? "under" : "over"
         return "Trending \(verb) target by \(tracker.formattedValue(abs(difference)))"
+    }
+
+    /// Subtle "Checked / Changed" lines under the balance for a
+    /// connected-source tracker: when the source was last asked, and when
+    /// the balance last actually moved (the latest reading's date).
+    @ViewBuilder
+    private var sourceTimingLines: some View {
+        VStack(spacing: 1) {
+            if let checked = tracker.lastCheckedDate {
+                Text("Checked \(Self.timingText(checked))")
+            }
+            if let changed = tracker.latestReading?.date {
+                Text("Changed \(Self.timingText(changed))")
+            }
+        }
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+    }
+
+    /// Time only when it's today, otherwise date and time.
+    private static func timingText(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date)
+            ? date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(date: .abbreviated, time: .shortened)
     }
 
     private func figureContent(title: String, value: Decimal, caption: String? = nil) -> some View {

@@ -201,7 +201,11 @@ final class TrackerStore {
         else { return false }
         let target = SourceTarget(id: sourceTargetId, displayName: tracker.name)
         let value = try await provider.fetchCurrentValue(target: target)
-        guard force || value != tracker.latestReading?.value else { return false }
+        tracker.lastCheckedDate = .now
+        guard force || value != tracker.latestReading?.value else {
+            try? modelContext.save()
+            return false
+        }
         logReading(value: value, date: .now, for: tracker)
         return true
     }
