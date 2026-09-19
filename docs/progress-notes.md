@@ -3531,3 +3531,14 @@ Tracker sheet. Not reproduced; looks like the macOS system text-suggestion popup
 app UI. Best-guess fix in [AddTrackerView.swift](src/WiggleRoom/Views/AddTrackerView.swift):
 `.autocorrectionDisabled()` on the Name field under `#if os(macOS)`. **Not built or run**
 — no xcodebuild/simulator used, so neither change is verified; iOS unaffected.
+
+## 2026-09-19 macOS: sheet buttons in the top toolbar (replaces the flush-left title attempt)
+
+The custom flush-left title (commit 35d21c6) was reverted: it fought macOS conventions.
+The real cause of the "indented" title was that the leading toolbar space was empty,
+because `.cancellationAction`/`.confirmationAction` sheet buttons render in a bottom bar
+on macOS. New `ToolbarItemPlacement.sheetCancel`/`.sheetConfirm` in
+[View+PlatformHelpers.swift](src/WiggleRoom/Views/View+PlatformHelpers.swift) map to
+`.navigation`/`.primaryAction` on macOS (Cancel leading, Save trailing, native title
+between) and to the original placements on iOS. Used by Add/Edit Tracker, Log Reading and
+Add Source. Verified: macOS `xcodebuild` builds; **not visually checked**. iOS placements unchanged.

@@ -279,10 +279,10 @@ struct AddTrackerView: View {
             .formStyle(.grouped)
             .navigationTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .sheetCancel) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .sheetConfirm) {
                     Button("Save") { save() }
                         .disabled(!isValid || isSaving)
                 }

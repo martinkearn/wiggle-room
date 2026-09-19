@@ -26,3 +26,24 @@ extension View {
         #endif
     }
 }
+
+extension ToolbarItemPlacement {
+    /// macOS sheets put `.cancellationAction`/`.confirmationAction` buttons in
+    /// a bottom bar; these place them in the top toolbar instead (Cancel
+    /// leading, Save trailing, title in between). Unchanged on iOS.
+    static var sheetCancel: ToolbarItemPlacement {
+        #if os(macOS)
+        .navigation
+        #else
+        .cancellationAction
+        #endif
+    }
+
+    static var sheetConfirm: ToolbarItemPlacement {
+        #if os(macOS)
+        .primaryAction
+        #else
+        .confirmationAction
+        #endif
+    }
+}
