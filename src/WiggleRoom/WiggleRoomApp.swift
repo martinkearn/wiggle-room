@@ -53,7 +53,8 @@ struct WiggleRoomApp: App {
             modelContainer = localContainer
         }
 
-        _store = State(initialValue: TrackerStore(modelContext: modelContainer.mainContext))
+        let trackerStore = TrackerStore(modelContext: modelContainer.mainContext)
+        _store = State(initialValue: trackerStore)
         CloudSyncWidgetRefresher.start()
         NotificationActionHandler.shared.register()
         StarlingRequestLogger.configure(container: modelContainer)
@@ -75,6 +76,9 @@ struct WiggleRoomApp: App {
                 .environment(deepLinkRouter)
                 .environment(appCommands)
                 .tint(WiggleRoomColors.brand)
+                // Nunito as the app-wide default; Fraunces is applied
+                // explicitly to names and headlines.
+                .font(.wiggleText(.body))
                 .task { TrackerSpotlightIndexer.reindex() }
                 .onOpenURL { url in
                     deepLinkRouter.handle(url)
@@ -120,6 +124,7 @@ struct WiggleRoomApp: App {
         // icon-tab-bar TabView the same day, per explicit design direction.
         Settings {
             SettingsRootView()
+                .font(.wiggleText(.body))
                 .environment(store)
                 .modelContainer(modelContainer)
         }
@@ -128,6 +133,7 @@ struct WiggleRoomApp: App {
         #if os(macOS)
         MenuBarExtra {
             MenuBarStatusView()
+                .font(.wiggleText(.body))
                 .environment(store)
                 .modelContainer(modelContainer)
         } label: {

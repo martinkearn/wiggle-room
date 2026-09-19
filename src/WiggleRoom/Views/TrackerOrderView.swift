@@ -25,11 +25,18 @@ struct TrackerOrderView: View {
                 Text("Drag trackers to set your own order. It syncs to all your devices. New trackers appear at the top.")
             }
 
-            Section("Order") {
+            Section {
                 ForEach(TrackerOrdering.ordered(allTrackers)) { tracker in
-                    Text(tracker.name)
+                    HStack(spacing: 10) {
+                        TrackerBadge(tracker: tracker, size: 28)
+                        Text(tracker.name)
+                            .font(WiggleRoomFont.headline(16, weight: 650))
+                    }
                 }
                 .onMove(perform: move)
+            } header: {
+                Text("Order")
+                    .font(WiggleRoomFont.headline(15, weight: 650))
             }
         }
         #if os(macOS)

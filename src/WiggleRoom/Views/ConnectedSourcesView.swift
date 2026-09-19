@@ -49,7 +49,7 @@ struct ConnectedSourcesView: View {
     private var macBody: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Connected Sources")
-                .font(.title2.weight(.semibold))
+                .font(WiggleRoomFont.headline(22, weight: 650))
 
             if addedSources.isEmpty && !isAddingSource {
                 WiggleEmptyState(
@@ -195,12 +195,15 @@ struct ConnectedSourcesView: View {
     }
 
     private func row(for source: ConnectedSource) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(source.displayName)
-                .font(WiggleRoomFont.headline(17, weight: 600))
-            Text(source.providerId.capitalized)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        HStack(spacing: 12) {
+            ProviderBadge(providerId: source.providerId, size: 38)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(source.displayName)
+                    .font(WiggleRoomFont.headline(17, weight: 600))
+                Text(source.providerId.capitalized)
+                    .font(.wiggleText(.subheadline))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -287,16 +290,17 @@ private struct SourceEditorCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center, spacing: 10) {
+                ProviderBadge(providerId: source.providerId, size: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     TextField("Name", text: $source.displayName)
                         .textFieldStyle(.plain)
-                        .font(.headline)
+                        .font(WiggleRoomFont.headline(17, weight: 650))
                         .onChange(of: source.displayName) {
                             try? modelContext.save()
                         }
                     Text(source.providerId.capitalized)
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -310,7 +314,7 @@ private struct SourceEditorCard: View {
             }
 
             Text("Personal Access Token")
-                .font(.caption)
+                .font(.wiggleText(.caption))
                 .foregroundStyle(.secondary)
             // axis: .vertical grows the field to fit a token's real
             // length (Starling's are long strings) rather than scrolling
@@ -325,15 +329,15 @@ private struct SourceEditorCard: View {
             HStack {
                 if let errorMessage {
                     Text(errorMessage)
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(WiggleRoomColors.error)
                 } else if didUpdate {
                     Text("Token updated.")
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 } else {
                     Text("Generate a token at developer.starlingbank.com with account:read and balance:read scopes.")
-                        .font(.caption2)
+                        .font(.wiggleText(.caption2))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -356,7 +360,7 @@ private struct SourceEditorCard: View {
             }
         }
         .padding(14)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+        .background(.quinary, in: WobblyCard.shape(0, scale: 0.7))
         .task { await refreshStarlingCooldown() }
     }
 
@@ -372,19 +376,19 @@ private struct SourceEditorCard: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Starling Requests Today")
-                    .font(.caption)
+                    .font(WiggleRoomFont.cardLabel)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text("\(starlingRequestsToday) / \(StarlingRequestBudget.dailyLimit)")
-                    .font(.caption.weight(.medium))
+                    .font(.wiggleText(.caption, weight: .medium))
             }
             if let starlingCooldownUntil {
                 Text("Paused until \(starlingCooldownUntil.formatted(Self.timeFormatter)) after hitting Starling's rate limit.")
-                    .font(.caption2)
+                    .font(.wiggleText(.caption2))
                     .foregroundStyle(WiggleRoomColors.warning)
             } else {
                 Text(StarlingRequestBudget.requestCaption)
-                    .font(.caption2)
+                    .font(.wiggleText(.caption2))
                     .foregroundStyle(.tertiary)
             }
         }
@@ -403,7 +407,7 @@ private struct SourceEditorCard: View {
 
     private var connectionStatusBadge: some View {
         Label(isConnected ? "Connected" : "Not Connected", systemImage: isConnected ? "checkmark.circle.fill" : "exclamationmark.circle")
-            .font(.caption.weight(.medium))
+            .font(.wiggleText(.caption, weight: .medium))
             .foregroundStyle(isConnected ? WiggleRoomColors.good : WiggleRoomColors.warning)
     }
 
@@ -451,7 +455,7 @@ private struct NewSourceCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Add Source")
-                .font(.headline)
+                .font(WiggleRoomFont.headline(17, weight: 650))
 
             Picker("Type", selection: $kind) {
                 ForEach(Kind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -471,7 +475,7 @@ private struct NewSourceCard: View {
                 .textFieldStyle(.roundedBorder)
 
             Text("Personal Access Token")
-                .font(.caption)
+                .font(.wiggleText(.caption))
                 .foregroundStyle(.secondary)
             TextField("Paste a Personal Access Token", text: $token, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
@@ -481,12 +485,12 @@ private struct NewSourceCard: View {
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.caption)
+                    .font(.wiggleText(.caption))
                     .foregroundStyle(WiggleRoomColors.error)
             }
 
             Text("Generate a personal access token at developer.starlingbank.com with account:read and balance:read scopes.")
-                .font(.caption2)
+                .font(.wiggleText(.caption2))
                 .foregroundStyle(.secondary)
 
             HStack {
@@ -508,7 +512,7 @@ private struct NewSourceCard: View {
             }
         }
         .padding(14)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+        .background(.quinary, in: WobblyCard.shape(0, scale: 0.7))
     }
 
     private func connect() async {

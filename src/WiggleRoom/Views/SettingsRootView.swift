@@ -22,6 +22,15 @@ private enum SettingsPane: String, Hashable {
         }
     }
 
+    var colorIndex: Int {
+        switch self {
+        case .general: 2
+        case .connectedSources: 3
+        case .order: 1
+        case .siri: 4
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .general: "gearshape"
@@ -50,7 +59,7 @@ struct SettingsRootView: View {
         HStack(spacing: 0) {
             List(selection: $selection) {
                 ForEach([SettingsPane.general, .connectedSources, .order, .siri], id: \.self) { pane in
-                    Label(pane.label, systemImage: pane.systemImage)
+                    SettingsLabel(title: pane.label, symbol: pane.systemImage, colorIndex: pane.colorIndex, size: 24)
                         .tag(pane)
                 }
             }

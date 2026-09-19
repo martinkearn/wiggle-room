@@ -154,40 +154,54 @@ private struct TrackerRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            RingsView(tracker: tracker, now: now, lineWidth: 6, showsCenterContent: false)
-                .frame(width: 46, height: 46)
+        HStack(spacing: 12) {
+            TrackerBadge(tracker: tracker, size: 42)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(tracker.name)
-                        .font(WiggleRoomFont.headline(18, weight: 650))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    if tracker.isCompleted(asOf: now) {
-                        CompletedBadge()
-                    }
-                }
-                if tracker.latestReading != nil {
-                    Text("\(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))")
-                        .font(.wiggleNumber(.subheadline))
-                        .foregroundStyle(status.color)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                Text(tracker.name)
+                    .font(WiggleRoomFont.headline(18, weight: 650))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                if tracker.isCompleted(asOf: now) {
+                    CompletedBadge()
                 } else {
-                    Text("No data yet")
-                        .font(.subheadline)
+                    Text(tracker.periodRemainingText(asOf: now))
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
 
             Spacer(minLength: 0)
+
+            RingsView(tracker: tracker, now: now, lineWidth: 6, showsCenterContent: false)
+                .frame(width: 42, height: 42)
+
+            if tracker.latestReading != nil {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(pace.statusLine(for: tracker))
+                        .font(.wiggleText(.caption2))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(pace.displayDifference(for: tracker))
+                        .font(.wiggleNumber(.subheadline, weight: .bold))
+                        .foregroundStyle(status.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .frame(minWidth: 76, alignment: .trailing)
+            } else {
+                Text("No data yet")
+                    .font(.wiggleText(.caption))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(14)
-        .background(status.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .trackerCard(tracker)
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(status.color.opacity(0.16), lineWidth: 1)
+            WobblyCard.shape()
+                .strokeBorder(tracker.accentColor.opacity(0.18), lineWidth: 1)
         )
     }
 }
@@ -211,7 +225,7 @@ private struct AddTrackerRow: View {
                         .padding(2.5/2)
                         .frame(width: 46, height: 46)
                     Image(systemName: "plus")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.wiggleText(size: 17, weight: .semibold))
                         .foregroundStyle(WiggleRoomColors.brand)
                 }
 
@@ -222,9 +236,9 @@ private struct AddTrackerRow: View {
                 Spacer(minLength: 0)
             }
             .padding(14)
-            .background(WiggleRoomColors.brand.opacity(0.06), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(WiggleRoomColors.brand.opacity(0.06), in: WobblyCard.shape(1))
             .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                WobblyCard.shape(1)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
                     .foregroundStyle(WiggleRoomColors.brand.opacity(0.3))
             )
@@ -261,7 +275,7 @@ private struct EmptyTrackersView: View {
                 isPresentingAddTracker = true
             } label: {
                 Label("Add a Tracker", systemImage: "plus")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.wiggleText(.subheadline, weight: .semibold))
                     .padding(.horizontal, 8)
             }
             .buttonStyle(.borderedProminent)

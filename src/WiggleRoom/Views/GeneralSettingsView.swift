@@ -28,7 +28,7 @@ struct GeneralSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("General")
-                .font(.title2.weight(.semibold))
+                .font(WiggleRoomFont.headline(22, weight: 650))
 
             if trackers.isEmpty {
                 Text("Add a tracker to choose one for the menu bar.")
@@ -54,7 +54,7 @@ struct GeneralSettingsView: View {
                         .frame(width: 240)
                     }
                     Text("Choose which tracker's rings and figures appear in the menu bar dropdown.")
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -88,13 +88,13 @@ struct GeneralSettingsView: View {
     private var dangerZoneSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Danger Zone")
-                .font(.caption.weight(.semibold))
+                .font(WiggleRoomFont.headline(15, weight: 650))
                 .foregroundStyle(WiggleRoomColors.error)
             Button("Reset App Data…", role: .destructive) {
                 isPresentingResetConfirmation = true
             }
             Text("Permanently deletes every tracker, reading, and connected source — synced to every device. Cannot be undone.")
-                .font(.caption)
+                .font(.wiggleText(.caption))
                 .foregroundStyle(.secondary)
         }
     }
@@ -105,7 +105,7 @@ struct GeneralSettingsView: View {
     private var buildInfoSection: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Build \(AppBuildInfo.gitCommitDescription)")
-                .font(.caption)
+                .font(.wiggleText(.caption))
                 .foregroundStyle(.secondary)
         }
     }

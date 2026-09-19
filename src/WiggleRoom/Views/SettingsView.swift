@@ -29,17 +29,17 @@ struct SettingsView: View {
                     NavigationLink {
                         ConnectedSourcesView()
                     } label: {
-                        Label("Connected Sources", systemImage: "point.3.filled.connected.trianglepath.dotted")
+                        SettingsLabel(title: "Connected Sources", symbol: "point.3.filled.connected.trianglepath.dotted", colorIndex: 3)
                     }
                     NavigationLink {
                         TrackerOrderView()
                     } label: {
-                        Label("Tracker Order", systemImage: "arrow.up.arrow.down")
+                        SettingsLabel(title: "Tracker Order", symbol: "arrow.up.arrow.down", colorIndex: 1)
                     }
                     NavigationLink {
                         SiriPhrasesView()
                     } label: {
-                        Label("Siri Phrases", systemImage: "waveform")
+                        SettingsLabel(title: "Siri Phrases", symbol: "waveform", colorIndex: 4)
                     }
                 }
 
@@ -49,6 +49,7 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Danger Zone")
+                        .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
                     // Same reasoning as macOS's copy of this feature
                     // (`GeneralSettingsView`) — see `TrackerStore
@@ -63,7 +64,7 @@ struct SettingsView: View {
                     // why this is a git commit hash, not a build date/time
                     // or version number.
                     LabeledContent("Build", value: AppBuildInfo.gitCommitDescription)
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 }
             }

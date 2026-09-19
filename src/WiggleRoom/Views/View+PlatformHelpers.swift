@@ -37,7 +37,7 @@ extension View {
             .toolbar(removing: .title)
             .safeAreaInset(edge: .top, spacing: 0) {
                 Text(title)
-                    .font(.title2.weight(.semibold))
+                    .font(WiggleRoomFont.headline(22, weight: 650))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 30)
                     .padding(.top, 16)

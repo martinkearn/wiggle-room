@@ -50,6 +50,16 @@ struct AddSourceView: View {
     var body: some View {
         Form {
             Section {
+                HStack(spacing: 12) {
+                    ProviderBadge(providerId: existingSource?.providerId ?? "starling", size: 46)
+                    Text("Starling")
+                        .font(WiggleRoomFont.headline(22, weight: 650))
+                    Spacer()
+                }
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
                 TextField("Name", text: $displayName)
                 if let existingSource {
                     connectionStatusRow(for: existingSource)
@@ -65,7 +75,8 @@ struct AddSourceView: View {
                     #endif
                     .autocorrectionDisabled()
             } header: {
-                Text("Starling")
+                Text("Details")
+                    .font(WiggleRoomFont.headline(15, weight: 650))
             } footer: {
                 Text(tokenFieldFooter)
             }
@@ -137,7 +148,7 @@ struct AddSourceView: View {
     private func connectionStatusRow(for source: ConnectedSource) -> some View {
         let isConnected = !(source.credentialToken ?? "").isEmpty
         return Label(isConnected ? "Connected" : "Not Connected", systemImage: isConnected ? "checkmark.circle.fill" : "exclamationmark.circle")
-            .font(.subheadline.weight(.medium))
+            .font(.wiggleText(.subheadline, weight: .medium))
             .foregroundStyle(isConnected ? WiggleRoomColors.good : WiggleRoomColors.warning)
     }
 
@@ -156,13 +167,14 @@ struct AddSourceView: View {
         Section {
             HStack {
                 Text("Starling Requests Today")
+                    .font(WiggleRoomFont.cardLabel)
                 Spacer()
                 Text("\(starlingRequestsToday) / \(StarlingRequestBudget.dailyLimit)")
                     .foregroundStyle(.secondary)
             }
             if let starlingCooldownUntil {
                 Text("Paused until \(starlingCooldownUntil.formatted(Self.timeFormatter)) after hitting Starling's rate limit.")
-                    .font(.caption)
+                    .font(.wiggleText(.caption))
                     .foregroundStyle(WiggleRoomColors.warning)
             }
         } footer: {

@@ -58,6 +58,9 @@ struct AddTrackerView: View {
     @State private var includesTime = false
     @State private var startingValueText = ""
     @State private var totalAllowanceText = ""
+    @State private var colorIndex = 0
+    @State private var glyph = ""
+    @Query private var allTrackers: [Tracker]
 
     @State private var sourceSelection: SourceOption?
     @State private var isShowingAddSource = false
@@ -114,9 +117,16 @@ struct AddTrackerView: View {
                     .pickerStyle(.segmented)
                 } header: {
                     Text("Details")
+                        .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
                     Text("Choose the unit this tracker is measured in.")
                 }
+
+                TrackerAppearancePicker(
+                    colorIndex: $colorIndex,
+                    glyph: $glyph,
+                    defaultGlyph: Tracker.isCurrencyUnit(unit) ? "creditcard.fill" : "gauge.with.dots.needle.33percent"
+                )
 
                 Section {
                     let components: DatePicker.Components = includesTime ? [.date, .hourAndMinute] : [.date]
@@ -133,6 +143,7 @@ struct AddTrackerView: View {
                         }
                 } header: {
                     Text("Period")
+                        .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
                     Text("Off by default — the period runs from midnight to midnight. Turn this on to start or end at a specific time instead.")
                 }
@@ -146,11 +157,11 @@ struct AddTrackerView: View {
                             ProgressView()
                             Text("Fetching live balance…")
                         }
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                     } else {
                         Text(startingValueHint)
-                            .font(.caption)
+                            .font(.wiggleText(.caption))
                             .foregroundStyle(.secondary)
                     }
 
@@ -158,26 +169,27 @@ struct AddTrackerView: View {
                         unitValueField(text: $totalAllowanceText, field: .totalAllowance)
                     }
                     Text(totalBudgetHint)
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
 
                     if let hourlyPaceDescription {
                         Text(hourlyPaceDescription)
-                            .font(.footnote)
+                            .font(.wiggleText(.footnote))
                             .foregroundStyle(.secondary)
                     }
                     if let dailyPaceDescription {
                         Text(dailyPaceDescription)
-                            .font(.footnote)
+                            .font(.wiggleText(.footnote))
                             .foregroundStyle(.secondary)
                     }
                     if let remainingAtEndDescription {
                         Text(remainingAtEndDescription)
-                            .font(.footnote.weight(.medium))
+                            .font(.wiggleText(.footnote, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("Budget")
+                        .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
                     Text(budgetFooter)
                 }
@@ -235,6 +247,7 @@ struct AddTrackerView: View {
                         }
                     } header: {
                         Text("Reminder")
+                            .font(WiggleRoomFont.headline(15, weight: 650))
                     } footer: {
                         Text("Get a local notification reminding you to log a new reading on this cadence.")
                     }
@@ -302,8 +315,14 @@ struct AddTrackerView: View {
                     totalAllowanceText = existingTracker.totalAllowance.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                     sourceSelection = .source(existingTracker.connectedSource?.id ?? store.manualEntrySource.id)
                     reminderCadenceMinutes = existingTracker.reminderCadenceMinutes
+                    colorIndex = existingTracker.resolvedColorIndex
+                    glyph = existingTracker.glyph
                     await resolveAccountNameIfNeeded(for: existingTracker)
                 } else if sourceSelection == nil {
+                    // New trackers start on the first colour no other tracker
+                    // is using, so a list fills with distinct colours.
+                    let used = Set(allTrackers.map(\.resolvedColorIndex))
+                    colorIndex = TrackerPalette.all.indices.first { !used.contains($0) } ?? (allTrackers.count % TrackerPalette.all.count)
                     sourceSelection = .source(store.manualEntrySource.id)
                 }
             }
@@ -362,6 +381,7 @@ struct AddTrackerView: View {
             }
         } header: {
             Text("Account")
+                .font(WiggleRoomFont.headline(15, weight: 650))
         } footer: {
             Text("Which account within this source this tracker reads its balance from.")
         }
@@ -452,7 +472,7 @@ struct AddTrackerView: View {
                         unit = symbol
                     } label: {
                         Text(symbol)
-                            .font(.subheadline.weight(.medium))
+                            .font(.wiggleText(.subheadline, weight: .medium))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 6)
                             .background(unit == symbol ? WiggleRoomColors.brand : Color.secondary.opacity(0.15), in: Capsule())
@@ -653,6 +673,8 @@ struct AddTrackerView: View {
         if let existingTracker {
             existingTracker.name = trimmedName
             existingTracker.unit = trimmedUnit
+            existingTracker.colorIndex = colorIndex
+            existingTracker.glyph = glyph
             existingTracker.direction = direction
             existingTracker.startDate = startDate
             existingTracker.endDate = endDate
@@ -701,6 +723,8 @@ struct AddTrackerView: View {
             totalAllowance: totalAllowance,
             reminderCadenceMinutes: reminderCadenceMinutes
         )
+        tracker.colorIndex = colorIndex
+        tracker.glyph = glyph
         store.addTracker(tracker)
         // Seed the reading history with the starting value itself, dated at
         // the tracker's own start — otherwise a brand new tracker shows "No

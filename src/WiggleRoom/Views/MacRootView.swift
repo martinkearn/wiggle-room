@@ -143,7 +143,7 @@ private struct AddTrackerRow: View {
                         .padding(2/2)
                         .frame(width: 28, height: 28)
                     Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.wiggleText(size: 11, weight: .semibold))
                         .foregroundStyle(WiggleRoomColors.brand)
                 }
                 Text("Add Tracker")
@@ -166,23 +166,23 @@ private struct MacTrackerRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            RingsView(tracker: tracker, now: now, lineWidth: 4, showsCenterContent: false)
-                .frame(width: 28, height: 28)
+            TrackerBadge(tracker: tracker, size: 30)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(tracker.name)
+                        .font(WiggleRoomFont.headline(15, weight: 650))
                     if tracker.isCompleted(asOf: now) {
                         CompletedBadge()
                     }
                 }
                 if tracker.latestReading != nil {
                     Text("\(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))")
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(pace.status.color)
                         .lineLimit(1)
                 } else {
                     Text("No data yet")
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 }
             }

@@ -27,6 +27,16 @@ struct LogReadingView: View {
         NavigationStack {
             Form {
                 Section {
+                    HStack(spacing: 12) {
+                        TrackerBadge(tracker: tracker, size: 36)
+                        Text(tracker.name)
+                            .font(WiggleRoomFont.headline(18, weight: 650))
+                        Spacer()
+                    }
+                    .listRowBackground(tracker.accentColor.opacity(0.10))
+                }
+
+                Section {
                     valueInput
                         .listRowInsets(EdgeInsets())
                         .padding(.vertical, 12)

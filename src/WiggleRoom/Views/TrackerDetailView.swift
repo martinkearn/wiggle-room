@@ -148,6 +148,17 @@ struct TrackerDetailView: View {
 
                 RingsView(tracker: tracker, now: now)
                     .frame(width: 260, height: 260)
+                    .padding(.vertical, 18)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        WobblyCard.shape(1, scale: 1.3).fill(
+                            RadialGradient(
+                                colors: [tracker.accentColor.opacity(0.22), tracker.accentColor.opacity(0.05)],
+                                center: .center, startRadius: 30, endRadius: 240
+                            )
+                        )
+                    )
+                    .padding(.horizontal)
 
                 if isCompleted {
                     completedSummary
@@ -160,25 +171,27 @@ struct TrackerDetailView: View {
 
                 if let refreshErrorMessage {
                     Text(refreshErrorMessage)
-                        .font(.caption)
+                        .font(.wiggleText(.caption))
                         .foregroundStyle(WiggleRoomColors.error)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
 
                 Text(periodRemainingText)
-                    .font(.caption)
+                    .font(.wiggleText(.caption))
                     .foregroundStyle(.secondary)
 
                 if tracker.latestReading == nil {
                     Text("No readings logged yet — log one to see your pace.")
-                        .font(.footnote)
+                        .font(.wiggleText(.footnote))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 } else if tracker.sortedReadings.count > 1 {
                     TrendChartView(tracker: tracker, now: now)
                         .frame(height: 240)
+                        .padding(14)
+                        .trackerCard(tracker, variant: 1, strength: 0.08)
                         .padding(.horizontal)
                 }
             }
@@ -314,7 +327,7 @@ struct TrackerDetailView: View {
                               captions: [remainingInAllowanceCaption].compactMap { $0 } + sourceTimingCaptions)
             }
 
-            card(tint: WiggleRoomColors.paceRing) {
+            card(tint: tracker.accentColor, variant: 1) {
                 figureContent(title: "Current Budget", value: pace.targetValueToday, captions: [totalBudgetCaption, finalBalanceCaption, estimatedFinalCaption].compactMap { $0 })
             }
             // A little "just updated" flourish when a new reading lands —
@@ -457,7 +470,7 @@ struct TrackerDetailView: View {
     /// actually performs for this tracker.
     private var pullToUpdateHint: some View {
         Label("Pull down to \(tracker.isManualEntry ? "update" : "refresh")", systemImage: "arrow.down")
-            .font(.caption2)
+            .font(.wiggleText(.caption2))
             .foregroundStyle(.secondary)
     }
     #else
@@ -478,7 +491,7 @@ struct TrackerDetailView: View {
                 tracker.isManualEntry ? "Update Current Balance" : "Refresh",
                 systemImage: tracker.isManualEntry ? "plus.circle.fill" : "arrow.clockwise"
             )
-            .font(.subheadline.weight(.semibold))
+            .font(.wiggleText(.subheadline, weight: .semibold))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
         }
@@ -491,16 +504,16 @@ struct TrackerDetailView: View {
     }
     #endif
 
-    private func card(tint: Color, @ViewBuilder content: () -> some View) -> some View {
+    private func card(tint: Color, variant: Int = 0, @ViewBuilder content: () -> some View) -> some View {
         VStack(spacing: 12) {
             content()
         }
         .frame(maxWidth: .infinity)
         .padding(16)
-        .background(tint.opacity(0.09), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(tint.opacity(0.10), in: WobblyCard.shape(variant))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(tint.opacity(0.18), lineWidth: 1)
+            WobblyCard.shape(variant)
+                .strokeBorder(tint.opacity(0.20), lineWidth: 1)
         )
     }
 
@@ -552,7 +565,7 @@ struct TrackerDetailView: View {
     private func figureContent(title: String, value: Decimal, captions: [String] = []) -> some View {
         VStack(spacing: 4) {
             Text(title)
-                .font(.caption.weight(.medium))
+                .font(WiggleRoomFont.cardLabel)
                 .foregroundStyle(.secondary)
             Text(tracker.formattedValue(value))
                 .font(.wiggleNumber(size: 24, weight: .bold))
@@ -563,7 +576,7 @@ struct TrackerDetailView: View {
             VStack(spacing: 2) {
                 ForEach(captions, id: \.self) { line in
                     Text(line)
-                        .font(.caption2)
+                        .font(.wiggleText(.caption2))
                         .foregroundStyle(.tertiary)
                 }
             }

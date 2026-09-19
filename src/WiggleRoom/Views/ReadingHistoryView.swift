@@ -114,7 +114,10 @@ struct ReadingHistoryView: View {
     }
 
     private func rowContent(for reading: ValueSnapshot) -> some View {
-        HStack {
+        HStack(spacing: 10) {
+            BlobShape(seed: Double(tracker.resolvedColorIndex))
+                .fill(tracker.accentColor)
+                .frame(width: 10, height: 10)
             Text(reading.date.formatted(date: .abbreviated, time: .shortened))
                 .foregroundStyle(.primary)
             Spacer()

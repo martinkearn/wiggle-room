@@ -52,16 +52,20 @@ struct SiriPhrasesView: View {
     var body: some View {
         #if os(macOS)
         VStack(alignment: .leading, spacing: 20) {
-            Text("Siri").font(.title2.weight(.semibold))
+            Text("Siri").font(WiggleRoomFont.headline(22, weight: 650))
             Text("Say \"Hey Siri\" followed by any of these.")
                 .foregroundStyle(.secondary)
             ForEach(groups) { group in
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(group.title).font(.headline)
+                    Text(group.title).font(WiggleRoomFont.headline(17, weight: 650))
                     ForEach(group.phrases, id: \.self) { phrase in
-                        Label("“\(phrase)”", systemImage: "waveform")
+                        Label {
+                            Text("“\(phrase)”")
+                        } icon: {
+                            Image(systemName: "waveform").foregroundStyle(TrackerPalette.color(at: 4))
+                        }
                     }
-                    Text(group.footer).font(.caption).foregroundStyle(.secondary)
+                    Text(group.footer).font(.wiggleText(.caption)).foregroundStyle(.secondary)
                 }
             }
         }
@@ -74,10 +78,15 @@ struct SiriPhrasesView: View {
             ForEach(groups) { group in
                 Section {
                     ForEach(group.phrases, id: \.self) { phrase in
-                        Label("“\(phrase)”", systemImage: "waveform")
+                        Label {
+                            Text("“\(phrase)”")
+                        } icon: {
+                            Image(systemName: "waveform").foregroundStyle(TrackerPalette.color(at: 4))
+                        }
                     }
                 } header: {
                     Text(group.title)
+                        .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
                     Text(group.footer)
                 }

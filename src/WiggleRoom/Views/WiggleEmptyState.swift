@@ -25,7 +25,7 @@ struct WiggleEmptyState: View {
             ZStack {
                 EmptyRingsMark(size: 120)
                 Image(systemName: symbol)
-                    .font(.system(size: 34, weight: .medium))
+                    .font(.wiggleText(size: 34, weight: .medium))
                     .foregroundStyle(WiggleRoomColors.brand)
             }
             .padding(.bottom, 4)
@@ -43,7 +43,7 @@ struct WiggleEmptyState: View {
             if let actionTitle, let action {
                 Button(action: action) {
                     Label(actionTitle, systemImage: "plus")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.wiggleText(.subheadline, weight: .semibold))
                         .padding(.horizontal, 8)
                 }
                 .buttonStyle(.borderedProminent)

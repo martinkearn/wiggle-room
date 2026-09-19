@@ -11,17 +11,20 @@ import SwiftUI
 struct AddSourcePickerView: View {
     var body: some View {
         List {
-            Section("Choose a Source Type") {
+            Section {
                 NavigationLink {
                     AddSourceView()
                 } label: {
-                    Label("Starling", systemImage: "creditcard")
+                    SettingsLabel(title: "Starling", symbol: "creditcard.fill", colorIndex: 2)
                 }
                 NavigationLink {
                     TeslaComingSoonView()
                 } label: {
-                    Label("Tesla", systemImage: "bolt.car")
+                    SettingsLabel(title: "Tesla", symbol: "bolt.car.fill", colorIndex: 5)
                 }
+            } header: {
+                Text("Choose a Source Type")
+                    .font(WiggleRoomFont.headline(15, weight: 650))
             }
         }
         .navigationTitle("Add Source")
@@ -31,10 +34,10 @@ struct AddSourcePickerView: View {
 
 struct TeslaComingSoonView: View {
     var body: some View {
-        ContentUnavailableView(
-            "Tesla — Coming Soon",
-            systemImage: "bolt.car",
-            description: Text("Tesla support isn't available yet.")
+        WiggleEmptyState(
+            symbol: "bolt.car.fill",
+            title: "Tesla — Coming Soon",
+            message: "Tesla support isn't available yet."
         )
         .navigationTitle("Tesla")
         .inlineNavigationBarIfAvailable()

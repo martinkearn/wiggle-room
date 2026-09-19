@@ -40,9 +40,9 @@ struct CelebrationView: View {
 
             ConfettiView(colors: [
                 WiggleRoomColors.good,
-                WiggleRoomColors.brand,
+                tracker.accentColor,
                 WiggleRoomColors.brandWarm,
-                WiggleRoomColors.paceRing,
+                tracker.accentColor.opacity(0.6),
             ])
             .allowsHitTesting(false)
             .opacity(isAnimating ? 1 : 0)
@@ -50,11 +50,11 @@ struct CelebrationView: View {
             VStack(spacing: 18) {
                 ZStack {
                     IconRingShape(ring: .outer, fitsRect: true)
-                        .fill(WiggleRoomColors.good.opacity(0.16))
+                        .fill(tracker.accentColor.opacity(0.22))
                         .frame(width: 132, height: 132)
                         .scaleEffect(isAnimating ? 1 : 0.4)
                     Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 64, weight: .bold))
+                        .font(.wiggleText(size: 64, weight: .bold))
                         .foregroundStyle(WiggleRoomColors.good)
                         .symbolEffect(.bounce, value: isAnimating)
                 }
@@ -75,11 +75,11 @@ struct CelebrationView: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
-                .tint(WiggleRoomColors.good)
+                .tint(tracker.accentColor)
                 .padding(.top, 6)
             }
             .padding(28)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .background(.thinMaterial, in: WobblyCard.shape(1, scale: 1.3))
             .padding(.horizontal, 32)
             .scaleEffect(isAnimating ? 1 : 0.75)
             .opacity(isAnimating ? 1 : 0)

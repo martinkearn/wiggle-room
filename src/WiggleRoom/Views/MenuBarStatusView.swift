@@ -57,10 +57,13 @@ struct MenuBarStatusView: View {
         VStack(spacing: 0) {
             if let tracker, let pace {
                 VStack(spacing: 12) {
-                    Text(tracker.name)
-                        .font(.headline)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    HStack(spacing: 8) {
+                        TrackerBadge(tracker: tracker, size: 26)
+                        Text(tracker.name)
+                            .font(WiggleRoomFont.headline(17, weight: 650))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
 
                     // showsStatusLabel: false — the status word ("JUST OVER
                     // BUDGET") is redundant here since it's repeated in the
@@ -69,19 +72,32 @@ struct MenuBarStatusView: View {
                     // so it stays.
                     RingsView(tracker: tracker, now: PaceClock.shared.now, lineWidth: 14, showsStatusLabel: false)
                         .frame(width: 132, height: 132)
+                        .padding(8)
+                        .background(
+                            Circle().fill(RadialGradient(
+                                colors: [tracker.accentColor.opacity(0.24), .clear],
+                                center: .center, startRadius: 20, endRadius: 100
+                            ))
+                        )
                     VStack(spacing: 6) {
                         HStack {
                             Text(tracker.currentValueLabel)
+                                .font(WiggleRoomFont.cardLabel)
                             Spacer()
                             Text(tracker.formattedValue(pace.currentValue))
+                                .font(.wiggleNumber(size: 13, weight: .bold))
+                                .foregroundStyle(pace.status.color)
                         }
                         HStack {
                             Text("Current Budget")
+                                .font(WiggleRoomFont.cardLabel)
                             Spacer()
                             Text(tracker.formattedValue(pace.targetValueToday))
+                                .font(.wiggleNumber(size: 13, weight: .bold))
                         }
                     }
-                    .font(.system(size: 12))
+                    .padding(10)
+                    .trackerCard(tracker, variant: 1)
                 }
                 .padding(16)
             } else {
