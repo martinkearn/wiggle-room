@@ -24,7 +24,7 @@ enum WiggleRoomFont {
     static func registerIfNeeded() {
         guard !hasRegistered else { return }
         hasRegistered = true
-        for resource in ["Fraunces", "Fraunces-Italic"] {
+        for resource in ["Fraunces", "Fraunces-Italic", "Nunito"] {
             guard let url = Bundle.wiggleRoomShared.url(forResource: resource, withExtension: "ttf") else {
                 continue
             }
@@ -81,6 +81,13 @@ enum WiggleRoomFont {
         fraunces(size: size, weight: 850, opticalSize: size * 1.4, wonky: 1)
     }
 
+    /// The small serif label that names a card or figure ("Current
+    /// Balance", "Current Budget") — Fraunces names things; Nunito carries
+    /// the figures and captions beneath it.
+    static var cardLabel: Font {
+        fraunces(size: 13, weight: 600, opticalSize: 24, wonky: 1, soft: 70)
+    }
+
     /// A quieter editorial accent — italic, softened, used sparingly for
     /// captions that should feel like a handwritten aside (e.g. empty
     /// states) rather than system chrome.
@@ -127,6 +134,15 @@ enum WiggleRoomFont {
         appearance.configureWithDefaultBackground()
         appearance.largeTitleTextAttributes = [.font: frauncesUIFont(size: 34, weight: 700, opticalSize: 48)]
         appearance.titleTextAttributes = [.font: frauncesUIFont(size: 17, weight: 700, opticalSize: 20)]
+        let variationKey = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
+        let barButtonDescriptor = UIFontDescriptor(fontAttributes: [
+            .name: "Nunito",
+            variationKey: [axisTag("wght"): CGFloat(700)],
+        ])
+        let barButtonAttributes: [NSAttributedString.Key: Any] = [.font: UIFont(descriptor: barButtonDescriptor, size: 17)]
+        appearance.buttonAppearance.normal.titleTextAttributes = barButtonAttributes
+        appearance.doneButtonAppearance.normal.titleTextAttributes = barButtonAttributes
+        appearance.backButtonAppearance.normal.titleTextAttributes = barButtonAttributes
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
@@ -147,15 +163,54 @@ enum WiggleRoomFont {
 }
 
 extension Font {
-    /// The one font every number in this app should use: tabular figures so
-    /// digits align as they change (§3.3), rounded for a touch of warmth
-    /// over a plain grotesque, while staying fully Dynamic-Type safe.
+    /// The body/UI face for everything that isn't a name or headline:
+    /// captions, buttons, form fields, tabs, chart labels. **Nunito**
+    /// (bundled variable font), scaled with Dynamic Type exactly like the
+    /// system text style it replaces. Fraunces (`WiggleRoomFont`) names
+    /// things; Nunito carries the rest — see the design direction in the
+    /// build spec §3.3.
+    static func wiggleText(_ style: Font.TextStyle, weight: Font.Weight = .regular) -> Font {
+        WiggleRoomFont.registerIfNeeded()
+        return .custom("Nunito", size: style.wiggleBaseSize, relativeTo: style).weight(weight)
+    }
+
+    /// The one font every number in this app should use. Nunito's digits
+    /// are natively equal-width (tabular) at every weight, so figures still
+    /// align as they change (§3.3) while sharing the app's friendly voice.
     static func wiggleNumber(_ style: Font.TextStyle, weight: Font.Weight = .semibold) -> Font {
-        .system(style, design: .rounded).weight(weight).monospacedDigit()
+        wiggleText(style, weight: weight).monospacedDigit()
     }
 
     static func wiggleNumber(size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .rounded).monospacedDigit()
+        WiggleRoomFont.registerIfNeeded()
+        return .custom("Nunito", fixedSize: size).weight(weight).monospacedDigit()
+    }
+
+    /// A fixed-size Nunito, for the few places that used `.system(size:)`.
+    static func wiggleText(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        WiggleRoomFont.registerIfNeeded()
+        return .custom("Nunito", fixedSize: size).weight(weight)
+    }
+}
+
+extension Font.TextStyle {
+    /// The default point size Apple's own text style resolves to at the
+    /// standard Dynamic Type setting, so Nunito reads at the same scale.
+    fileprivate var wiggleBaseSize: CGFloat {
+        switch self {
+        case .largeTitle: 34
+        case .title: 28
+        case .title2: 22
+        case .title3: 20
+        case .headline: 17
+        case .body: 17
+        case .callout: 16
+        case .subheadline: 15
+        case .footnote: 13
+        case .caption: 12
+        case .caption2: 11
+        default: 17
+        }
     }
 }
 

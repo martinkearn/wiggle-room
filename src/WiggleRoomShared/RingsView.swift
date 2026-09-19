@@ -216,7 +216,7 @@ struct RingsView: View {
             VStack(spacing: 4) {
                 if showsStatusLabel {
                     Text(centerStatusLine.uppercased())
-                        .font(.caption.weight(.bold))
+                        .font(.wiggleText(.caption, weight: .bold))
                         .tracking(0.5)
                         .foregroundStyle(statusColor)
                         .multilineTextAlignment(.center)
@@ -228,13 +228,13 @@ struct RingsView: View {
                     .lineLimit(1)
                 if showsStatusLabel && (!tracker.usesBudgetLanguage || status == .warning) {
                     Text("difference from budget")
-                        .font(.caption2)
+                        .font(.wiggleText(.caption2))
                         .foregroundStyle(.secondary)
                 }
             }
         } else {
             Text("No data yet")
-                .font(.subheadline)
+                .font(.wiggleText(.subheadline))
                 .foregroundStyle(.secondary)
         }
     }
@@ -281,7 +281,9 @@ struct RingsView: View {
         let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
         return ZStack {
             shape
-                .stroke(color.opacity(0.18), style: style)
+                // The empty part of each ring wears the tracker's own colour;
+                // the filled arc keeps its clock/status colour.
+                .stroke(tracker.accentColor.opacity(0.24), style: style)
             shape
                 .trim(from: 0, to: fraction)
                 .stroke(color, style: style)

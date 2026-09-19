@@ -11,7 +11,7 @@ import SwiftUI
 struct CompletedBadge: View {
     var body: some View {
         Text("Completed")
-            .font(.caption2.weight(.semibold))
+            .font(.wiggleText(.caption2, weight: .semibold))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)

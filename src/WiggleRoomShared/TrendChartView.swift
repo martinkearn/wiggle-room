@@ -221,11 +221,11 @@ struct TrendChartView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(color: WiggleRoomColors.paceRing, label: "Budget")
+            legendItem(color: tracker.accentColor, label: "Budget")
             legendItem(color: WiggleRoomColors.good, label: "Actual")
             legendItem(color: WiggleRoomColors.brand, label: "Trend")
         }
-        .font(.caption2)
+        .font(.wiggleText(.caption2))
         .foregroundStyle(.secondary)
     }
 
@@ -252,7 +252,7 @@ struct TrendChartView: View {
                     y: .value("Budget", point.value),
                     series: .value("Series", "Budget")
                 )
-                .foregroundStyle(WiggleRoomColors.paceRing)
+                .foregroundStyle(tracker.accentColor)
                 .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
                 .interpolationMethod(.catmullRom)
             }
@@ -342,6 +342,7 @@ struct TrendChartView: View {
             }
         }
         .chartYScale(domain: yDomain)
+        .font(.wiggleText(.caption2))
     }
 }
 

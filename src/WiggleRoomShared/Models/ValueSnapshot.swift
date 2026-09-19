@@ -22,3 +22,7 @@ final class ValueSnapshot {
         self.date = date
     }
 }
+
+// `@Model` also synthesises an `Identifiable` (persistentModelID); declare it explicitly
+// so `ForEach`/`.sheet(item:)` use this stored `id` unambiguously.
+extension ValueSnapshot: Identifiable {}

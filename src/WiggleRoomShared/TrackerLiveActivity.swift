@@ -22,6 +22,10 @@ struct TrackerActivityAttributes: ActivityAttributes {
     var trackerId: UUID
     var name: String
     var endDate: Date
+    /// The tracker's palette index and badge glyph. Optional so an activity
+    /// started by an older build (without them) still decodes.
+    var colorIndex: Int?
+    var glyph: String?
 }
 
 enum TrackerLiveActivity {
@@ -59,7 +63,10 @@ enum TrackerLiveActivity {
         if let existing {
             Task { await existing.update(content) }
         } else if ActivityAuthorizationInfo().areActivitiesEnabled {
-            let attributes = TrackerActivityAttributes(trackerId: tracker.id, name: tracker.name, endDate: tracker.endDate)
+            let attributes = TrackerActivityAttributes(
+                trackerId: tracker.id, name: tracker.name, endDate: tracker.endDate,
+                colorIndex: tracker.resolvedColorIndex, glyph: tracker.glyphSymbol
+            )
             _ = try? Activity.request(attributes: attributes, content: content)
         }
     }

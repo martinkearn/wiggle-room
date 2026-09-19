@@ -72,6 +72,15 @@ final class Tracker {
     /// (Settings → Tracker Order). Synced like the rest of the record.
     var sortOrder: Int = 0
 
+    /// Index into `TrackerPalette.all` — this tracker's identity colour.
+    /// -1 means "never chosen" (a tracker from before colours existed), in
+    /// which case `resolvedColorIndex` derives a stable one from its id.
+    var colorIndex: Int = -1
+
+    /// SF Symbol name for this tracker's badge; empty means the default for
+    /// its unit (see `glyphSymbol`).
+    var glyph: String = ""
+
     /// Every reading ever logged for this tracker (§4.6 — timestamped
     /// history, not a single overwritten current value). Optional array for
     /// CloudKit compatibility; use `sortedReadings`/`latestReading` rather

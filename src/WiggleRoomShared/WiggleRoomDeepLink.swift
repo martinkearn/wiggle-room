@@ -14,7 +14,7 @@ enum WiggleRoomDeepLink {
     private static let scheme = "wiggleroom"
     private static let trackerHost = "tracker"
 
-    static func url(forTrackerId id: UUID) -> URL {
+    nonisolated static func url(forTrackerId id: UUID) -> URL {
         URL(string: "\(scheme)://\(trackerHost)/\(id.uuidString)")!
     }
 
