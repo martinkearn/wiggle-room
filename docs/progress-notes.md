@@ -3713,3 +3713,7 @@ The concept of a tracker's target is now called its budget in everything user-fa
 ## 2026-09-19 "Total budget" on the Current Budget card
 
 The Current Budget card (iOS/macOS detail, watch detail) now shows "Total budget £X" (`Tracker.totalAllowance`) as the first subtle caption, above "Final budget £X" and "Estimated final £X". Not shown on widgets. iOS, macOS and watch schemes build; not run.
+
+## 2026-09-19 Consistent spacing between sub-lines on the balance and budget cards
+
+The gaps between the small grey lines differed: some were separate `Text`s in a 4pt stack, one card used a `\n`-joined multi-line `Text` (font line spacing), and Checked/Changed sat in their own 1pt stack. `figureContent` (iOS/macOS, [TrackerDetailView.swift](src/WiggleRoom/Views/TrackerDetailView.swift)) and the watch `card` ([WatchTrackerDetailView.swift](src/WiggleRoomWatch/WatchTrackerDetailView.swift)) now take a `captions: [String]` list and render every sub-line as its own `Text` in one 2pt `VStack`, so all lines on both cards space identically. iOS, macOS and watch schemes build; not run. No behaviour/spec change beyond visuals.

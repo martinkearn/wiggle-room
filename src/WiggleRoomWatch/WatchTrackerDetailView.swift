@@ -50,7 +50,15 @@ struct WatchTrackerDetailView: View {
             : date.formatted(date: .abbreviated, time: .shortened)
     }
 
-    private func card(tint: Color, title: String, value: Decimal, caption: String?, showsSourceTiming: Bool = false) -> some View {
+    private var sourceTimingCaptions: [String] {
+        guard !tracker.isManualEntry else { return [] }
+        return [
+            tracker.lastCheckedDate.map { "Checked \(Self.timingText($0))" },
+            tracker.latestReading.map { "Changed \(Self.timingText($0.date))" }
+        ].compactMap { $0 }
+    }
+
+    private func card(tint: Color, title: String, value: Decimal, captions: [String]) -> some View {
         VStack(spacing: 2) {
             Text(title)
                 .font(.caption2.weight(.medium))
@@ -59,24 +67,14 @@ struct WatchTrackerDetailView: View {
                 .font(.wiggleNumber(size: 22, weight: .bold))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
-            if let caption {
-                Text(caption)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-            }
-            if showsSourceTiming, !tracker.isManualEntry {
-                // Same "Checked / Changed" lines as the phone/Mac balance card.
-                VStack(spacing: 1) {
-                    if let checked = tracker.lastCheckedDate {
-                        Text("Checked \(Self.timingText(checked))")
-                    }
-                    if let changed = tracker.latestReading?.date {
-                        Text("Changed \(Self.timingText(changed))")
-                    }
+            // One stack for every sub-line so spacing is identical on every card.
+            VStack(spacing: 2) {
+                ForEach(captions, id: \.self) { line in
+                    Text(line)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
                 }
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
             }
         }
         .frame(maxWidth: .infinity)
@@ -92,18 +90,18 @@ struct WatchTrackerDetailView: View {
                 tint: (final?.status ?? .warning).color,
                 title: "Final \(tracker.currentValueLabel)",
                 value: final?.currentValue ?? tracker.startingValue,
-                caption: final.map { "\($0.statusLine(for: tracker)) \($0.displayDifference(for: tracker))" }
+                captions: [final.map { "\($0.statusLine(for: tracker)) \($0.displayDifference(for: tracker))" }].compactMap { $0 }
             )
         } else {
             card(tint: pace.status.color, title: tracker.currentValueLabel,
-                 value: pace.currentValue, caption: pace.remainingInAllowanceCaption(for: tracker),
-                 showsSourceTiming: true)
+                 value: pace.currentValue,
+                 captions: [pace.remainingInAllowanceCaption(for: tracker)].compactMap { $0 } + sourceTimingCaptions)
             card(tint: WiggleRoomColors.paceRing, title: "Current Budget",
                  value: pace.targetValueToday,
-                 caption: ["Total budget \(tracker.formattedValue(tracker.totalAllowance))",
+                 captions: ["Total budget \(tracker.formattedValue(tracker.totalAllowance))",
                            "Final budget \(tracker.formattedValue(tracker.projectedFinalValue))",
                            tracker.sortedReadings.count > 1 ? tracker.estimatedFinalValue.map { "Estimated final \(tracker.formattedValue($0))" } : nil]
-                    .compactMap { $0 }.joined(separator: "\n"))
+                    .compactMap { $0 })
         }
     }
 

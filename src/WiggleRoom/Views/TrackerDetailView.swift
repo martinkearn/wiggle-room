@@ -304,16 +304,12 @@ struct TrackerDetailView: View {
     private var figuresRow: some View {
         HStack(alignment: .top, spacing: 12) {
             card(tint: pace.status.color) {
-                VStack(spacing: 4) {
-                    figureContent(title: tracker.currentValueLabel, value: pace.currentValue, caption: remainingInAllowanceCaption)
-                    if !tracker.isManualEntry {
-                        sourceTimingLines
-                    }
-                }
+                figureContent(title: tracker.currentValueLabel, value: pace.currentValue,
+                              captions: [remainingInAllowanceCaption].compactMap { $0 } + sourceTimingCaptions)
             }
 
             card(tint: WiggleRoomColors.paceRing) {
-                figureContent(title: "Current Budget", value: pace.targetValueToday, caption: "\(totalBudgetCaption)\n\(finalBalanceCaption)", extraCaption: estimatedFinalCaption)
+                figureContent(title: "Current Budget", value: pace.targetValueToday, captions: [totalBudgetCaption, finalBalanceCaption, estimatedFinalCaption].compactMap { $0 })
             }
             // A little "just updated" flourish when a new reading lands —
             // a full turn rather than a half-flip so the card never rests
@@ -337,7 +333,7 @@ struct TrackerDetailView: View {
             figureContent(
                 title: "Final \(tracker.currentValueLabel)",
                 value: finalPace?.currentValue ?? tracker.startingValue,
-                caption: finalSummaryCaption
+                captions: [finalSummaryCaption].compactMap { $0 }
             )
         }
         .padding(.horizontal)
@@ -532,18 +528,12 @@ struct TrackerDetailView: View {
     /// Subtle "Checked / Changed" lines under the balance for a
     /// connected-source tracker: when the source was last asked, and when
     /// the balance last actually moved (the latest reading's date).
-    @ViewBuilder
-    private var sourceTimingLines: some View {
-        VStack(spacing: 1) {
-            if let checked = tracker.lastCheckedDate {
-                Text("Checked \(Self.timingText(checked))")
-            }
-            if let changed = tracker.latestReading?.date {
-                Text("Changed \(Self.timingText(changed))")
-            }
-        }
-        .font(.caption2)
-        .foregroundStyle(.tertiary)
+    private var sourceTimingCaptions: [String] {
+        guard !tracker.isManualEntry else { return [] }
+        return [
+            tracker.lastCheckedDate.map { "Checked \(Self.timingText($0))" },
+            tracker.latestReading.map { "Changed \(Self.timingText($0.date))" }
+        ].compactMap { $0 }
     }
 
     /// Time only when it's today, otherwise date and time.
@@ -553,7 +543,7 @@ struct TrackerDetailView: View {
             : date.formatted(date: .abbreviated, time: .shortened)
     }
 
-    private func figureContent(title: String, value: Decimal, caption: String? = nil, extraCaption: String? = nil) -> some View {
+    private func figureContent(title: String, value: Decimal, captions: [String] = []) -> some View {
         VStack(spacing: 4) {
             Text(title)
                 .font(.caption.weight(.medium))
@@ -562,10 +552,14 @@ struct TrackerDetailView: View {
                 .font(.wiggleNumber(size: 24, weight: .bold))
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
-            ForEach([caption, extraCaption].compactMap { $0 }, id: \.self) { line in
-                Text(line)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            // One stack for every sub-line so spacing between them is
+            // identical on every card.
+            VStack(spacing: 2) {
+                ForEach(captions, id: \.self) { line in
+                    Text(line)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
         .frame(maxWidth: .infinity)
