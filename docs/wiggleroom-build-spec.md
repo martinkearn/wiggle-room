@@ -262,7 +262,7 @@ All glanceable surfaces (widgets, menu bar item) should support four states, col
 
 ### 8.5 Other iOS extensions (added 2026-09-19)
 
-- **Interactive widget**: the medium Home Screen widget shows a refresh button for a connected-source (non-manual), uncompleted tracker. It runs `RefreshTrackerIntent` in the widget's own process (`TrackerStore.refreshFromSource`) — a one-tap fetch without opening the app. Because a refresh that finds the value unchanged (or fails) is otherwise indistinguishable from a dead button, the intent records its outcome in the App Group (`RefreshOutcome`) and the widget shows a caption beside the button — "Updated 14:03", "Checked 14:03" (value unchanged) or "Refresh failed" — for an hour after a tap. Manual trackers have no source to fetch, so no button.
+- **Interactive widget**: removed — the Home Screen widget refresh button (and `RefreshTrackerIntent`/`RefreshOutcome`) didn't work reliably and isn't needed; widgets refresh on their timeline only.
 - **Control** (iOS only): `TrackerStatusControl` — a Control Center / Lock Screen button for a configurable tracker (`SelectTrackerControlIntent`), labelled with its name and ahead/behind figure; tapping deep-links to its dashboard.
 - **Live Activity — final stretch only** (iOS only): `TrackerLiveActivity` shows a Lock Screen / Dynamic Island activity for a tracker during the last 10% of its period (`finalStretchFraction`), with status line, ahead/behind figure and time left. It is updated on every logged reading (`TrackerStore.logReading`) and started/ended when the app becomes active. **Limitation**: ActivityKit only allows starting an activity from the foreground, so a tracker that enters its final stretch while the app is closed gets its activity the next time the app is opened.
 - **Spotlight**: `TrackerEntity` is an `IndexedEntity`; `TrackerSpotlightIndexer` replaces the index on launch and on backgrounding. Tapping a result runs `OpenTrackerIntent` (deep link into the dashboard), which is also usable from Shortcuts / the Action Button. Siri phrases and Shortcuts already existed (`WiggleRoomShortcuts`).
@@ -328,3 +328,5 @@ Resolved (kept here for the record):
 - **Connected Sources "Reconnect" wording**: renamed to "Save" 2026-09-18 — see §5.2. Saving (whether just a rename or a new token) still validates the PAT and reports connection status.
 - **iOS Home Screen widget resize/reconfigure blank period**: fixed 2026-09-18 — see §8.1. Was WidgetKit's snapshot path sharing the timeline path's CloudKit wait; not a general widget-freshness issue.
 - **Time-driven pace refresh without balance fetches**: Target Right Now / under-over figures refresh every 30s in the foreground and ~5 min in the background via `PaceClock`, with no provider calls; the balance refresh policy is unchanged. See §5.3.
+
+<!-- Lock Screen rectangular widget now mirrors the watch complication: rings, then tracker name above the above/below figure. -->

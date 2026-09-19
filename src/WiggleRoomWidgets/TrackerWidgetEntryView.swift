@@ -38,25 +38,6 @@ struct TrackerWidgetEntryView: View {
         .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
-    /// Bottom-trailing refresh button for connected-source trackers (manual
-    /// trackers have nothing to fetch, so they get none).
-    @ViewBuilder
-    private func refreshButton(_ tracker: Tracker) -> some View {
-        if !tracker.isManualEntry, !tracker.isCompleted(asOf: entry.date) {
-            HStack(spacing: 6) {
-                if let caption = RefreshOutcome.caption(for: tracker.id, asOf: entry.date) {
-                    Text(caption).font(.caption2)
-                }
-                Button(intent: RefreshTrackerIntent(trackerId: tracker.id)) {
-                    Image(systemName: "arrow.clockwise").font(.caption.weight(.semibold))
-                }
-                .buttonStyle(.plain)
-            }
-            .foregroundStyle(.secondary)
-            .padding(6)
-        }
-    }
-
     @ViewBuilder
     private func content(for tracker: Tracker) -> some View {
         switch family {
@@ -161,7 +142,6 @@ struct TrackerWidgetEntryView: View {
         .overlay(alignment: .topTrailing) {
             brandMark.frame(width: 18, height: 18).padding(6)
         }
-        .overlay(alignment: .bottomTrailing) { refreshButton(tracker) }
         .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
@@ -220,9 +200,6 @@ struct TrackerWidgetEntryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay(alignment: .topTrailing) {
             brandMark.frame(width: 20, height: 20).padding(6)
-        }
-        .overlay(alignment: .bottomTrailing) {
-            refreshButton(tracker)
         }
         .containerBackground(for: .widget) { Color.widgetBackground }
     }
@@ -305,9 +282,6 @@ struct TrackerWidgetEntryView: View {
         .overlay(alignment: .topTrailing) {
             brandMark.frame(width: 24, height: 24).padding(8)
         }
-        .overlay(alignment: .bottomTrailing) {
-            refreshButton(tracker)
-        }
         .containerBackground(for: .widget) { Color.widgetBackground }
     }
 
@@ -327,17 +301,21 @@ struct TrackerWidgetEntryView: View {
 
     private func rectangularLockScreen(_ tracker: Tracker) -> some View {
         let p = pace(for: tracker)
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(tracker.name)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(p.displayDifference(for: tracker))
-                .font(.wiggleNumber(.caption))
-            Text(tracker.isCompleted(asOf: entry.date) ? "Completed" : p.statusLine(for: tracker))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+        return HStack(spacing: 8) {
+            RingsView(tracker: tracker, now: entry.date, lineWidth: 5, showsCenterContent: false, isAnimated: false)
+                .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tracker.name)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(p.displayDifference(for: tracker))
+                    .font(.wiggleNumber(.title3))
+                    .foregroundStyle(p.status.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            Spacer(minLength: 0)
         }
         .containerBackground(for: .widget) { Color.clear }
     }

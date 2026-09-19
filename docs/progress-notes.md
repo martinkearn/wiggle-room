@@ -3579,3 +3579,7 @@ back on later opens. Neither `.autocorrectionDisabled()` nor `.writingToolsBehav
 changed that, so both guesses were removed (the earlier autocorrect line from 553485d is
 gone). Most likely a system text-input panel warming up on this pre-release macOS (Darwin 27);
 cause not confirmed, no app-side fix shipped. Revisit if it reproduces on a release macOS.
+
+## 2026-09-19 Widget refresh button removed; Lock Screen rectangular widget copies the watch's
+
+The Home Screen widget refresh button wasn't working and isn't needed, so it's gone: `RefreshTrackerIntent.swift` (with `RefreshOutcome`) deleted, and the button/caption overlays removed from [TrackerWidgetEntryView.swift](src/WiggleRoomWidgets/TrackerWidgetEntryView.swift). The iOS wide Lock Screen (`accessoryRectangular`) widget now copies the watch's wide complication: rings on the left, tracker name (small) over the coloured above/below figure — priority rings, figure, name. Spec §8.5 interactive-widget bullet and README checklist updated. Not built or run — no xcodebuild/simulator this session.
