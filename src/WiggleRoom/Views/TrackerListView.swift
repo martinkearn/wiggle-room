@@ -231,7 +231,7 @@ private struct AddTrackerRow: View {
     }
 }
 
-/// A hand-drawn-feeling empty state — three overlapping rings rather
+/// A hand-drawn-feeling empty state — the two-ring motif rather
 /// than a single generic SF Symbol, echoing the app's own ring motif so
 /// even the "nothing here yet" moment feels like Wiggle Room rather than a
 /// stock `ContentUnavailableView`.
@@ -242,18 +242,8 @@ private struct EmptyTrackersView: View {
         VStack(spacing: 22) {
             Spacer()
 
-            ZStack {
-                Circle()
-                    .stroke(WiggleRoomColors.brand.opacity(0.35), lineWidth: 10)
-                    .frame(width: 132, height: 132)
-                Circle()
-                    .stroke(WiggleRoomColors.brandWarm.opacity(0.5), lineWidth: 10)
-                    .frame(width: 92, height: 92)
-                Circle()
-                    .stroke(WiggleRoomColors.good.opacity(0.6), lineWidth: 8)
-                    .frame(width: 52, height: 52)
-            }
-            .padding(.bottom, 4)
+            EmptyRingsMark(size: 132)
+                .padding(.bottom, 4)
 
             VStack(spacing: 8) {
                 Text("No Trackers Yet")

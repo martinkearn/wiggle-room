@@ -3489,3 +3489,10 @@ Tracker" in [SelectTrackerIntent.swift](src/WiggleRoomWidgets/SelectTrackerInten
 prompt on an empty widget. Builds for the widgets (iOS) and watch schemes succeed; the wording itself
 hasn't been viewed on a device.
 
+Follow-up: the app's empty tracker list drew **three** overlapping rings, contradicting the two-ring
+motif (§3.4). Extracted the graphic to [EmptyRingsMark.swift](src/WiggleRoomShared/EmptyRingsMark.swift)
+as two rings, used by `EmptyTrackersView` in [TrackerListView.swift](src/WiggleRoom/Views/TrackerListView.swift)
+and, at 56pt, by the widgets' "Loading data…" state (replacing the generic spinner). The other empty state,
+`WiggleEmptyState` (one ring around an SF Symbol), is unchanged. iOS, macOS and widget builds succeed; not
+viewed on a device.
+

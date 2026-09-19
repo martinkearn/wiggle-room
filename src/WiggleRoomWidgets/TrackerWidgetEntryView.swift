@@ -32,7 +32,7 @@ struct TrackerWidgetEntryView: View {
     /// reconfigured — say so rather than showing something that looks broken.
     private var loadingState: some View {
         VStack(spacing: 6) {
-            ProgressView()
+            EmptyRingsMark(size: 56)
             Text("Loading data…")
                 .font(.caption)
                 .foregroundStyle(.secondary)
