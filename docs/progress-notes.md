@@ -3569,3 +3569,13 @@ without the new code while reporting success — `touch` the sources or check th
 `.debug.dylib` timestamp before trusting a visual check. Still open: an empty rounded
 glass box floats beside the Name field on the Add/Edit Tracker sheet (not fixed by
 `.autocorrectionDisabled()`, still there in the latest build). iOS unaffected.
+
+### Follow-up: the empty glass box beside the Name field (same day)
+
+Investigated with the running app: it is a separate, empty, 250×110pt window owned by the
+WiggleRoom process (no accessibility children), and it appears only on the *first* New/Edit
+Tracker sheet opened after launch — closing the sheet removes it and it does not come
+back on later opens. Neither `.autocorrectionDisabled()` nor `.writingToolsBehavior(.disabled)`
+changed that, so both guesses were removed (the earlier autocorrect line from 553485d is
+gone). Most likely a system text-input panel warming up on this pre-release macOS (Darwin 27);
+cause not confirmed, no app-side fix shipped. Revisit if it reproduces on a release macOS.
