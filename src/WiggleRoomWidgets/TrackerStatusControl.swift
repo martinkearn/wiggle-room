@@ -52,7 +52,7 @@ struct TrackerStatusControl: ControlWidget {
             }
         }
         .displayName("Tracker Status")
-        .description("Shows how far over or under target a tracker is. Tap it to open that tracker in Wiggle Room.")
+        .description("Shows how far over or under budget a tracker is. Tap it to open that tracker in Wiggle Room.")
     }
 }
 #endif

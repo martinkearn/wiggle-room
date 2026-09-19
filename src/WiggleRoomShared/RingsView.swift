@@ -36,7 +36,7 @@ struct RingsView: View {
     var showsCenterContent: Bool = true
 
     /// Whether the center content's status-word line ("JUST OVER BUDGET")
-    /// and its "difference from target" caption are shown alongside the
+    /// and its "difference from budget" caption are shown alongside the
     /// number. The number itself (`centerAmountText`) always shows
     /// whenever `showsCenterContent` is true — this only controls the
     /// surrounding label text. `false` for the macOS menu bar dropdown
@@ -226,7 +226,7 @@ struct RingsView: View {
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                 if showsStatusLabel && (!tracker.usesBudgetLanguage || status == .warning) {
-                    Text("difference from target")
+                    Text("difference from budget")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

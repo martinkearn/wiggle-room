@@ -30,7 +30,7 @@ struct CelebrationView: View {
         let name = tracker.name
         return tracker.usesBudgetLanguage
             ? "\(name) wrapped up with room to spare. Nicely paced."
-            : "\(name) wrapped up right on target. Nicely paced."
+            : "\(name) wrapped up right on budget. Nicely paced."
     }
 
     var body: some View {

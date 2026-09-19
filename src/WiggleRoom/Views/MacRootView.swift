@@ -29,7 +29,7 @@ struct MacRootView: View {
                     ContentUnavailableView(
                         "No Trackers Yet",
                         systemImage: "circle.circle",
-                        description: Text("Add a tracker to start tracking pace against a target.")
+                        description: Text("Add a tracker to start tracking pace against a budget.")
                     )
                 } else {
                     // Explicit `List(selection:) { ... }` content rather

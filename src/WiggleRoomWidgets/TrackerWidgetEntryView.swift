@@ -184,7 +184,7 @@ struct TrackerWidgetEntryView: View {
                         .foregroundStyle(p.status.color)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    Text("difference from target")
+                    Text("difference from budget")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -270,7 +270,7 @@ struct TrackerWidgetEntryView: View {
                         title: "Current Budget",
                         value: tracker.formattedValue(p.targetValueToday),
                         color: .primary,
-                        caption: "Final target \(tracker.formattedValue(tracker.projectedFinalValue))"
+                        caption: "Final budget \(tracker.formattedValue(tracker.projectedFinalValue))"
                     )
                 }
             }

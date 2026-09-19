@@ -189,7 +189,7 @@ struct TrendChartView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(color: WiggleRoomColors.paceRing, label: "Target")
+            legendItem(color: WiggleRoomColors.paceRing, label: "Budget")
             legendItem(color: WiggleRoomColors.good, label: "Actual")
             legendItem(color: WiggleRoomColors.brand, label: "Trend")
         }
@@ -212,15 +212,15 @@ struct TrendChartView: View {
             // it's the fixed yardstick everything else is read against.
             LineMark(
                 x: .value("Date", window.start),
-                y: .value("Target", tracker.startingValue),
-                series: .value("Series", "Target")
+                y: .value("Budget", tracker.startingValue),
+                series: .value("Series", "Budget")
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
             .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round))
             LineMark(
                 x: .value("Date", window.end),
-                y: .value("Target", targetEndValue),
-                series: .value("Series", "Target")
+                y: .value("Budget", targetEndValue),
+                series: .value("Series", "Budget")
             )
             .foregroundStyle(WiggleRoomColors.paceRing)
             .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round))

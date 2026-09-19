@@ -3705,3 +3705,7 @@ The "My Starling Account · Personal" caption is no longer body text above the r
 ## 2026-09-19 "Current Target" → "Current Budget"
 
 Renamed the label everywhere in app code (detail screens, watch, widgets, menu bar, rings) and the build spec. "Final target £X", the chart's "Target" line and "Right on target" wording were left as they were — only the "Current Target" label was asked for. Not built or run.
+
+## 2026-09-19 "Target" → "Budget" throughout
+
+The concept of a tracker's target is now called its budget in everything user-facing: "Final budget £X", "difference from budget" (rings, widget), the chart's "Budget" reference line/legend, "Right on budget", "over or under budget" (Control, Siri intent descriptions), the celebration copy and the empty-state text. Spec prose updated to match. Deliberately **not** renamed: code identifiers (`targetValueToday`, `targetEndValue`, `sourceTargetId`, `SourceTarget` — the latter two mean a provider *account/target*, an unrelated concept) and the Tesla-era/architecture uses of "target" in the spec. iOS, macOS and Widgets schemes build.

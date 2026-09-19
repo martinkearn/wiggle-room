@@ -512,7 +512,7 @@ struct TrackerDetailView: View {
     /// number above is landing right now, this is where it's designed to
     /// land by the very end of the period.
     private var finalBalanceCaption: String {
-        "Final target \(tracker.formattedValue(tracker.projectedFinalValue))"
+        "Final budget \(tracker.formattedValue(tracker.projectedFinalValue))"
     }
 
     /// A second subtle line under Current Budget: where the trend line
