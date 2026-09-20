@@ -221,19 +221,25 @@ struct TrendChartView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(color: tracker.accentColor, label: "Budget")
-            legendItem(color: WiggleRoomColors.good, label: "Actual")
-            legendItem(color: WiggleRoomColors.brand, label: "Trend")
+            legendItem(colors: [tracker.accentColor], label: "Budget")
+            legendItem(colors: [WiggleRoomColors.good, WiggleRoomColors.bad], label: "Actual")
+            legendItem(colors: [WiggleRoomColors.brand], label: "Trend")
         }
         .font(.wiggleText(.caption2))
         .foregroundStyle(.secondary)
     }
 
-    private func legendItem(color: Color, label: String) -> some View {
+    /// More than one colour splits the swatch side by side — "Actual" is
+    /// drawn green or red depending on pace, so its key shows both.
+    private func legendItem(colors: [Color], label: String) -> some View {
         HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(color)
-                .frame(width: 12, height: 3)
+            HStack(spacing: 0) {
+                ForEach(Array(colors.enumerated()), id: \.offset) { _, color in
+                    Rectangle().fill(color)
+                }
+            }
+            .frame(width: 12, height: 3)
+            .clipShape(RoundedRectangle(cornerRadius: 1.5))
             Text(label)
         }
     }
