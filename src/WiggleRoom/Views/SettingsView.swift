@@ -37,6 +37,11 @@ struct SettingsView: View {
                         SettingsLabel(title: "Tracker Order", symbol: "arrow.up.arrow.down", colorIndex: 1)
                     }
                     NavigationLink {
+                        CloudSyncDiagnosticsView()
+                    } label: {
+                        SettingsLabel(title: "CloudKit Sync", symbol: "icloud", colorIndex: 5)
+                    }
+                    NavigationLink {
                         SiriPhrasesView()
                     } label: {
                         SettingsLabel(title: "Siri Phrases", symbol: "waveform", colorIndex: 4)

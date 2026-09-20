@@ -43,9 +43,11 @@ struct WiggleRoomApp: App {
             groupContainer: .identifier(AppGroup.identifier),
             cloudKitDatabase: .automatic
         )
-        if let container = try? ModelContainer(for: schema, configurations: [cloudConfiguration]) {
-            modelContainer = container
-        } else {
+        do {
+            modelContainer = try ModelContainer(for: schema, configurations: [cloudConfiguration])
+            CloudSyncDiagnostics.shared.recordCloudKitStore()
+        } catch {
+            CloudSyncDiagnostics.shared.recordLocalFallback(error: error)
             let localConfiguration = ModelConfiguration(schema: schema, groupContainer: .identifier(AppGroup.identifier))
             guard let localContainer = try? ModelContainer(for: schema, configurations: [localConfiguration]) else {
                 fatalError("Could not create a ModelContainer")

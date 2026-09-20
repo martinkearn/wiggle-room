@@ -11,6 +11,7 @@ private enum SettingsPane: String, Hashable {
     case general
     case connectedSources
     case order
+    case cloudKit
     case siri
 
     var label: String {
@@ -18,6 +19,7 @@ private enum SettingsPane: String, Hashable {
         case .general: "General"
         case .connectedSources: "Connected Sources"
         case .order: "Tracker Order"
+        case .cloudKit: "CloudKit Sync"
         case .siri: "Siri Phrases"
         }
     }
@@ -27,6 +29,7 @@ private enum SettingsPane: String, Hashable {
         case .general: 2
         case .connectedSources: 3
         case .order: 1
+        case .cloudKit: 5
         case .siri: 4
         }
     }
@@ -36,6 +39,7 @@ private enum SettingsPane: String, Hashable {
         case .general: "gearshape"
         case .connectedSources: "point.3.filled.connected.trianglepath.dotted"
         case .order: "arrow.up.arrow.down"
+        case .cloudKit: "icloud"
         case .siri: "waveform"
         }
     }
@@ -58,7 +62,7 @@ struct SettingsRootView: View {
     var body: some View {
         HStack(spacing: 0) {
             List(selection: $selection) {
-                ForEach([SettingsPane.general, .connectedSources, .order, .siri], id: \.self) { pane in
+                ForEach([SettingsPane.general, .connectedSources, .order, .cloudKit, .siri], id: \.self) { pane in
                     SettingsLabel(title: pane.label, symbol: pane.systemImage, colorIndex: pane.colorIndex, size: 24)
                         .tag(pane)
                 }
@@ -87,6 +91,8 @@ struct SettingsRootView: View {
             ConnectedSourcesView()
         case .order:
             TrackerOrderView()
+        case .cloudKit:
+            CloudSyncDiagnosticsView()
         case .siri:
             SiriPhrasesView()
         }
