@@ -5,12 +5,13 @@
 
 import SwiftUI
 
-/// The eight per-tracker identity colours (design direction, 2026-09-19).
-/// Deliberately clear of every status hue: no pure green, amber or red, so
-/// "which tracker is this" never gets confused with "how is it doing" — the
-/// rings' actual arc and the ahead/behind figure always keep the
-/// `WiggleRoomColors` traffic-light colours. Each has a light and a dark
-/// value so it glows on dark surfaces rather than muddying.
+/// The twelve per-tracker identity colours (design direction, 2026-09-19;
+/// Forest, Slate, Sunshine and Cherry added 2026-09-20). The first eight
+/// deliberately avoid every status hue; the last four are user-requested
+/// green/grey/yellow/red choices, kept deeper or softer than the
+/// `WiggleRoomColors` traffic-light colours the rings' arc and ahead/behind
+/// figure use. Append only — `Tracker.colorIndex` indexes this array. Each
+/// has a light and a dark value so it glows on dark surfaces.
 enum TrackerPalette {
     struct Entry: Identifiable {
         let id: Int
@@ -27,6 +28,10 @@ enum TrackerPalette {
         entry(5, "Peach", light: 0xE9805A, dark: 0xF5A283),
         entry(6, "Plum", light: 0x86407E, dark: 0xB96FB0),
         entry(7, "Toffee", light: 0xA9754A, dark: 0xD19F72),
+        entry(8, "Forest", light: 0x2F6B45, dark: 0x5FA57A),
+        entry(9, "Slate", light: 0x6B7280, dark: 0x9CA3AF),
+        entry(10, "Sunshine", light: 0xE0B000, dark: 0xF5CD3D),
+        entry(11, "Cherry", light: 0xC4302B, dark: 0xF06A63),
     ]
 
     private static func entry(_ id: Int, _ name: String, light: UInt32, dark: UInt32) -> Entry {
