@@ -543,7 +543,7 @@ struct TrackerDetailView: View {
     /// number above is landing right now, this is where it's designed to
     /// land by the very end of the period.
     private var totalBudgetCaption: String {
-        "Total budget \(tracker.formattedValue(tracker.totalAllowance))"
+        "Tracker budget \(tracker.formattedValue(tracker.totalAllowance))"
     }
 
     private var finalBalanceCaption: String {

@@ -98,7 +98,7 @@ struct WatchTrackerDetailView: View {
                  captions: [pace.remainingInAllowanceCaption(for: tracker)].compactMap { $0 } + sourceTimingCaptions)
             card(tint: tracker.accentColor, title: "Current Budget",
                  value: pace.targetValueToday,
-                 captions: ["Total budget \(tracker.formattedValue(tracker.totalAllowance))",
+                 captions: ["Tracker budget \(tracker.formattedValue(tracker.totalAllowance))",
                            "Final budget \(tracker.formattedValue(tracker.projectedFinalValue))",
                            tracker.sortedReadings.count > 1 ? tracker.estimatedFinalValue.map { "Estimated final \(tracker.formattedValue($0))" } : nil]
                     .compactMap { $0 },

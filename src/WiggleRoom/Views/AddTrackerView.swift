@@ -165,7 +165,7 @@ struct AddTrackerView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    LabeledContent("Total budget") {
+                    LabeledContent("Tracker budget") {
                         unitValueField(text: $totalAllowanceText, field: .totalAllowance)
                     }
                     Text(totalBudgetHint)
@@ -190,8 +190,6 @@ struct AddTrackerView: View {
                 } header: {
                     Text("Budget")
                         .font(WiggleRoomFont.headline(15, weight: 650))
-                } footer: {
-                    Text(budgetFooter)
                 }
 
                 if existingTracker == nil {
@@ -210,8 +208,6 @@ struct AddTrackerView: View {
                             // selection — restore whatever was chosen before.
                             sourceSelection = oldValue
                         }
-                    } footer: {
-                        Text("Manual Entry means you'll log this tracker's readings yourself. Otherwise, pick a source you've added in Settings → Connected Sources.")
                     }
 
                     if !isManualEntrySelected {
@@ -248,8 +244,6 @@ struct AddTrackerView: View {
                     } header: {
                         Text("Reminder")
                             .font(WiggleRoomFont.headline(15, weight: 650))
-                    } footer: {
-                        Text("Get a local notification reminding you to log a new reading on this cadence.")
                     }
                 }
 
@@ -559,22 +553,6 @@ struct AddTrackerView: View {
             return "The total amount allowed for the whole period — usually the same as starting value."
         case .increasing:
             return "How much more you're allowed to add over the whole period."
-        }
-    }
-
-    private var budgetFooter: String {
-        let displayUnit = unit.isEmpty ? "units" : unit
-        switch direction {
-        case .decreasing:
-            if Tracker.isCurrencyUnit(unit) {
-                return "Example: for a simple \(unit)3000 budget, set both starting value and total budget to 3000. You'll then log your remaining balance over time (e.g. 3000 → 0), not your bank account's own balance unless this tracker follows that account exactly."
-            }
-            return "Example: for a simple 3000 \(displayUnit) budget, set both starting value and total budget to 3000. You'll then log your remaining amount over time (e.g. 3000 → 0)."
-        case .increasing:
-            if Tracker.isCurrencyUnit(unit) {
-                return "Example: for a \(unit)3000 allowance, set starting value to what you've already used and total budget to 3000. You'll then log your running total over time as it rises."
-            }
-            return "Example: for a 3000 \(displayUnit) allowance (e.g. a mileage lease), set starting value to your reading at the start and total budget to 3000. You'll then log your current reading over time as it rises."
         }
     }
 
