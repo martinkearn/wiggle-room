@@ -74,10 +74,14 @@ jobs:
             -S apple-tool:,apple: \
             -k "$KEYCHAIN_PASSWORD" \
             "$KEYCHAIN_PATH"
+          ORIGINAL_KEYCHAINS_PATH="$RUNNER_TEMP/original-keychains"
+          security list-keychains -d user \
+            | sed -E 's/^[[:space:]]*"//; s/"[[:space:]]*$//' \
+            > "$ORIGINAL_KEYCHAINS_PATH"
           ORIGINAL_KEYCHAINS=()
           while IFS= read -r keychain; do
-            ORIGINAL_KEYCHAINS+=("${keychain//\"/}")
-          done < <(security list-keychains -d user)
+            ORIGINAL_KEYCHAINS+=("$keychain")
+          done < "$ORIGINAL_KEYCHAINS_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" "${ORIGINAL_KEYCHAINS[@]}"
 
       - name: Archive macOS app
@@ -120,6 +124,8 @@ jobs:
             <string>automatic</string>
             <key>teamID</key>
             <string>${TEAM_ID}</string>
+            <key>uploadSymbols</key>
+            <true/>
           </dict>
           </plist>
           PLIST
@@ -138,8 +144,18 @@ jobs:
         env:
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
         run: |
+          if [[ -f "$RUNNER_TEMP/original-keychains" ]]; then
+            ORIGINAL_KEYCHAINS=()
+            while IFS= read -r keychain; do
+              ORIGINAL_KEYCHAINS+=("$keychain")
+            done < "$RUNNER_TEMP/original-keychains"
+            if (( ${#ORIGINAL_KEYCHAINS[@]} > 0 )); then
+              security list-keychains -d user -s "${ORIGINAL_KEYCHAINS[@]}"
+            fi
+          fi
           security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
           rm -f \
+            "$RUNNER_TEMP/original-keychains" \
             "$RUNNER_TEMP/apple-distribution.p12" \
             "$RUNNER_TEMP/mac-installer-distribution.p12" \
             "$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8"
