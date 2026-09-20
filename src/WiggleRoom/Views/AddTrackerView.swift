@@ -119,7 +119,7 @@ struct AddTrackerView: View {
                     Text("Details")
                         .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
-                    Text("Choose the unit this tracker is measured in.")
+                    Text(directionFooter)
                 }
 
                 TrackerAppearancePicker(
@@ -553,6 +553,15 @@ struct AddTrackerView: View {
             return "The total amount allowed for the whole period — usually the same as starting value."
         case .increasing:
             return "How much more you're allowed to add over the whole period."
+        }
+    }
+
+    private var directionFooter: String {
+        switch direction {
+        case .decreasing:
+            return "Decreasing: you start with an amount and use it up, like spending a £3000 budget or a balance that runs down to 0."
+        case .increasing:
+            return "Increasing: your reading climbs towards a limit, like a car's mileage counting up against a 3000 mile allowance."
         }
     }
 
