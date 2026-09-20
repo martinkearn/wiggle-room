@@ -1,0 +1,141 @@
+name: Distribute macOS to TestFlight
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight-macos
+  cancel-in-progress: false
+
+env:
+  PROJECT_PATH: src/WiggleRoom.xcodeproj
+  SCHEME: WiggleRoom
+
+jobs:
+  distribute:
+    name: Archive and upload macOS
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Set build number
+        run: echo "BUILD_NUMBER=$((1000 + GITHUB_RUN_NUMBER)).${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+
+      - name: Install App Store Connect API key
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+        run: |
+          API_KEY_DIRECTORY="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$API_KEY_DIRECTORY"
+          printf '%s' "$API_PRIVATE_KEY" > "$API_KEY_DIRECTORY/AuthKey_${API_KEY_ID}.p8"
+          chmod 600 "$API_KEY_DIRECTORY/AuthKey_${API_KEY_ID}.p8"
+          echo "API_KEY_PATH=$API_KEY_DIRECTORY/AuthKey_${API_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Install macOS distribution certificates
+        env:
+          APP_CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          APP_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          INSTALLER_CERTIFICATE_BASE64: ${{ secrets.MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+        run: |
+          APP_CERTIFICATE_PATH="$RUNNER_TEMP/apple-distribution.p12"
+          INSTALLER_CERTIFICATE_PATH="$RUNNER_TEMP/mac-installer-distribution.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+
+          printf '%s' "$APP_CERTIFICATE_BASE64" | base64 --decode > "$APP_CERTIFICATE_PATH"
+          printf '%s' "$INSTALLER_CERTIFICATE_BASE64" | base64 --decode > "$INSTALLER_CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$APP_CERTIFICATE_PATH" \
+            -P "$APP_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security import "$INSTALLER_CERTIFICATE_PATH" \
+            -P "$INSTALLER_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+      - name: Archive macOS app
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcodebuild archive \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -archivePath "$RUNNER_TEMP/WiggleRoom-macOS.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$API_KEY_PATH" \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            DEVELOPMENT_TEAM="$TEAM_ID"
+
+      - name: Upload macOS archive to TestFlight
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions-macOS.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>destination</key>
+            <string>upload</string>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>${TEAM_ID}</string>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/WiggleRoom-macOS.xcarchive" \
+            -exportPath "$RUNNER_TEMP/WiggleRoom-macOS-export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions-macOS.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$API_KEY_PATH" \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
+          rm -f \
+            "$RUNNER_TEMP/apple-distribution.p12" \
+            "$RUNNER_TEMP/mac-installer-distribution.p12" \
+            "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8"
