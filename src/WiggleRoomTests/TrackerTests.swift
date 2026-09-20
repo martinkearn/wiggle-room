@@ -126,7 +126,7 @@ final class TrackerTests: XCTestCase {
 
     func testRemainingAtEndCaption_budgetExceedsStartingValue_saysByHowMuch() {
         let t = tracker(unit: "£", direction: .decreasing, startingValue: 400, totalAllowance: 500)
-        XCTAssertEqual(t.remainingAtEndCaption, "Budget exceeds starting value by £100")
+        XCTAssertEqual(t.remainingAtEndCaption, "Budget is £100 more than the starting value")
     }
 
     func testRemainingAtEndCaption_startingValueEqualsBudget_isNil() {
