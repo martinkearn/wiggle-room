@@ -40,7 +40,10 @@ final class TrackerStore {
     /// listed in Settings → Connected Sources (§5.2) and there is exactly
     /// one of it — never user-creatable, never duplicated. Fetched once at
     /// launch, created the first time only.
-    let manualEntrySource: ConnectedSource
+    private(set) var manualEntrySource: ConnectedSource
+    private(set) var lastManualEntryHousekeepingDate: Date?
+    private(set) var lastManualEntryHousekeepingRemovedCount = 0
+    private(set) var manualEntryHousekeepingError: String?
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -92,6 +95,61 @@ final class TrackerStore {
         }
         try? modelContext.save()
         reloadWidgets()
+    }
+
+    /// Collapses duplicate Manual Entry pseudo-sources created by devices
+    /// before their first CloudKit import. The lexicographically-lowest UUID is
+    /// selected so every device that sees the same records chooses the same
+    /// canonical source. Trackers are reassigned before duplicates are deleted.
+    @discardableResult
+    func consolidateManualEntrySources() throws -> Int {
+        let sources = try modelContext.fetch(FetchDescriptor<ConnectedSource>())
+        let manualSources = sources.filter { $0.providerId == manualProvider.providerId }
+        guard let canonicalSource = manualSources.min(by: {
+            $0.id.uuidString < $1.id.uuidString
+        }) else {
+            return 0
+        }
+
+        manualEntrySource = canonicalSource
+        let duplicates = manualSources.filter {
+            $0.persistentModelID != canonicalSource.persistentModelID
+        }
+        guard !duplicates.isEmpty else { return 0 }
+
+        let duplicateIDs = Set(duplicates.map(\.persistentModelID))
+        let trackers = try modelContext.fetch(FetchDescriptor<Tracker>())
+        for tracker in trackers {
+            if let sourceID = tracker.connectedSource?.persistentModelID,
+               duplicateIDs.contains(sourceID) {
+                tracker.connectedSource = canonicalSource
+            }
+        }
+        for duplicate in duplicates {
+            modelContext.delete(duplicate)
+        }
+
+        try modelContext.save()
+        reloadWidgets()
+        return duplicates.count
+    }
+
+    /// Runs idempotent housekeeping after giving SwiftData's CloudKit store time
+    /// to import records. It is safe to call at launch and on every activation.
+    func performManualEntryHousekeeping(after delay: Duration = .zero) async {
+        if delay > .zero {
+            try? await Task.sleep(for: delay)
+        }
+        guard !Task.isCancelled else { return }
+
+        do {
+            lastManualEntryHousekeepingRemovedCount = try consolidateManualEntrySources()
+            manualEntryHousekeepingError = nil
+        } catch {
+            lastManualEntryHousekeepingRemovedCount = 0
+            manualEntryHousekeepingError = error.localizedDescription
+        }
+        lastManualEntryHousekeepingDate = .now
     }
 
     /// Persists in-place edits to an existing `@Model` object (e.g. from

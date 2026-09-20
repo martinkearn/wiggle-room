@@ -14,9 +14,7 @@ struct WiggleRoomApp: App {
     @State private var store: TrackerStore
     @State private var deepLinkRouter = DeepLinkRouter()
     @State private var appCommands = AppCommands()
-    #if os(iOS)
     @Environment(\.scenePhase) private var scenePhase
-    #endif
     #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     #endif
@@ -81,9 +79,19 @@ struct WiggleRoomApp: App {
                 // Nunito as the app-wide default; Fraunces is applied
                 // explicitly to names and headlines.
                 .font(.wiggleText(.body))
-                .task { TrackerSpotlightIndexer.reindex() }
+                .task {
+                    TrackerSpotlightIndexer.reindex()
+                    await store.performManualEntryHousekeeping(after: .seconds(10))
+                }
                 .onOpenURL { url in
                     deepLinkRouter.handle(url)
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        Task {
+                            await store.performManualEntryHousekeeping(after: .seconds(3))
+                        }
+                    }
                 }
                 #if os(iOS)
                 .onChange(of: scenePhase) { _, newPhase in

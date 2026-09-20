@@ -32,6 +32,11 @@ struct SettingsView: View {
                         SettingsLabel(title: "Connected Sources", symbol: "point.3.filled.connected.trianglepath.dotted", colorIndex: 3)
                     }
                     NavigationLink {
+                        ManualEntryRecordsView()
+                    } label: {
+                        SettingsLabel(title: "Manual Entry Records", symbol: "doc.on.doc", colorIndex: 0)
+                    }
+                    NavigationLink {
                         TrackerOrderView()
                     } label: {
                         SettingsLabel(title: "Tracker Order", symbol: "arrow.up.arrow.down", colorIndex: 1)

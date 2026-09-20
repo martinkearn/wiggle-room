@@ -38,7 +38,8 @@ private struct CloudSyncSnapshot: Equatable {
     var zoneCount: Int?
     var trackerCount = 0
     var readingCount = 0
-    var sourceCount = 0
+    var externalSourceCount = 0
+    var manualSourceCount = 0
     var latestReadingDate: Date?
     var checkedAt: Date?
     var errorDetails: String?
@@ -48,9 +49,12 @@ struct CloudSyncDiagnosticsView: View {
     private static let containerIdentifier = "iCloud.martinkearn.WiggleRoom"
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(TrackerStore.self) private var store
     @State private var diagnostics = CloudSyncDiagnostics.shared
     @State private var snapshot = CloudSyncSnapshot()
     @State private var isRefreshing = false
+    @State private var isPresentingManualCleanupConfirmation = false
+    @State private var manualCleanupResult: String?
 
     var body: some View {
         #if os(macOS)
@@ -65,8 +69,11 @@ struct CloudSyncDiagnosticsView: View {
             CloudSyncLocalDataSection(
                 trackerCount: snapshot.trackerCount,
                 readingCount: snapshot.readingCount,
-                sourceCount: snapshot.sourceCount,
-                latestReadingDate: snapshot.latestReadingDate
+                externalSourceCount: snapshot.externalSourceCount,
+                manualSourceCount: snapshot.manualSourceCount,
+                latestReadingDate: snapshot.latestReadingDate,
+                cleanupResult: manualCleanupResult,
+                requestCleanup: { isPresentingManualCleanupConfirmation = true }
             )
             CloudSyncTechnicalSection(
                 containerIdentifier: Self.containerIdentifier,
@@ -76,6 +83,17 @@ struct CloudSyncDiagnosticsView: View {
         }
         .navigationTitle("CloudKit Sync")
         .task { await refresh() }
+        .confirmationDialog(
+            "Remove Duplicate Manual Records?",
+            isPresented: $isPresentingManualCleanupConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clean Up Records", role: .destructive) {
+                Task { await cleanUpManualRecords() }
+            }
+        } message: {
+            Text("Trackers will be moved to one Manual Entry record before the redundant records are deleted. This cleanup syncs to your other devices.")
+        }
         #else
         List {
             CloudSyncStatusSection(
@@ -88,8 +106,11 @@ struct CloudSyncDiagnosticsView: View {
             CloudSyncLocalDataSection(
                 trackerCount: snapshot.trackerCount,
                 readingCount: snapshot.readingCount,
-                sourceCount: snapshot.sourceCount,
-                latestReadingDate: snapshot.latestReadingDate
+                externalSourceCount: snapshot.externalSourceCount,
+                manualSourceCount: snapshot.manualSourceCount,
+                latestReadingDate: snapshot.latestReadingDate,
+                cleanupResult: manualCleanupResult,
+                requestCleanup: { isPresentingManualCleanupConfirmation = true }
             )
             CloudSyncTechnicalSection(
                 containerIdentifier: Self.containerIdentifier,
@@ -101,6 +122,17 @@ struct CloudSyncDiagnosticsView: View {
         .inlineNavigationBarIfAvailable()
         .task { await refresh() }
         .refreshable { await refresh() }
+        .confirmationDialog(
+            "Remove Duplicate Manual Records?",
+            isPresented: $isPresentingManualCleanupConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clean Up Records", role: .destructive) {
+                Task { await cleanUpManualRecords() }
+            }
+        } message: {
+            Text("Trackers will be moved to one Manual Entry record before the redundant records are deleted. This cleanup syncs to your other devices.")
+        }
         #endif
     }
 
@@ -111,7 +143,9 @@ struct CloudSyncDiagnosticsView: View {
 
         snapshot.trackerCount = (try? modelContext.fetchCount(FetchDescriptor<Tracker>())) ?? 0
         snapshot.readingCount = (try? modelContext.fetchCount(FetchDescriptor<ValueSnapshot>())) ?? 0
-        snapshot.sourceCount = (try? modelContext.fetchCount(FetchDescriptor<ConnectedSource>())) ?? 0
+        let sources = (try? modelContext.fetch(FetchDescriptor<ConnectedSource>())) ?? []
+        snapshot.externalSourceCount = sources.count { $0.providerId != "manual" }
+        snapshot.manualSourceCount = sources.count { $0.providerId == "manual" }
 
         var latestReadingDescriptor = FetchDescriptor<ValueSnapshot>(
             sortBy: [SortDescriptor(\.date, order: .reverse)]
@@ -142,6 +176,18 @@ struct CloudSyncDiagnosticsView: View {
             snapshot.errorDetails = error.localizedDescription
         }
         snapshot.checkedAt = .now
+    }
+
+    private func cleanUpManualRecords() async {
+        do {
+            let removedCount = try store.consolidateManualEntrySources()
+            manualCleanupResult = removedCount == 0
+                ? "No duplicate Manual Entry records were found."
+                : "Removed \(removedCount) duplicate Manual Entry record\(removedCount == 1 ? "" : "s")."
+        } catch {
+            manualCleanupResult = "Cleanup failed: \(error.localizedDescription)"
+        }
+        await refresh()
     }
 
     private func accountStatusDescription(_ status: CKAccountStatus) -> String {
@@ -214,20 +260,33 @@ private struct CloudSyncStatusSection: View {
 private struct CloudSyncLocalDataSection: View {
     let trackerCount: Int
     let readingCount: Int
-    let sourceCount: Int
+    let externalSourceCount: Int
+    let manualSourceCount: Int
     let latestReadingDate: Date?
+    let cleanupResult: String?
+    let requestCleanup: () -> Void
 
     var body: some View {
         Section("Local data on this device") {
             LabeledContent("Trackers", value: trackerCount.formatted())
             LabeledContent("Readings", value: readingCount.formatted())
-            LabeledContent("Connected sources", value: sourceCount.formatted())
+            LabeledContent("External connected sources", value: externalSourceCount.formatted())
+            LabeledContent("Manual Entry plumbing records", value: manualSourceCount.formatted())
+            LabeledContent("Duplicate manual records", value: max(manualSourceCount - 1, 0).formatted())
             LabeledContent("Latest reading") {
                 if let latestReadingDate {
                     Text(latestReadingDate, format: .dateTime.day().month().year().hour().minute())
                 } else {
                     Text("None")
                 }
+            }
+            if manualSourceCount > 1 {
+                Button("Clean Up Manual Records…", role: .destructive, action: requestCleanup)
+            }
+            if let cleanupResult {
+                Text(cleanupResult)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
