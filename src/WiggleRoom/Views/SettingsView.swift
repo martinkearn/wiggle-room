@@ -87,12 +87,27 @@ struct SettingsView: View {
             titleVisibility: .visible
         ) {
             Button("Reset Everything", role: .destructive) {
-                store.resetAllData()
-                dismiss()
+                Task {
+                    if await store.resetAllData() {
+                        dismiss()
+                    }
+                }
             }
         } message: {
             Text("Clears everything on every device signed in to this iCloud account. This can't be undone.")
         }
+        .alert("Reset Failed", isPresented: resetErrorBinding) {
+            Button("OK") { store.clearResetError() }
+        } message: {
+            Text(store.resetErrorDescription ?? "The app data could not be reset.")
+        }
+    }
+
+    private var resetErrorBinding: Binding<Bool> {
+        Binding(
+            get: { store.resetErrorDescription != nil },
+            set: { if !$0 { store.clearResetError() } }
+        )
     }
 }
 

@@ -9,12 +9,21 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    @Environment(TrackerStore.self) private var store
+
     var body: some View {
-        #if os(macOS)
-        MacRootView()
-        #else
-        TrackerListView()
-        #endif
+        Group {
+            if store.isResettingData {
+                ProgressView("Resetting app data…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                #if os(macOS)
+                MacRootView()
+                #else
+                TrackerListView()
+                #endif
+            }
+        }
     }
 }
 

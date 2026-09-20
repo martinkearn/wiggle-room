@@ -60,6 +60,38 @@ final class TrackerStoreTests: XCTestCase {
         XCTAssertTrue(fetched.isEmpty)
     }
 
+    func testResetAllData_removesUserDataAndKeepsManualSource() async throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let store = TrackerStore(modelContext: context)
+        let externalSource = ConnectedSource(providerId: "starling", displayName: "My Starling")
+        context.insert(externalSource)
+        let tracker = Tracker(
+            name: "Test",
+            unit: "£",
+            direction: .decreasing,
+            connectedSource: externalSource,
+            startDate: .now,
+            endDate: .now.addingTimeInterval(3600),
+            startingValue: 100,
+            totalAllowance: 100
+        )
+        store.addTracker(tracker)
+        store.logReading(value: 80, date: .now, for: tracker)
+
+        let succeeded = await store.resetAllData()
+
+        XCTAssertTrue(succeeded)
+        XCTAssertFalse(store.isResettingData)
+        XCTAssertNil(store.resetErrorDescription)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<Tracker>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<ValueSnapshot>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<StarlingRequestLogEntry>()).isEmpty)
+        let sources = try context.fetch(FetchDescriptor<ConnectedSource>())
+        XCTAssertEqual(sources.count, 1)
+        XCTAssertEqual(sources.first?.providerId, "manual")
+    }
+
     func testLogReading_appendsToTrackerReadings() {
         let container = makeInMemoryModelContainer()
         let context = container.mainContext

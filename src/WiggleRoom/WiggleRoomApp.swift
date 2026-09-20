@@ -133,7 +133,14 @@ struct WiggleRoomApp: App {
         // (System Settings' own modern convention), replacing an earlier
         // icon-tab-bar TabView the same day, per explicit design direction.
         Settings {
-            SettingsRootView()
+            Group {
+                if store.isResettingData {
+                    ProgressView("Resetting app data…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    SettingsRootView()
+                }
+            }
                 .font(.wiggleText(.body))
                 .environment(store)
                 .modelContainer(modelContainer)
@@ -142,12 +149,25 @@ struct WiggleRoomApp: App {
 
         #if os(macOS)
         MenuBarExtra {
-            MenuBarStatusView()
+            Group {
+                if store.isResettingData {
+                    ProgressView("Resetting…")
+                        .padding()
+                } else {
+                    MenuBarStatusView()
+                }
+            }
                 .font(.wiggleText(.body))
                 .environment(store)
                 .modelContainer(modelContainer)
         } label: {
-            MenuBarStatusLabel()
+            Group {
+                if store.isResettingData {
+                    Text("Wiggle Room")
+                } else {
+                    MenuBarStatusLabel()
+                }
+            }
                 .modelContainer(modelContainer)
         }
         // `.window`, not `.menu`: `.menu` renders this dropdown as a real

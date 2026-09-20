@@ -44,6 +44,8 @@ final class TrackerStore {
     private(set) var lastManualEntryHousekeepingDate: Date?
     private(set) var lastManualEntryHousekeepingRemovedCount = 0
     private(set) var manualEntryHousekeepingError: String?
+    private(set) var isResettingData = false
+    private(set) var resetErrorDescription: String?
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -75,22 +77,54 @@ final class TrackerStore {
     /// tracker's source picker depends on existing, not user data, and
     /// `TrackerStore` doesn't currently support recreating it without a
     /// fresh `init`.
-    func resetAllData() {
-        let trackers = (try? modelContext.fetch(FetchDescriptor<Tracker>())) ?? []
-        for tracker in trackers {
-            ReminderScheduler.cancel(tracker)
-            modelContext.delete(tracker)
+    ///
+    /// The operation is asynchronous so every scene can stop rendering live
+    /// SwiftData models before those models are invalidated. This matters on
+    /// macOS, where the main window, Settings window, and menu-bar extra can
+    /// all retain the same tracker at once.
+    @discardableResult
+    func resetAllData() async -> Bool {
+        guard !isResettingData else { return false }
+
+        resetErrorDescription = nil
+        isResettingData = true
+
+        // Let SwiftUI replace every model-backed scene with its reset state
+        // before deleting any object those scenes may still be rendering.
+        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(100))
+
+        do {
+            let trackers = try modelContext.fetch(FetchDescriptor<Tracker>())
+            for tracker in trackers {
+                ReminderScheduler.cancel(tracker)
+                modelContext.delete(tracker)
+            }
+
+            let sources = try modelContext.fetch(FetchDescriptor<ConnectedSource>())
+            for source in sources where source.providerId != manualProvider.providerId {
+                modelContext.delete(source)
+            }
+
+            let requestLog = try modelContext.fetch(FetchDescriptor<StarlingRequestLogEntry>())
+            for entry in requestLog {
+                modelContext.delete(entry)
+            }
+
+            try modelContext.save()
+            reloadWidgets()
+            isResettingData = false
+            return true
+        } catch {
+            modelContext.rollback()
+            resetErrorDescription = error.localizedDescription
+            isResettingData = false
+            return false
         }
-        let sources = (try? modelContext.fetch(FetchDescriptor<ConnectedSource>())) ?? []
-        for source in sources where source.providerId != manualProvider.providerId {
-            modelContext.delete(source)
-        }
-        let requestLog = (try? modelContext.fetch(FetchDescriptor<StarlingRequestLogEntry>())) ?? []
-        for entry in requestLog {
-            modelContext.delete(entry)
-        }
-        try? modelContext.save()
-        reloadWidgets()
+    }
+
+    func clearResetError() {
+        resetErrorDescription = nil
     }
 
     /// Collapses duplicate Manual Entry pseudo-sources created by devices
@@ -136,7 +170,7 @@ final class TrackerStore {
         if delay > .zero {
             try? await Task.sleep(for: delay)
         }
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, !isResettingData else { return }
 
         do {
             lastManualEntryHousekeepingRemovedCount = try consolidateManualEntrySources()
