@@ -45,9 +45,10 @@ Developer identifiers and capabilities before CloudKit or device builds work.
 ## TestFlight deployment
 
 Pushes to `main` start separate GitHub Actions workflows for iOS and macOS.
-Each workflow gives every app and embedded extension the same CI build number,
-creates a signed archive, and uploads it to the existing App Store Connect
-record.
+Every workflow attempt receives a new build number derived from its GitHub run
+number and attempt number. That number is applied consistently to the app and
+all embedded extensions before the workflow creates a signed archive and
+uploads it to the existing App Store Connect record.
 
 Add the following repository secrets under **Settings → Secrets and variables
 → Actions → New repository secret**:
