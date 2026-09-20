@@ -139,9 +139,9 @@ struct LogReadingView: View {
     private var footerHint: String {
         switch tracker.direction {
         case .decreasing:
-            return "Enter your current remaining balance (e.g. 2400 if you've spent 600 of a 3000 budget)."
+            return "Enter your remaining balance now (e.g. 2400 after spending 600 of a 3000 budget)."
         case .increasing:
-            return "Enter your current reading (e.g. today's odometer value)."
+            return "Enter your current reading, e.g. today's odometer."
         }
     }
 

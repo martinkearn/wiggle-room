@@ -134,7 +134,7 @@ struct AddSourceView: View {
     }
 
     private var tokenFieldFooter: String {
-        "Generate a personal access token at developer.starlingbank.com with account:read and balance:read scopes."
+        "Create a personal access token at developer.starlingbank.com with account:read and balance:read."
     }
 
     private var trimmedToken: String {
@@ -173,7 +173,7 @@ struct AddSourceView: View {
                     .foregroundStyle(.secondary)
             }
             if let starlingCooldownUntil {
-                Text("Paused until \(starlingCooldownUntil.formatted(Self.timeFormatter)) after hitting Starling's rate limit.")
+                Text("Taking a breather until \(starlingCooldownUntil.formatted(Self.timeFormatter)) — Starling's rate limit was hit.")
                     .font(.wiggleText(.caption))
                     .foregroundStyle(WiggleRoomColors.warning)
             }
@@ -234,11 +234,11 @@ struct AddSourceView: View {
     private static func errorMessage(for error: Error) -> String {
         switch error {
         case StarlingAPIError.invalidToken:
-            return "That token was rejected — check it's current and has account:read/balance:read scopes."
+            return "Starling didn't accept that token. Check it's current and includes account:read and balance:read."
         case StarlingAPIError.rateLimited, StarlingAPIError.budgetExceeded:
-            return "Starling is rate-limiting requests right now — try again shortly."
+            return "Starling is busy right now — try again in a moment."
         case StarlingAPIError.network:
-            return "Couldn't reach Starling — check your connection and try again."
+            return "Can't reach Starling. Check your connection and try again."
         default:
             return "Couldn't connect — try again."
         }

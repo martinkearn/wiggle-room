@@ -265,9 +265,9 @@ extension Tracker {
     var remainingAtEndCaption: String? {
         guard let remainder = projectedRemainder else { return nil }
         if remainder > 0 {
-            return "\(formattedValue(remainder)) should remain at the end"
+            return "\(formattedValue(remainder)) left at the end"
         } else {
-            return "Budget exceeds starting value by \(formattedValue(abs(remainder)))"
+            return "Budget is \(formattedValue(abs(remainder))) more than the starting value"
         }
     }
 

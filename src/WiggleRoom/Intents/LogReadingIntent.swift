@@ -14,9 +14,9 @@ enum LogReadingIntentError: Error, CustomLocalizedStringResourceConvertible {
     var localizedStringResource: LocalizedStringResource {
         switch self {
         case .notManualEntry(let name):
-            return "\"\(name)\" isn't a manual tracker, so it can't be updated from Shortcuts."
+            return "\"\(name)\" isn't a manual tracker, so Shortcuts can't update it."
         case .completed(let name):
-            return "\"\(name)\" has already completed, so it can't be updated anymore."
+            return "\"\(name)\" has finished, so it can't be updated."
         }
     }
 }

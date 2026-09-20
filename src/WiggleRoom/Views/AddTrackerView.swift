@@ -145,7 +145,7 @@ struct AddTrackerView: View {
                     Text("Period")
                         .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
-                    Text("Off by default — the period runs from midnight to midnight. Turn this on to start or end at a specific time instead.")
+                    Text("Off by default, so the period runs midnight to midnight. Turn on to pick exact start and end times.")
                 }
 
                 Section {
@@ -226,7 +226,7 @@ struct AddTrackerView: View {
                             }
                         }
                     } footer: {
-                        Text("A tracker's source and account can't be changed after it's created.")
+                        Text("Source and account are fixed once a tracker is created.")
                     }
                 }
 
@@ -273,7 +273,7 @@ struct AddTrackerView: View {
                             }
                         }
                     } footer: {
-                        Text("This removes the tracker and all its logged readings. This can't be undone.")
+                        Text("Removes this tracker and its readings for good.")
                     }
                     #if os(iOS)
                     .listSectionSpacing(.custom(48))
@@ -342,7 +342,7 @@ struct AddTrackerView: View {
                     dismiss()
                 }
             } message: {
-                Text("This removes the tracker and all its logged readings. This can't be undone.")
+                Text("Removes this tracker and its readings for good.")
             }
         }
     }
@@ -377,7 +377,7 @@ struct AddTrackerView: View {
             Text("Account")
                 .font(WiggleRoomFont.headline(15, weight: 650))
         } footer: {
-            Text("Which account within this source this tracker reads its balance from.")
+            Text("The account this tracker reads its balance from.")
         }
     }
 
@@ -398,7 +398,7 @@ struct AddTrackerView: View {
         do {
             availableTargets = try await store.listAvailableTargets(for: source)
         } catch {
-            targetLoadErrorMessage = "Couldn't load accounts for this source — try again."
+            targetLoadErrorMessage = "Couldn't load accounts — try again."
         }
     }
 
@@ -541,27 +541,27 @@ struct AddTrackerView: View {
     private var startingValueHint: String {
         switch direction {
         case .decreasing:
-            return "How much you're starting with, e.g. 3000 for a £3000 budget."
+            return "What you're starting with, e.g. 3000 for a £3000 budget."
         case .increasing:
-            return "Your reading at the start, e.g. 0 miles, or today's odometer reading."
+            return "Where your reading starts, e.g. 0 miles or today's odometer."
         }
     }
 
     private var totalBudgetHint: String {
         switch direction {
         case .decreasing:
-            return "The total amount allowed for the whole period — usually the same as starting value."
+            return "How much you can use across the whole period — usually the same as the starting value."
         case .increasing:
-            return "How much more you're allowed to add over the whole period."
+            return "How much more you can add across the whole period."
         }
     }
 
     private var directionFooter: String {
         switch direction {
         case .decreasing:
-            return "Decreasing: you start with an amount and use it up, like spending a £3000 budget or a balance that runs down to 0."
+            return "Decreasing: start with an amount and use it up, like a £3000 budget running down to 0."
         case .increasing:
-            return "Increasing: your reading climbs towards a limit, like a car's mileage counting up against a 3000 mile allowance."
+            return "Increasing: a reading that climbs towards a limit, like mileage counting up against a 3000 mile allowance."
         }
     }
 
@@ -611,9 +611,9 @@ struct AddTrackerView: View {
         else { return nil }
         let displayUnit = unit.isEmpty ? "units" : unit
         if remainder > 0 {
-            return "\(Tracker.formattedValue(remainder, unit: displayUnit)) should remain at the end of the tracker."
+            return "\(Tracker.formattedValue(remainder, unit: displayUnit)) left at the end."
         } else {
-            return "This budget exceeds the starting value by \(Tracker.formattedValue(abs(remainder), unit: displayUnit))."
+            return "This budget is \(Tracker.formattedValue(abs(remainder), unit: displayUnit)) more than the starting value."
         }
     }
 
@@ -690,7 +690,7 @@ struct AddTrackerView: View {
             resolvedTargetId = trackerId.uuidString
         } else {
             guard let selectedTargetId else {
-                errorMessage = "Please choose an account for this source."
+                errorMessage = "Pick an account for this source."
                 isSaving = false
                 return
             }

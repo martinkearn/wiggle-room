@@ -195,7 +195,7 @@ struct TrackerDetailView: View {
                     .foregroundStyle(.secondary)
 
                 if tracker.latestReading == nil {
-                    Text("No readings logged yet — log one to see your pace.")
+                    Text("No readings yet — log one to see your pace.")
                         .font(.wiggleText(.footnote))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -483,13 +483,13 @@ struct TrackerDetailView: View {
             return "Connection expired — reconnect this source in Settings."
         case StarlingAPIError.rateLimited(let retryAfter):
             let resumeText = retryAfter.map { " Resumes at \(Date.now.addingTimeInterval($0).formatted(Self.retryTimeFormatter))." } ?? ""
-            return "Balance update paused — Starling rate limit reached.\(resumeText)"
+            return "Update paused — Starling needs a breather.\(resumeText)"
         case StarlingAPIError.budgetExceeded(let resetsAt):
-            return "Balance update paused — daily request limit reached. Resumes at \(resetsAt.formatted(Self.retryTimeFormatter))."
+            return "Update paused — daily request limit reached. Resumes at \(resetsAt.formatted(Self.retryTimeFormatter))."
         case StarlingAPIError.network:
             return "Couldn't reach Starling — check your connection."
         default:
-            return "Couldn't update balance — will try again shortly."
+            return "Couldn't update the balance — will try again soon."
         }
     }
 

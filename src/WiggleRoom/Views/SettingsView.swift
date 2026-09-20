@@ -55,7 +55,7 @@ struct SettingsView: View {
                     // (`GeneralSettingsView`) — see `TrackerStore
                     // .resetAllData()`'s own doc comment for why this
                     // exists at all.
-                    Text("Permanently deletes every tracker, reading, and connected source — synced to every device. Cannot be undone.")
+                    Text("Clears every tracker, reading and source on all your devices. This can't be undone.")
                 }
 
                 Section {
@@ -81,7 +81,7 @@ struct SettingsView: View {
                 dismiss()
             }
         } message: {
-            Text("Deletes every tracker, reading, and connected source, on every device signed into this iCloud account. This can't be undone.")
+            Text("Clears everything on every device signed in to this iCloud account. This can't be undone.")
         }
     }
 }

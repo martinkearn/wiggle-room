@@ -63,6 +63,6 @@ struct WiggleEmptyState: View {
     WiggleEmptyState(
         symbol: "point.3.filled.connected.trianglepath.dotted",
         title: "No Connected Sources",
-        message: "Add a source like Starling or Tesla to fetch readings automatically."
+        message: "Add a source like Starling to fetch readings for you."
     )
 }

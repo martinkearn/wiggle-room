@@ -53,7 +53,7 @@ struct GeneralSettingsView: View {
                         .labelsHidden()
                         .frame(width: 240)
                     }
-                    Text("Choose which tracker's rings and figures appear in the menu bar dropdown.")
+                    Text("Choose which tracker shows in the menu bar.")
                         .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 }
@@ -78,7 +78,7 @@ struct GeneralSettingsView: View {
                 store.resetAllData()
             }
         } message: {
-            Text("Deletes every tracker, reading, and connected source, on every device signed into this iCloud account. This can't be undone.")
+            Text("Clears everything on every device signed in to this iCloud account. This can't be undone.")
         }
     }
 
@@ -93,7 +93,7 @@ struct GeneralSettingsView: View {
             Button("Reset App Data…", role: .destructive) {
                 isPresentingResetConfirmation = true
             }
-            Text("Permanently deletes every tracker, reading, and connected source — synced to every device. Cannot be undone.")
+            Text("Clears every tracker, reading and source on all your devices. This can't be undone.")
                 .font(.wiggleText(.caption))
                 .foregroundStyle(.secondary)
         }

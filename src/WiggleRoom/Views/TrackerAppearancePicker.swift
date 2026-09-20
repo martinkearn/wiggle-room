@@ -93,7 +93,7 @@ struct TrackerAppearancePicker: View {
             Text("Colour & Glyph")
                 .font(WiggleRoomFont.headline(15, weight: 650))
         } footer: {
-            Text("Colour and glyph make this tracker easy to spot in lists and widgets. The rings still turn green, amber or red for how it's doing.")
+            Text("Pick a colour and icon to spot this tracker at a glance. The rings still show how it's doing.")
         }
     }
 }

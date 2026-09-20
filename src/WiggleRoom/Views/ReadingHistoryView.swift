@@ -31,7 +31,7 @@ struct ReadingHistoryView: View {
                     title: "No Updates Yet",
                     message: tracker.isManualEntry
                         ? "Updates you log will appear here."
-                        : "Updates fetched from this source will appear here."
+                        : "Updates fetched from this source will show up here."
                 )
             } else {
                 List {

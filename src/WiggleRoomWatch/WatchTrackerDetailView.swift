@@ -152,7 +152,7 @@ struct WatchTrackerDetailView: View {
                     }
 
                     if tracker.latestReading == nil {
-                        Text("No readings logged yet — log one to see your pace.")
+                        Text("No readings yet — log one to see your pace.")
                             .font(.wiggleText(.caption2))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)

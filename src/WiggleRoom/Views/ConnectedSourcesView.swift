@@ -55,7 +55,7 @@ struct ConnectedSourcesView: View {
                 WiggleEmptyState(
                     symbol: "point.3.filled.connected.trianglepath.dotted",
                     title: "No Connected Sources",
-                    message: "Add a source like Starling or Tesla to fetch readings automatically.",
+                    message: "Add a source like Starling to fetch readings for you.",
                     actionTitle: "Add Source",
                     action: { isAddingSource = true }
                 )
@@ -108,7 +108,7 @@ struct ConnectedSourcesView: View {
                 sourcePendingRemoval = nil
             }
         } message: {
-            Text("This removes the connection and its stored token everywhere it's synced. Only allowed while no trackers use it.")
+            Text("Removes this connection and its token from all your devices. Only possible while no trackers use it.")
         }
         .alert(
             "Can't Remove Source",
@@ -134,7 +134,7 @@ struct ConnectedSourcesView: View {
                 WiggleEmptyState(
                     symbol: "point.3.filled.connected.trianglepath.dotted",
                     title: "No Connected Sources",
-                    message: "Add a source like Starling or Tesla to fetch readings automatically."
+                    message: "Add a source like Starling to fetch readings for you."
                 )
             } else {
                 List(addedSources) { source in
@@ -179,7 +179,7 @@ struct ConnectedSourcesView: View {
                 sourcePendingRemoval = nil
             }
         } message: {
-            Text("This removes the connection and its stored token everywhere it's synced. Only allowed while no trackers use it.")
+            Text("Removes this connection and its token from all your devices. Only possible while no trackers use it.")
         }
         .alert(
             "Can't Remove Source",
@@ -235,11 +235,11 @@ struct ConnectedSourcesView: View {
 private func starlingConnectErrorMessage(for error: Error) -> String {
     switch error {
     case StarlingAPIError.invalidToken:
-        return "That token was rejected — check it's current and has account:read/balance:read scopes."
+        return "Starling didn't accept that token. Check it's current and includes account:read and balance:read."
     case StarlingAPIError.rateLimited, StarlingAPIError.budgetExceeded:
-        return "Starling is rate-limiting requests right now — try again shortly."
+        return "Starling is busy right now — try again in a moment."
     case StarlingAPIError.network:
-        return "Couldn't reach Starling — check your connection and try again."
+        return "Can't reach Starling. Check your connection and try again."
     default:
         return "Couldn't connect — try again."
     }
@@ -336,7 +336,7 @@ private struct SourceEditorCard: View {
                         .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("Generate a token at developer.starlingbank.com with account:read and balance:read scopes.")
+                    Text("Create a token at developer.starlingbank.com with account:read and balance:read.")
                         .font(.wiggleText(.caption2))
                         .foregroundStyle(.secondary)
                 }
@@ -383,7 +383,7 @@ private struct SourceEditorCard: View {
                     .font(.wiggleText(.caption, weight: .medium))
             }
             if let starlingCooldownUntil {
-                Text("Paused until \(starlingCooldownUntil.formatted(Self.timeFormatter)) after hitting Starling's rate limit.")
+                Text("Taking a breather until \(starlingCooldownUntil.formatted(Self.timeFormatter)) — Starling's rate limit was hit.")
                     .font(.wiggleText(.caption2))
                     .foregroundStyle(WiggleRoomColors.warning)
             } else {
@@ -489,7 +489,7 @@ private struct NewSourceCard: View {
                     .foregroundStyle(WiggleRoomColors.error)
             }
 
-            Text("Generate a personal access token at developer.starlingbank.com with account:read and balance:read scopes.")
+            Text("Create a personal access token at developer.starlingbank.com with account:read and balance:read.")
                 .font(.wiggleText(.caption2))
                 .foregroundStyle(.secondary)
 

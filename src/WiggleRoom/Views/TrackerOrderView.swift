@@ -22,7 +22,7 @@ struct TrackerOrderView: View {
                     }
                 }
             } footer: {
-                Text("Drag trackers to set your own order. It syncs to all your devices. New trackers appear at the top.")
+                Text("Drag to reorder. Your order syncs across your devices, and new trackers land at the top.")
             }
 
             Section {
