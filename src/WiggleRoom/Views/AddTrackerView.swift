@@ -149,7 +149,7 @@ struct AddTrackerView: View {
                 }
 
                 Section {
-                    LabeledContent("Starting value") {
+                    LabeledContent("Starting balance") {
                         unitValueField(text: $startingValueText, field: .startingValue)
                     }
                     if isPrefillingStartingValue {
@@ -273,7 +273,7 @@ struct AddTrackerView: View {
                             }
                         }
                     } footer: {
-                        Text("Removes this tracker and its readings for good.")
+                        Text("Removes this tracker and its data.")
                     }
                     #if os(iOS)
                     .listSectionSpacing(.custom(48))
@@ -342,7 +342,7 @@ struct AddTrackerView: View {
                     dismiss()
                 }
             } message: {
-                Text("Removes this tracker and its readings for good.")
+                Text("Removes this tracker and its data.")
             }
         }
     }
@@ -550,7 +550,7 @@ struct AddTrackerView: View {
     private var totalBudgetHint: String {
         switch direction {
         case .decreasing:
-            return "How much you can use across the whole period — usually the same as the starting value."
+            return "How much you can use across the whole period, usually the same as the starting value."
         case .increasing:
             return "How much more you can add across the whole period."
         }
@@ -559,9 +559,9 @@ struct AddTrackerView: View {
     private var directionFooter: String {
         switch direction {
         case .decreasing:
-            return "Decreasing: start with an amount and use it up, like a £3000 budget running down to 0."
+            return "Decreasing: start with an amount and use it up, like a £3000 budget running down to £0."
         case .increasing:
-            return "Increasing: a reading that climbs towards a limit, like mileage counting up against a 3000 mile allowance."
+            return "Increasing: a reading that climbs towards a limit, like mileage counting up against a 10000 mile allowance."
         }
     }
 

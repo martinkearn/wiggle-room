@@ -134,7 +134,7 @@ struct AddSourceView: View {
     }
 
     private var tokenFieldFooter: String {
-        "Create a personal access token at developer.starlingbank.com with account:read and balance:read."
+        "Create a free personal access token at developer.starlingbank.com with account:read and balance:read."
     }
 
     private var trimmedToken: String {

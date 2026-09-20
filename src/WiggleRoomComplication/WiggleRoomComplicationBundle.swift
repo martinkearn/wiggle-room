@@ -26,7 +26,7 @@ struct TrackerComplication: Widget {
             TrackerComplicationEntryView(entry: entry)
         }
         .configurationDisplayName("Tracker")
-        .description("Shows a tracker's pace at a glance.")
+        .description("Shows a tracker at a glance.")
         .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }

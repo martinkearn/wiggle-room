@@ -29,8 +29,8 @@ struct CelebrationView: View {
     private var subheadline: String {
         let name = tracker.name
         return tracker.usesBudgetLanguage
-            ? "\(name) wrapped up with room to spare. Nicely paced."
-            : "\(name) wrapped up right on budget. Nicely paced."
+            ? "\(name) wrapped up with room to spare. Nicely done."
+            : "\(name) wrapped up right on budget. Nicely done."
     }
 
     var body: some View {

@@ -72,7 +72,7 @@ struct TrackerListView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Trackers")
+            .navigationTitle("Wiggle Room")
             .navigationDestination(for: TrackerRoute.self) { route in
                 if let tracker = trackers.first(where: { $0.id == route.id }) {
                     TrackerDetailView(tracker: tracker)
