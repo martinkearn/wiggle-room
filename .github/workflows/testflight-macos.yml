@@ -42,6 +42,7 @@ jobs:
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
         run: |
+          umask 077
           API_KEY_DIRECTORY="$HOME/.appstoreconnect/private_keys"
           mkdir -p "$API_KEY_DIRECTORY"
           printf '%s' "$API_PRIVATE_KEY" > "$API_KEY_DIRECTORY/AuthKey_${API_KEY_ID}.p8"
@@ -59,7 +60,12 @@ jobs:
           INSTALLER_CERTIFICATE_PATH="$RUNNER_TEMP/mac-installer-distribution.p12"
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+          ORIGINAL_KEYCHAINS_PATH="$RUNNER_TEMP/original-keychains"
 
+          umask 077
+          security list-keychains -d user \
+            | sed -E 's/^[[:space:]]*"//; s/"[[:space:]]*$//' \
+            > "$ORIGINAL_KEYCHAINS_PATH"
           printf '%s' "$APP_CERTIFICATE_BASE64" | base64 --decode > "$APP_CERTIFICATE_PATH"
           printf '%s' "$INSTALLER_CERTIFICATE_BASE64" | base64 --decode > "$INSTALLER_CERTIFICATE_PATH"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -81,10 +87,6 @@ jobs:
             -S apple-tool:,apple: \
             -k "$KEYCHAIN_PASSWORD" \
             "$KEYCHAIN_PATH"
-          ORIGINAL_KEYCHAINS_PATH="$RUNNER_TEMP/original-keychains"
-          security list-keychains -d user \
-            | sed -E 's/^[[:space:]]*"//; s/"[[:space:]]*$//' \
-            > "$ORIGINAL_KEYCHAINS_PATH"
           ORIGINAL_KEYCHAINS=()
           while IFS= read -r keychain; do
             ORIGINAL_KEYCHAINS+=("$keychain")
