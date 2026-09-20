@@ -225,9 +225,27 @@ struct TrackerDetailView: View {
         #if os(macOS)
         .toolbar(removing: .title)
         #endif
-        // Header: title, date range, then (connected sources only) the
-        // "connection · account" line beneath the range.
+        // Header: title and date range in the navigation bar. On iOS the
+        // subtitle only shows one line, so the "connection · account" line
+        // (connected sources only) is a pinned strip directly beneath the
+        // bar — a top safe-area inset, so it stays put while the content
+        // scrolls and the content starts below it rather than under it.
+        #if os(macOS)
         .navigationSubtitle(sourceCaption.map { "\(periodRangeText)\n\($0)" } ?? periodRangeText)
+        #else
+        .navigationSubtitle(periodRangeText)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let sourceCaption {
+                Text(sourceCaption)
+                    .font(.wiggleText(.caption))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(.bar)
+            }
+        }
+        #endif
         .inlineNavigationBarIfAvailable()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
