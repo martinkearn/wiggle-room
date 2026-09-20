@@ -65,3 +65,6 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 src/.DS_Store
 .DS_Store
+
+# Private local development journal
+docs/progress-notes.md

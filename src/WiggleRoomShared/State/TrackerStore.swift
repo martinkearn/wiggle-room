@@ -67,14 +67,10 @@ final class TrackerStore {
 
     /// Wipes every tracker (and, via its cascade delete rule, every
     /// reading), every real connected source, and every Starling request
-    /// log entry — a full reset back to a blank app. Deliberately something
-    /// the user has to explicitly trigger from Settings (§7.2/§12) rather
-    /// than anything automatic, after a real 2026-09-18 incident where a
-    /// schema mismatch across processes corrupted local test data badly
-    /// enough that some records couldn't even be selected/deleted
-    /// individually (see progress-notes.md) — this is the clean-slate
-    /// escape hatch for exactly that kind of situation, not a routine
-    /// feature. The fixed "Manual Entry" pseudo-source (`manualEntrySource`)
+    /// log entry — a full reset back to a blank app. This is an explicitly
+    /// confirmed clean-slate escape hatch for corrupted or unwanted data, not
+    /// routine maintenance. The fixed "Manual Entry" pseudo-source
+    /// (`manualEntrySource`)
     /// is deliberately **not** deleted — it's required plumbing every
     /// tracker's source picker depends on existing, not user data, and
     /// `TrackerStore` doesn't currently support recreating it without a

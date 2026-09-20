@@ -1,89 +1,79 @@
 # Wiggle Room
 
-A personal iOS/iPadOS/macOS/watchOS app that tracks any allowance —
-a bank balance against a monthly budget, a car's mileage against a
-lease — against the pace needed to land exactly on target by the end
-of the period. Visualized as two concentric rings: an outer ring for
-time elapsed, an inner ring for how much of the allowance has actually
-been used.
+Wiggle Room is a SwiftUI app for tracking a limited allowance against the
+pace needed to reach a target at the end of a fixed period. A tracker can
+represent a monthly budget, annual mileage allowance, or any other quantity
+that decreases or increases over time.
 
-This is a private household project, not intended for public
-distribution — see the spec for why (Starling API access is
-scoped to personal use, not a public multi-user product).
+The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit
+keep a user's trackers and reading history in sync across their own devices.
 
-## Documentation
+## Features
 
-The full build specification lives at
-[`docs/wiggleroom-build-spec.md`](docs/wiggleroom-build-spec.md). It's the
-source of truth for how the app should work — data model, the source
-provider architecture, visual/UX direction, platform-specific UI, and
-what's explicitly out of scope for v1. Read it before making any
-non-trivial change.
-
-## Status
-
-See [`docs/progress-notes.md`](docs/progress-notes.md) for the detailed,
-continuously-updated log of what's built, key decisions, and known gaps.
-Rough shape of what's implemented vs. still to come:
-
-- [x] Core Tracker model & pace/consumption calculations
-- [x] Starling provider (implemented — accounts, balances, and Spaces (savings goals + spending spaces) as tracker targets; token stored on the synced ConnectedSource record (CloudKit, not Keychain); flat 45s foreground refresh, time-of-day-banded + per-tracker-burst background refresh with a cross-tracker balance cache and a rate-limit insight panel in Settings; edit/remove in Settings. Build-verified on both iOS and macOS as of 2026-09-18 — see progress-notes.md's 2026-09-18 entries)
-- [x] Manual entry provider
-- [ ] Tesla and other providers (deferred — not being built right now; spec §9)
-- [x] SwiftData + CloudKit sync
-- [x] Per-tracker colours/glyphs and the friendly "wobbly" visual refresh (Fraunces + Nunito) across iOS, macOS, watch and widgets
-- [x] iOS dashboard & rings visual, incl. a completed-tracker presentation
-- [x] Settings → Tracker Order (synced custom ordering of the tracker list)
-- [x] Widgets (Home Screen incl. extra-large, Lock Screen — configurable per tracker)
-- [x] macOS UI (sidebar, menu bar item, Dock badge)
-- [x] watchOS companion app (embedded in the iOS app)
-- [x] watchOS complication
-- [x] Siri/Shortcuts (log a reading, check a tracker's status)
-- [x] Extensions: Control, final-10% Live Activity, Spotlight, actionable reminder notification (built, not runtime-verified — spec §8.5)
-- [ ] visionOS / Mac Catalyst (deliberately removed — iOS and macOS only, see progress notes)
+- Generic increasing and decreasing trackers
+- Manual readings and optional Starling Bank balance integration
+- Pace, budget, and projected-final calculations
+- Reading history and trend charts
+- iOS and macOS apps, Apple Watch companion app, widgets, complications,
+  Live Activities, Siri Shortcuts, and Spotlight integration
+- Cross-device sync through the user's private CloudKit database
+- Per-tracker colours, symbols, reminders, and custom ordering
 
 ## Requirements
 
-- Xcode (current stable release)
-- An Apple ID added to Xcode for local builds; the Apple Developer
-  Program ($99/year) is needed later for CloudKit sync and TestFlight
-  distribution — not required to build and run locally
-- A Starling personal access token (developer.starlingbank.com) for
-  testing the Starling provider
+- A current stable version of Xcode
+- An Apple ID configured in Xcode
+- Apple Developer Program membership for CloudKit on physical devices and
+  TestFlight distribution
+- An optional Starling personal access token to use the Starling provider
 
 ## Getting started
 
-1. Open `src/WiggleRoom.xcodeproj` (or `.xcworkspace`, if present) in Xcode.
-2. Build and run on the iOS, macOS, or watchOS simulator — pick the
-   `WiggleRoom` scheme for the iPhone/Mac app (the watch app and widgets embed
-   automatically), or `WiggleRoomWatch`/`WiggleRoomWidgets` directly to iterate on
-   just one of them.
-3. Provider credentials are entered in-app under Settings → Connected
-   Sources — never hardcode tokens in source or commit them to this
-   repo. (Not yet relevant in practice — no real provider ships yet.)
+1. Open `src/WiggleRoom.xcodeproj` in Xcode.
+2. Select the `WiggleRoom` scheme.
+3. Choose an iOS simulator, a Mac, or a connected device.
+4. Build and run.
+
+The app can be used entirely with manual trackers. Starling credentials are
+entered at runtime under **Settings → Connected Sources**. Never hard-code or
+commit personal access tokens.
+
+CloudKit, App Groups, signing identities, and bundle identifiers are tied to
+the original developer account. Forks must configure their own Apple
+Developer identifiers and capabilities before CloudKit or device builds work.
 
 ## Project structure
 
-```
+```text
 wiggle-room/
-├── CLAUDE.md                  — instructions for an AI agent working in this repo
 ├── docs/
-│   ├── wiggleroom-build-spec.md — the build spec (source of truth)
-│   └── progress-notes.md      — what's actually been built, decisions, gaps
-├── scripts/                   — one-off Xcode-project-surgery scripts (see
-│                                 progress-notes.md; not part of the app), plus
-│                                 generate_app_icon.py (regenerates every icon PNG)
-├── src/                       — Xcode project & app source
+│   └── wiggleroom-build-spec.md
+├── scripts/                    # Project maintenance and icon generation
+├── src/
 │   ├── WiggleRoom.xcodeproj
-│   ├── WiggleRoom/                — the iOS/iPadOS/macOS app + Shortcuts intents
-│   ├── WiggleRoomShared/          — model/pace/scheduling layer + RingsView,
-│   │                             shared by every target below (no App Group —
-│   │                             each target syncs independently via CloudKit)
-│   ├── WiggleRoomWidgets/         — WidgetKit extension (Home Screen, Lock Screen)
-│   ├── WiggleRoomWatch/           — watchOS companion app
-│   ├── WiggleRoomComplication/    — watchOS complication (WidgetKit extension,
-│   │                             embedded inside WiggleRoomWatch)
+│   ├── WiggleRoom/             # iOS, iPadOS and macOS app
+│   ├── WiggleRoomShared/       # Shared models, services and UI
+│   ├── WiggleRoomWidgets/      # iOS/macOS widgets and Live Activity
+│   ├── WiggleRoomWatch/        # watchOS companion app
+│   ├── WiggleRoomComplication/ # watchOS complication
 │   ├── WiggleRoomTests/
 │   └── WiggleRoomUITests/
 └── README.md
 ```
+
+The concise product and architecture specification is in
+[`docs/wiggleroom-build-spec.md`](docs/wiggleroom-build-spec.md).
+
+## Security and privacy
+
+- User data is stored locally with SwiftData and synced through the user's
+  private CloudKit database.
+- Starling requests go directly from the app to Starling over HTTPS.
+- The project contains no API credentials. Test credentials are synthetic.
+- Do not include real balances, account identifiers, tokens, screenshots, or
+  other personal data in issues, tests, documentation, or commits.
+
+## Licence
+
+Wiggle Room is available under the [MIT Licence](LICENSE). Bundled fonts retain
+their own SIL Open Font Licence files under `src/WiggleRoomShared/Fonts`.
