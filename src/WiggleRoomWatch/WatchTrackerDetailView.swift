@@ -170,7 +170,7 @@ struct WatchTrackerDetailView: View {
                             Button {
                                 Task { await refreshFromSourceIfNeeded() }
                             } label: {
-                                Label("Refresh", systemImage: "arrow.clockwise")
+                                Label("Update", systemImage: "arrow.clockwise")
                             }
                             .buttonStyle(.borderedProminent)
                             .disabled(isRefreshingFromSource)

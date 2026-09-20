@@ -483,13 +483,13 @@ struct TrackerDetailView: View {
             return "Connection expired — reconnect this source in Settings."
         case StarlingAPIError.rateLimited(let retryAfter):
             let resumeText = retryAfter.map { " Resumes at \(Date.now.addingTimeInterval($0).formatted(Self.retryTimeFormatter))." } ?? ""
-            return "Refresh paused — Starling rate limit reached.\(resumeText)"
+            return "Balance update paused — Starling rate limit reached.\(resumeText)"
         case StarlingAPIError.budgetExceeded(let resetsAt):
-            return "Refresh paused — daily request limit reached. Resumes at \(resetsAt.formatted(Self.retryTimeFormatter))."
+            return "Balance update paused — daily request limit reached. Resumes at \(resetsAt.formatted(Self.retryTimeFormatter))."
         case StarlingAPIError.network:
             return "Couldn't reach Starling — check your connection."
         default:
-            return "Couldn't refresh — will try again shortly."
+            return "Couldn't update balance — will try again shortly."
         }
     }
 
@@ -498,12 +498,13 @@ struct TrackerDetailView: View {
     /// A persistent affordance for the pull-to-refresh gesture — unlike a
     /// button, `.refreshable`'s own control only appears once a pull is
     /// already underway, so without this there'd be nothing on screen
-    /// hinting the gesture exists at all. Worded per source: "update" for a
-    /// manual tracker (it opens the log sheet), "refresh" for a connected
-    /// one (it re-fetches) — same gesture, described as whichever action it
-    /// actually performs for this tracker.
+    /// hinting the gesture exists at all. Always "update current balance" —
+    /// for a manual tracker it opens the log sheet, for a connected one it
+    /// re-fetches the balance; either way the balance figure changes.
+    /// ("Refresh" is reserved for re-evaluating the budget against the
+    /// current time, which never changes the balance.)
     private var pullToUpdateHint: some View {
-        Label("Pull down to \(tracker.isManualEntry ? "update" : "refresh")", systemImage: "arrow.down")
+        Label("Pull down to update current balance", systemImage: "arrow.down")
             .font(.wiggleText(.caption2))
             .foregroundStyle(.secondary)
     }
@@ -522,7 +523,7 @@ struct TrackerDetailView: View {
             }
         } label: {
             Label(
-                tracker.isManualEntry ? "Update Current Balance" : "Refresh",
+                "Update Current Balance",
                 systemImage: tracker.isManualEntry ? "plus.circle.fill" : "arrow.clockwise"
             )
             .font(.wiggleText(.subheadline, weight: .semibold))
