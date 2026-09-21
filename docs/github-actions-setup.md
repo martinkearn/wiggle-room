@@ -347,7 +347,7 @@ In Terminal, start a zsh shell if necessary by running `zsh`. Then set
 (
   set -e
   P12_PATH="$HOME/path/to/Certificate.p12"
-  TEMP_DIRECTORY="$(mktemp -d "${TMPDIR:-/tmp/}wiggleroom-signing.XXXXXX")"
+  TEMP_DIRECTORY="$(mktemp -d -t wiggleroom-signing)"
   TEMP_KEYCHAIN="$TEMP_DIRECTORY/test.keychain-db"
   TEMP_KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
   trap 'security delete-keychain "$TEMP_KEYCHAIN" 2>/dev/null || true; rm -rf "$TEMP_DIRECTORY"' EXIT
