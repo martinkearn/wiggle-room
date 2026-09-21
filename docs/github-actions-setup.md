@@ -498,9 +498,11 @@ Create the matching GitHub secret and paste the copied single-line value. The
 profiles have no separate password secret. Repeat for all six profiles.
 
 The workflows decode each profile, verify its bundle identifier, install it
-under its UUID, and configure manual distribution signing where required. This
-prevents Xcode from falling back to cloud-managed distribution signing or
-creating development signing assets during CI archives.
+under its UUID, and configure manual distribution signing where required. The
+iOS archive uses Release build settings that select those installed profile UUIDs
+for the app, widget, watch app, and complication targets. This prevents Xcode
+from falling back to cloud-managed distribution signing or creating development
+signing assets during CI archives.
 
 ## Verify the configuration
 
