@@ -69,8 +69,16 @@ jobs:
           security list-keychains -d user \
             | sed -E 's/^[[:space:]]*"//; s/"[[:space:]]*$//' \
             > "$ORIGINAL_KEYCHAINS_PATH"
-          printf '%s' "$APP_CERTIFICATE_BASE64" | base64 --decode > "$APP_CERTIFICATE_PATH"
-          printf '%s' "$INSTALLER_CERTIFICATE_BASE64" | base64 --decode > "$INSTALLER_CERTIFICATE_PATH"
+          if ! printf '%s' "$APP_CERTIFICATE_BASE64" | base64 --decode > "$APP_CERTIFICATE_PATH" \
+            || [[ ! -s "$APP_CERTIFICATE_PATH" ]]; then
+            echo "::error::APPLE_DISTRIBUTION_CERTIFICATE_BASE64 is empty or is not valid Base64 for a .p12 file."
+            exit 1
+          fi
+          if ! printf '%s' "$INSTALLER_CERTIFICATE_BASE64" | base64 --decode > "$INSTALLER_CERTIFICATE_PATH" \
+            || [[ ! -s "$INSTALLER_CERTIFICATE_PATH" ]]; then
+            echo "::error::MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_BASE64 is empty or is not valid Base64 for a .p12 file."
+            exit 1
+          fi
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"

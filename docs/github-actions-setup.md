@@ -301,6 +301,7 @@ that will export it, or securely obtain a `.p12` from the private-key holder.
 7. If Keychain Access subsequently requests the Mac login password or Touch ID,
    that is only authorization to export the private key. It is not the `.p12`
    password and must not be saved in GitHub.
+8. Store the `.p12` export password securely until it has been added to GitHub.
 
 Before encoding the file, use the
 [local import preflight](#test-each-p12-locally-before-uploading-it) below.
@@ -418,6 +419,12 @@ After all eight secrets are present:
 
 Workflow runs perform real TestFlight uploads. Each attempt receives a unique,
 platform-specific build number, including reruns.
+
+Feature branches may be added temporarily to a workflow's `push.branches` list
+for pre-merge verification. Because every push then performs a real upload,
+remove temporary branch entries from both platform workflows after verification
+and before merging. Permanent automatic deployments should run only from
+`main`; use `workflow_dispatch` for later ad hoc tests.
 
 ## Secret rotation and cleanup
 
