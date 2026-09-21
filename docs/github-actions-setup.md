@@ -9,6 +9,12 @@ signing with an App Store Connect API key, an Apple Distribution certificate,
 and a Mac Installer Distribution certificate. Never commit any private key,
 certificate export, password, or secret value to the repository.
 
+Automatic signing manages provisioning profiles, but archive export explicitly
+selects the imported `Apple Distribution` identity (and, for macOS, the
+imported `Mac Installer Distribution` identity). This avoids relying on access
+to Apple's separate cloud-managed distribution certificate while still
+allowing Xcode to create or download profiles through the API key.
+
 ## Prerequisites
 
 Before configuring the secrets, ensure that:
