@@ -45,9 +45,7 @@ Developer identifiers and capabilities before CloudKit or device builds work.
 ## TestFlight deployment
 
 Pushes to `main` start separate GitHub Actions workflows for iOS and macOS.
-Both workflows also support manual dispatch. During initial verification,
-pushes to `copilot/create-github-actions-pipeline` perform real TestFlight
-deployments before the branch is merged.
+Both workflows also support manual dispatch.
 
 Every workflow attempt receives a new build number derived from the repository
 commit count, workflow attempt, and platform. This keeps iOS and macOS archive
@@ -55,35 +53,9 @@ numbers distinct, including reruns. The number is applied consistently to the
 app and all embedded extensions before the workflow creates a signed archive
 and uploads it to the existing App Store Connect record.
 
-Add the following repository secrets under **Settings → Secrets and variables
-→ Actions → New repository secret**:
-
-| Secret | Value and source |
-|---|---|
-| `APPLE_TEAM_ID` | The Team ID shown on the [Apple Developer membership page](https://developer.apple.com/account#MembershipDetailsCard). |
-| `APP_STORE_CONNECT_API_KEY_ID` | The Key ID shown for a team API key under **App Store Connect → Users and Access → Integrations → App Store Connect API**. |
-| `APP_STORE_CONNECT_ISSUER_ID` | The Issuer ID shown on the same App Store Connect API page. |
-| `APP_STORE_CONNECT_API_PRIVATE_KEY` | The complete contents of the `AuthKey_<key-id>.p8` file. Apple permits this file to be downloaded only once when the API key is created. |
-| `APPLE_DISTRIBUTION_CERTIFICATE_BASE64` | A base64-encoded `.p12` export containing the Apple Distribution certificate and its private key. Create the certificate under **Apple Developer → Certificates, Identifiers & Profiles → Certificates**, install it, then export it from Keychain Access. |
-| `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD` | The password chosen when exporting the Apple Distribution `.p12` file. |
-| `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_BASE64` | A base64-encoded `.p12` export containing the Mac Installer Distribution certificate and its private key, obtained and exported in the same way. |
-| `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD` | The password chosen when exporting the Mac Installer Distribution `.p12` file. |
-
-Create the App Store Connect API key with access to this app and to
-Certificates, Identifiers & Profiles; the **App Manager** role is sufficient
-for uploading builds. On macOS, encode each certificate export for its secret
-with:
-
-```sh
-base64 -i Certificate.p12 | tr -d '\n' | pbcopy
-```
-
-Paste the copied output into the corresponding `*_BASE64` secret. Never commit
-the `.p8`, `.p12`, or their passwords. The workflows use the API key to obtain
-the existing provisioning profiles through Xcode automatic signing.
-
-For complete setup, certificate export, fork configuration, rotation, and
-troubleshooting instructions, see the
+The workflows require GitHub repository secrets for App Store Connect
+authentication and signing. For the complete list, purpose, setup, certificate
+export, fork configuration, rotation, and troubleshooting instructions, see the
 [GitHub Actions TestFlight setup guide](docs/github-actions-setup.md).
 
 ## Project structure
