@@ -4,16 +4,16 @@ This guide explains how to configure the GitHub Actions secrets used to sign,
 archive, and upload Wiggle Room builds to TestFlight. It is intended for
 maintainers of this repository and developers configuring their own fork.
 
-The workflows create separate iOS and macOS archives. Archive creation uses
-Xcode automatic signing with an App Store Connect API key. Distribution export
-uses an imported Apple Distribution certificate, explicit App Store
-provisioning profiles, and, for macOS, a Mac Installer Distribution
-certificate. Never commit any private key, profile, certificate export,
-password, or secret value to the repository.
+The workflows create separate iOS and macOS archives. The iOS workflow installs
+explicit App Store provisioning profiles before archive creation and signs with
+the imported Apple Distribution certificate. Distribution export uses the same
+explicit profiles, and, for macOS, a Mac Installer Distribution certificate.
+Never commit any private key, profile, certificate export, password, or secret
+value to the repository.
 
 Explicit export signing avoids relying on access to Apple's separate
 cloud-managed distribution certificate. The API key remains responsible for
-provisioning during archive creation and authentication during upload.
+authentication during archive creation and upload.
 
 ## Prerequisites
 
@@ -434,8 +434,7 @@ encoded.
 
 ## App Store provisioning profile secrets
 
-The App Store Connect API key can upload builds and help Xcode create
-development profiles during archive creation, but API-key authentication
+The App Store Connect API key can upload builds, but API-key authentication
 cannot use a cloud-managed distribution certificate during export. The
 workflows therefore install explicit App Store distribution profiles associated
 with the imported Apple Distribution certificate.
@@ -499,8 +498,9 @@ Create the matching GitHub secret and paste the copied single-line value. The
 profiles have no separate password secret. Repeat for all six profiles.
 
 The workflows decode each profile, verify its bundle identifier, install it
-under its UUID, and configure manual export signing. This prevents Xcode from
-falling back to cloud-managed distribution signing.
+under its UUID, and configure manual distribution signing where required. This
+prevents Xcode from falling back to cloud-managed distribution signing or
+creating development signing assets during CI archives.
 
 ## Verify the configuration
 
