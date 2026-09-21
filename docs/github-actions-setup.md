@@ -4,16 +4,16 @@ This guide explains how to configure the GitHub Actions secrets used to sign,
 archive, and upload Wiggle Room builds to TestFlight. It is intended for
 maintainers of this repository and developers configuring their own fork.
 
-The workflows create separate iOS and macOS archives. They use Xcode automatic
-signing with an App Store Connect API key, an Apple Distribution certificate,
-and a Mac Installer Distribution certificate. Never commit any private key,
-certificate export, password, or secret value to the repository.
+The workflows create separate iOS and macOS archives. Archive creation uses
+Xcode automatic signing with an App Store Connect API key. Distribution export
+uses an imported Apple Distribution certificate, explicit App Store
+provisioning profiles, and, for macOS, a Mac Installer Distribution
+certificate. Never commit any private key, profile, certificate export,
+password, or secret value to the repository.
 
-Automatic signing manages provisioning profiles, but archive export explicitly
-selects the imported `Apple Distribution` identity (and, for macOS, the
-imported `Mac Installer Distribution` identity). This avoids relying on access
-to Apple's separate cloud-managed distribution certificate while still
-allowing Xcode to create or download profiles through the API key.
+Explicit export signing avoids relying on access to Apple's separate
+cloud-managed distribution certificate. The API key remains responsible for
+provisioning during archive creation and authentication during upload.
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@ Before configuring the secrets, ensure that:
 - You can access the repository's **Settings → Secrets and variables →
   Actions** page.
 
-The repository workflows expect all eight secrets listed below. GitHub does not
+The repository workflows expect all fourteen secrets listed below. GitHub does not
 allow empty Actions secrets, and it does not display a secret again after it is
 saved.
 
@@ -44,6 +44,12 @@ saved.
 | `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD` | Unlocks the exported Apple Distribution `.p12`. |
 | `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_BASE64` | Supplies the installer signing identity required for Mac App Store distribution. |
 | `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD` | Unlocks the exported Mac Installer Distribution `.p12`. |
+| `IOS_APP_STORE_PROFILE_BASE64` | Supplies the App Store provisioning profile for the iOS app. |
+| `IOS_WIDGET_APP_STORE_PROFILE_BASE64` | Supplies the App Store provisioning profile for the iOS widget extension. |
+| `WATCH_APP_STORE_PROFILE_BASE64` | Supplies the App Store provisioning profile for the embedded watch app. |
+| `WATCH_COMPLICATION_APP_STORE_PROFILE_BASE64` | Supplies the App Store provisioning profile for the watch complication. |
+| `MAC_APP_STORE_PROFILE_BASE64` | Supplies the Mac App Store provisioning profile for the macOS app. |
+| `MAC_WIDGET_APP_STORE_PROFILE_BASE64` | Supplies the Mac App Store provisioning profile for the macOS widget extension. |
 
 ## Add a repository secret
 
@@ -413,9 +419,79 @@ valid matching PKCS#12 pair—for example, the wrong password was saved, the Mac
 login password was confused with the export password, or the wrong file was
 encoded.
 
+## App Store provisioning profile secrets
+
+The App Store Connect API key can upload builds and help Xcode create
+development profiles during archive creation, but API-key authentication
+cannot use a cloud-managed distribution certificate during export. The
+workflows therefore install explicit App Store distribution profiles associated
+with the imported Apple Distribution certificate.
+
+Create a separate profile for every distributed bundle:
+
+| Secret | Platform | Bundle identifier |
+|---|---|---|
+| `IOS_APP_STORE_PROFILE_BASE64` | iOS | `martinkearn.WiggleRoom` |
+| `IOS_WIDGET_APP_STORE_PROFILE_BASE64` | iOS | `martinkearn.WiggleRoom.WiggleRoomWidgets` |
+| `WATCH_APP_STORE_PROFILE_BASE64` | watchOS | `martinkearn.WiggleRoom.watchkitapp` |
+| `WATCH_COMPLICATION_APP_STORE_PROFILE_BASE64` | watchOS | `martinkearn.WiggleRoom.watchkitapp.WiggleRoomComplication` |
+| `MAC_APP_STORE_PROFILE_BASE64` | macOS | `martinkearn.WiggleRoom` |
+| `MAC_WIDGET_APP_STORE_PROFILE_BASE64` | macOS | `martinkearn.WiggleRoom.WiggleRoomWidgets` |
+
+Fork maintainers must use their replacement bundle identifiers instead.
+
+### Create each profile
+
+1. Open
+   [Apple Developer Profiles](https://developer.apple.com/account/resources/profiles/list).
+2. Select **+**.
+3. Choose the App Store distribution profile type for the profile's platform:
+   **App Store** for iOS/watchOS bundles or **Mac App Store** for macOS
+   bundles.
+4. Select the explicit App ID whose bundle identifier exactly matches the table
+   above.
+5. Select the Apple Distribution certificate exported earlier. All profiles
+   must contain the same distribution certificate installed by the workflows.
+6. Give the profile a descriptive name identifying its platform and target.
+7. Generate and download the profile.
+8. Keep each downloaded file clearly associated with its bundle identifier;
+   iOS and watchOS files normally use `.mobileprovision`, while macOS files
+   normally use `.provisionprofile`.
+
+If a required App ID is missing, create it under **Certificates, Identifiers &
+Profiles → Identifiers** with the capabilities used by the corresponding
+target. App Groups, CloudKit, push notifications, and other entitlements in the
+profile must agree with the Xcode target.
+
+### Verify and encode each profile
+
+To inspect a downloaded profile before uploading it:
+
+```sh
+security cms -D -i Profile.mobileprovision | plutil -p -
+```
+
+Use the actual `.provisionprofile` filename for a macOS profile. Confirm that
+the `application-identifier` entitlement ends with the expected bundle
+identifier. For macOS, the equivalent entitlement may be named
+`com.apple.application-identifier`.
+
+Encode each verified profile:
+
+```sh
+base64 -i Profile.mobileprovision | tr -d '\n' | pbcopy
+```
+
+Create the matching GitHub secret and paste the copied single-line value. The
+profiles have no separate password secret. Repeat for all six profiles.
+
+The workflows decode each profile, verify its bundle identifier, install it
+under its UUID, and configure manual export signing. This prevents Xcode from
+falling back to cloud-managed distribution signing.
+
 ## Verify the configuration
 
-After all eight secrets are present:
+After all fourteen secrets are present:
 
 1. Confirm every secret name exactly matches this guide.
 2. Confirm both Base64 secrets were created from `.p12` files that include
@@ -425,11 +501,13 @@ After all eight secrets are present:
    key.
 5. Confirm `APPLE_TEAM_ID` identifies the team that owns the app and
    capabilities.
-6. Run the iOS and macOS workflows manually or push to a configured deployment
+6. Confirm every provisioning profile targets the expected bundle identifier
+   and contains the same Apple Distribution certificate imported by CI.
+7. Run the iOS and macOS workflows manually or push to a configured deployment
    branch.
-7. Inspect failures only through GitHub Actions logs; never print secret values
+8. Inspect failures only through GitHub Actions logs; never print secret values
    while troubleshooting.
-8. After successful uploads, confirm both builds appear in App Store Connect
+9. After successful uploads, confirm both builds appear in App Store Connect
    under TestFlight.
 
 Workflow runs perform real TestFlight uploads. Each attempt receives a unique,

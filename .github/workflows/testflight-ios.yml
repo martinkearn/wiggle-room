@@ -116,6 +116,48 @@ jobs:
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             DEVELOPMENT_TEAM="$TEAM_ID"
 
+      - name: Install App Store provisioning profiles
+        env:
+          APP_PROFILE_BASE64: ${{ secrets.IOS_APP_STORE_PROFILE_BASE64 }}
+          WIDGET_PROFILE_BASE64: ${{ secrets.IOS_WIDGET_APP_STORE_PROFILE_BASE64 }}
+          WATCH_PROFILE_BASE64: ${{ secrets.WATCH_APP_STORE_PROFILE_BASE64 }}
+          COMPLICATION_PROFILE_BASE64: ${{ secrets.WATCH_COMPLICATION_APP_STORE_PROFILE_BASE64 }}
+        run: |
+          PROFILE_DIRECTORY="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIRECTORY"
+
+          install_profile() {
+            local encoded_profile="$1"
+            local expected_bundle_id="$2"
+            local environment_name="$3"
+            local profile_path="$PROFILE_DIRECTORY/${environment_name}.mobileprovision"
+            local profile_plist="$RUNNER_TEMP/${environment_name}.plist"
+
+            if ! printf '%s' "$encoded_profile" | openssl base64 -d -A > "$profile_path" \
+              || [[ ! -s "$profile_path" ]] \
+              || ! security cms -D -i "$profile_path" > "$profile_plist"; then
+              echo "::error::Provisioning profile secret for ${expected_bundle_id} is empty, invalid, or not Base64 for a provisioning profile."
+              exit 1
+            fi
+
+            local profile_uuid
+            local profile_app_identifier
+            profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$profile_plist")"
+            profile_app_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$profile_plist")"
+            if [[ "$profile_app_identifier" != *".${expected_bundle_id}" ]]; then
+              echo "::error::Provisioning profile ${profile_uuid} is for ${profile_app_identifier}, not ${expected_bundle_id}."
+              exit 1
+            fi
+
+            mv "$profile_path" "$PROFILE_DIRECTORY/${profile_uuid}.mobileprovision"
+            echo "${environment_name}=${profile_uuid}" >> "$GITHUB_ENV"
+          }
+
+          install_profile "$APP_PROFILE_BASE64" "martinkearn.WiggleRoom" "IOS_APP_PROFILE_UUID"
+          install_profile "$WIDGET_PROFILE_BASE64" "martinkearn.WiggleRoom.WiggleRoomWidgets" "IOS_WIDGET_PROFILE_UUID"
+          install_profile "$WATCH_PROFILE_BASE64" "martinkearn.WiggleRoom.watchkitapp" "WATCH_APP_PROFILE_UUID"
+          install_profile "$COMPLICATION_PROFILE_BASE64" "martinkearn.WiggleRoom.watchkitapp.WiggleRoomComplication" "WATCH_COMPLICATION_PROFILE_UUID"
+
       - name: Upload iOS archive to TestFlight
         env:
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
@@ -134,9 +176,20 @@ jobs:
             <key>method</key>
             <string>app-store-connect</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
             <key>signingCertificate</key>
             <string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>martinkearn.WiggleRoom</key>
+              <string>${IOS_APP_PROFILE_UUID}</string>
+              <key>martinkearn.WiggleRoom.WiggleRoomWidgets</key>
+              <string>${IOS_WIDGET_PROFILE_UUID}</string>
+              <key>martinkearn.WiggleRoom.watchkitapp</key>
+              <string>${WATCH_APP_PROFILE_UUID}</string>
+              <key>martinkearn.WiggleRoom.watchkitapp.WiggleRoomComplication</key>
+              <string>${WATCH_COMPLICATION_PROFILE_UUID}</string>
+            </dict>
             <key>teamID</key>
             <string>${TEAM_ID}</string>
             <key>uploadSymbols</key>
@@ -149,7 +202,6 @@ jobs:
             -archivePath "$RUNNER_TEMP/WiggleRoom-iOS.xcarchive" \
             -exportPath "$RUNNER_TEMP/WiggleRoom-iOS-export" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions-iOS.plist" \
-            -allowProvisioningUpdates \
             -authenticationKeyPath "$API_KEY_PATH" \
             -authenticationKeyID "$API_KEY_ID" \
             -authenticationKeyIssuerID "$API_ISSUER_ID"
@@ -174,4 +226,9 @@ jobs:
           rm -f \
             "$RUNNER_TEMP/original-keychains" \
             "$RUNNER_TEMP/apple-distribution.p12" \
+            "$RUNNER_TEMP/"*_PROFILE_UUID.plist \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/${IOS_APP_PROFILE_UUID:-missing}.mobileprovision" \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/${IOS_WIDGET_PROFILE_UUID:-missing}.mobileprovision" \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/${WATCH_APP_PROFILE_UUID:-missing}.mobileprovision" \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/${WATCH_COMPLICATION_PROFILE_UUID:-missing}.mobileprovision" \
             "$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8"
