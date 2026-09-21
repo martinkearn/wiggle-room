@@ -260,10 +260,15 @@ Do not use a blank export password.
 ## Mac Installer Distribution certificate secrets
 
 The Mac Installer Distribution certificate signs the installer package
-produced for Mac App Store and macOS TestFlight distribution. It is distinct
-from Apple Distribution, Mac App Distribution, and Developer ID Installer.
-The workflow needs a `.p12` containing both this certificate and its private
-key.
+produced for Mac App Store and macOS TestFlight distribution. Apple calls the
+certificate type **Mac Installer Distribution** in the Developer portal, but
+Keychain Access may display an issued certificate using the legacy identity
+name **3rd Party Mac Developer Installer: _account holder_ (_team ID_)**. These
+names refer to the same certificate type.
+
+It is distinct from Apple Distribution, Mac App Distribution, and Developer ID
+Installer. The workflow needs a `.p12` containing both this certificate and its
+private key.
 
 ### Create a certificate signing request
 
@@ -285,12 +290,17 @@ key.
 5. Download the resulting `.cer` file.
 6. Double-click the `.cer` file to install it in Keychain Access.
 7. Open **Keychain Access → login → My Certificates**.
-8. Find **Mac Installer Distribution: …**.
-9. Expand it and confirm that a private key appears underneath.
+8. Find the issued installer certificate. Depending on the macOS and
+   certificate version, Keychain Access may show either:
+   - **Mac Installer Distribution: …**
+   - **3rd Party Mac Developer Installer: … (_team ID_)**
+9. Confirm that the team ID in the certificate name matches `APPLE_TEAM_ID`.
+10. Expand the certificate and confirm that a private key appears underneath.
 
 Do not choose **Developer ID Installer**; that certificate is for distribution
 outside the Mac App Store. Do not use **Mac App Distribution** in place of the
-installer certificate.
+installer certificate. The presence of **3rd Party** in the legacy Keychain
+name does not mean it is a Developer ID certificate.
 
 If no private key appears, the certificate signing request was generated on a
 different Mac. Recreate the certificate using a request generated on the Mac
@@ -299,7 +309,8 @@ that will export it, or securely obtain a `.p12` from the private-key holder.
 ### Export the `.p12`
 
 1. In **Keychain Access → login → My Certificates**, expand the
-   **Mac Installer Distribution: …** entry.
+   **Mac Installer Distribution: …** or
+   **3rd Party Mac Developer Installer: …** entry.
 2. Confirm its private key is visible beneath it.
 3. Select the certificate, then Command-click its private key so both items are
    highlighted.
