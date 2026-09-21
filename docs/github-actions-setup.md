@@ -516,8 +516,7 @@ After all fourteen secrets are present:
    capabilities.
 6. Confirm every provisioning profile targets the expected bundle identifier
    and contains the same Apple Distribution certificate imported by CI.
-7. Run the iOS and macOS workflows manually or push to a configured deployment
-   branch.
+7. Run the iOS and macOS workflows manually or push to `main`.
 8. Inspect failures only through GitHub Actions logs; never print secret values
    while troubleshooting.
 9. After successful uploads, confirm both builds appear in App Store Connect

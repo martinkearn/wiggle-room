@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - copilot/create-github-actions-pipeline
 
 permissions:
   contents: read

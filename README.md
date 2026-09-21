@@ -44,9 +44,8 @@ Developer identifiers and capabilities before CloudKit or device builds work.
 
 ## TestFlight deployment
 
-Pushes to `main`, and to any temporary verification branch explicitly listed
-in the workflow files, start separate GitHub Actions workflows for iOS and
-macOS. Both workflows also support manual dispatch.
+Pushes to `main` start separate GitHub Actions workflows for iOS and macOS.
+Both workflows also support manual dispatch from the GitHub Actions interface.
 
 Every workflow attempt receives a new build number derived from the repository
 commit count, workflow attempt, and platform. This keeps iOS and macOS archive
