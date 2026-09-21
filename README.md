@@ -42,11 +42,28 @@ CloudKit, App Groups, signing identities, and bundle identifiers are tied to
 the original developer account. Forks must configure their own Apple
 Developer identifiers and capabilities before CloudKit or device builds work.
 
+## TestFlight deployment
+
+Pushes to `main` start separate GitHub Actions workflows for iOS and macOS.
+Both workflows also support manual dispatch from the GitHub Actions interface.
+
+Every workflow attempt receives a new build number derived from the repository
+commit count, workflow attempt, and platform. This keeps iOS and macOS archive
+numbers distinct, including reruns. The number is applied consistently to the
+app and all embedded extensions before the workflow creates a signed archive
+and uploads it to the existing App Store Connect record.
+
+The workflows require GitHub repository secrets for App Store Connect
+authentication and signing. For the complete list, purpose, setup, certificate
+export, fork configuration, rotation, and troubleshooting instructions, see the
+[GitHub Actions TestFlight setup guide](docs/github-actions-setup.md).
+
 ## Project structure
 
 ```text
 wiggle-room/
 ├── docs/
+│   ├── github-actions-setup.md
 │   └── wiggleroom-build-spec.md
 ├── scripts/                    # Project maintenance and icon generation
 ├── src/
