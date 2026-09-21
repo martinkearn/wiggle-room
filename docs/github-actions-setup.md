@@ -190,14 +190,26 @@ using a request generated on your Mac.
 
 ### Export the `.p12`
 
-1. In **Keychain Access → login → My Certificates**, select the expandable
+1. In **Keychain Access → login → My Certificates**, expand the
    **Apple Distribution: …** entry.
 2. Confirm its private key is visible beneath it.
-3. Right-click the certificate and select **Export**.
-4. Choose the Personal Information Exchange (`.p12`) format.
-5. Save it with a descriptive temporary filename.
-6. Choose a strong, unique export password.
-7. Store the password securely until it has been added to GitHub.
+3. Select the certificate, then Command-click its private key so both items are
+   highlighted.
+4. Select **File → Export 2 Items…**. If Keychain Access does not offer the
+   Personal Information Exchange (`.p12`) format, stop: the matching private
+   key is not selected or is not available on this Mac.
+5. Save the export with a descriptive temporary filename and the `.p12`
+   extension.
+6. At the export-password prompt, choose a non-empty, strong password and enter
+   it identically in both fields. This is the value required by
+   `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`.
+7. Keychain Access may then separately request the Mac login password or
+   Touch ID to authorize access to the private key. That authorization is not
+   the `.p12` export password and must not be saved in GitHub.
+8. Store the `.p12` export password securely until it has been added to GitHub.
+
+Before encoding the file, use the
+[local import preflight](#test-each-p12-locally-before-uploading-it) below.
 
 ### `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`
 
@@ -230,7 +242,8 @@ identity into the temporary keychain.
 
 Add the exact password chosen during export to GitHub as
 `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`. This is the `.p12` export password,
-not the Mac login password, Apple ID password, or API key.
+not the later Mac login/Touch ID authorization, Apple ID password, or API key.
+Do not use a blank export password.
 
 ## Mac Installer Distribution certificate secrets
 
@@ -273,13 +286,24 @@ that will export it, or securely obtain a `.p12` from the private-key holder.
 
 ### Export the `.p12`
 
-1. In **Keychain Access → login → My Certificates**, select the expandable
+1. In **Keychain Access → login → My Certificates**, expand the
    **Mac Installer Distribution: …** entry.
 2. Confirm its private key is visible beneath it.
-3. Right-click the certificate and select **Export**.
-4. Choose the Personal Information Exchange (`.p12`) format.
-5. Save it with a descriptive temporary filename.
-6. Choose a strong, unique export password.
+3. Select the certificate, then Command-click its private key so both items are
+   highlighted.
+4. Select **File → Export 2 Items…**. If `.p12` is unavailable, stop and
+   confirm that the matching private key is selected and stored on this Mac.
+5. Save the export with a descriptive temporary filename and the `.p12`
+   extension.
+6. At the export-password prompt, choose a non-empty, strong password and enter
+   it identically in both fields. This is the value required by
+   `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD`.
+7. If Keychain Access subsequently requests the Mac login password or Touch ID,
+   that is only authorization to export the private key. It is not the `.p12`
+   password and must not be saved in GitHub.
+
+Before encoding the file, use the
+[local import preflight](#test-each-p12-locally-before-uploading-it) below.
 
 ### `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_BASE64`
 
@@ -306,7 +330,67 @@ This password unlocks the Mac Installer Distribution `.p12` during import.
 
 Add the exact export password to GitHub as
 `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD`. It is independent of the
-Apple Distribution certificate password and may be different.
+Apple Distribution certificate password and may be different. Do not use the
+Mac login password or a blank export password.
+
+## Test each `.p12` locally before uploading it
+
+Test the exact exported file and password before creating its Base64 secret.
+This preflight mirrors the workflow's `security import` operation, uses a
+temporary keychain, and does not place the password in shell history.
+
+In Terminal, set `P12_PATH` to the exported file and run:
+
+```zsh
+P12_PATH="$HOME/path/to/Certificate.p12"
+TEMP_KEYCHAIN="$(mktemp -u "${TMPDIR}wiggleroom-signing.XXXXXX").keychain-db"
+TEMP_KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+
+read -s "P12_PASSWORD?Enter the .p12 export password: "
+echo
+trap 'security delete-keychain "$TEMP_KEYCHAIN" 2>/dev/null || true; unset P12_PASSWORD TEMP_KEYCHAIN_PASSWORD' EXIT
+
+security create-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN"
+security unlock-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN"
+security import "$P12_PATH" \
+  -P "$P12_PASSWORD" \
+  -T /usr/bin/security \
+  -f pkcs12 \
+  -k "$TEMP_KEYCHAIN"
+```
+
+A valid file/password pair reports that identities or items were imported. If
+it reports `The user name or passphrase you entered is not correct`, do not
+encode or upload that file. Re-export it and carefully distinguish:
+
+1. the new `.p12` export password, which belongs in the GitHub password secret;
+2. the Mac login password or Touch ID prompt that merely authorizes Keychain
+   Access to export the private key.
+
+Run the preflight separately for the Apple Distribution `.p12` and Mac
+Installer Distribution `.p12`. After each successful test, encode that exact
+file and pair it with that exact export password in GitHub.
+
+## Certificate import failures
+
+Both workflows import `APPLE_DISTRIBUTION_CERTIFICATE_BASE64` first. Therefore,
+if iOS and macOS both fail at their certificate step with
+`SecKeychainItemImport: The user name or passphrase you entered is not
+correct`, replace and retest this shared pair first:
+
+- `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`
+- `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`
+
+That failure does not yet test the Mac Installer Distribution secrets. The
+macOS workflow imports those only after the Apple Distribution identity
+succeeds.
+
+The workflow passes secret values through environment variables and decodes
+the Base64 data into a temporary file. Password punctuation does not require
+shell escaping. The error means that the decoded file and password are not a
+valid matching PKCS#12 pair—for example, the wrong password was saved, the Mac
+login password was confused with the export password, or the wrong file was
+encoded.
 
 ## Verify the configuration
 

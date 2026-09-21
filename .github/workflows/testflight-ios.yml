@@ -70,12 +70,15 @@ jobs:
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERTIFICATE_PATH" \
+          if ! security import "$CERTIFICATE_PATH" \
             -P "$CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign \
             -T /usr/bin/security \
             -f pkcs12 \
-            -k "$KEYCHAIN_PATH"
+            -k "$KEYCHAIN_PATH"; then
+            echo "::error::Apple Distribution certificate import failed. Verify that the Base64 secret contains the password-protected .p12 with its private key and that the password secret is the .p12 export password."
+            exit 1
+          fi
           security set-key-partition-list \
             -S apple-tool:,apple: \
             -k "$KEYCHAIN_PASSWORD" \
