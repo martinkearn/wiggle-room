@@ -347,26 +347,34 @@ In Terminal, start a zsh shell if necessary by running `zsh`. Then set
 (
   set -e
   P12_PATH="$HOME/path/to/Certificate.p12"
+  if [[ ! -f "$P12_PATH" ]]; then
+    echo "ERROR: No .p12 file found at: $P12_PATH" >&2
+    exit 1
+  fi
+
   TEMP_DIRECTORY="$(mktemp -d -t wiggleroom-signing)"
   TEMP_KEYCHAIN="$TEMP_DIRECTORY/test.keychain-db"
   TEMP_KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
-  trap 'security delete-keychain "$TEMP_KEYCHAIN" 2>/dev/null || true; rm -rf "$TEMP_DIRECTORY"' EXIT
 
   read -s "P12_PASSWORD?Enter the .p12 export password: "
   echo
+  echo "Testing .p12 import..."
   security create-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN"
+  trap 'security delete-keychain "$TEMP_KEYCHAIN" 2>/dev/null || true; rm -rf "$TEMP_DIRECTORY"' EXIT
   security unlock-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN"
   security import "$P12_PATH" \
     -P "$P12_PASSWORD" \
     -T /usr/bin/security \
     -f pkcs12 \
     -k "$TEMP_KEYCHAIN"
+  echo "SUCCESS: The .p12 file and export password are valid."
 )
 ```
 
-A valid file/password pair reports that identities or items were imported. If
-it reports `The user name or passphrase you entered is not correct`, do not
-encode or upload that file. Re-export it and carefully distinguish:
+A valid file/password pair prints `SUCCESS: The .p12 file and export password
+are valid.` If that message does not appear, the test did not succeed. If it
+reports `The user name or passphrase you entered is not correct`, do not encode
+or upload that file. Re-export it and carefully distinguish:
 
 1. the new `.p12` export password, which belongs in the GitHub password secret;
 2. the Mac login password or Touch ID prompt that merely authorizes Keychain
