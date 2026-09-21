@@ -342,21 +342,24 @@ temporary keychain, and does not place the password in shell history.
 In Terminal, set `P12_PATH` to the exported file and run:
 
 ```zsh
-P12_PATH="$HOME/path/to/Certificate.p12"
-TEMP_KEYCHAIN="$(mktemp -u "${TMPDIR}wiggleroom-signing.XXXXXX").keychain-db"
-TEMP_KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+(
+  set -e
+  P12_PATH="$HOME/path/to/Certificate.p12"
+  TEMP_DIRECTORY="$(mktemp -d "${TMPDIR:-/tmp/}wiggleroom-signing.XXXXXX")"
+  TEMP_KEYCHAIN="$TEMP_DIRECTORY/test.keychain-db"
+  TEMP_KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+  trap 'security delete-keychain "$TEMP_KEYCHAIN" 2>/dev/null || true; rm -rf "$TEMP_DIRECTORY"' EXIT
 
-read -s "P12_PASSWORD?Enter the .p12 export password: "
-echo
-trap 'security delete-keychain "$TEMP_KEYCHAIN" 2>/dev/null || true; unset P12_PASSWORD TEMP_KEYCHAIN_PASSWORD' EXIT
-
-security create-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN"
-security unlock-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN"
-security import "$P12_PATH" \
-  -P "$P12_PASSWORD" \
-  -T /usr/bin/security \
-  -f pkcs12 \
-  -k "$TEMP_KEYCHAIN"
+  read -s "P12_PASSWORD?Enter the .p12 export password: "
+  echo
+  security create-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN"
+  security unlock-keychain -p "$TEMP_KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN"
+  security import "$P12_PATH" \
+    -P "$P12_PASSWORD" \
+    -T /usr/bin/security \
+    -f pkcs12 \
+    -k "$TEMP_KEYCHAIN"
+)
 ```
 
 A valid file/password pair reports that identities or items were imported. If
@@ -369,7 +372,9 @@ encode or upload that file. Re-export it and carefully distinguish:
 
 Run the preflight separately for the Apple Distribution `.p12` and Mac
 Installer Distribution `.p12`. After each successful test, encode that exact
-file and pair it with that exact export password in GitHub.
+file and pair it with that exact export password in GitHub. The parentheses run
+the commands in a subshell, so the password leaves the environment and the
+temporary keychain is deleted as soon as the test finishes.
 
 ## Certificate import failures
 
