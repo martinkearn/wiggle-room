@@ -268,7 +268,9 @@ names refer to the same certificate type.
 
 It is distinct from Apple Distribution, Mac App Distribution, and Developer ID
 Installer. The workflow needs a `.p12` containing both this certificate and its
-private key.
+private key. During CI, the workflow finds either Keychain name and passes the
+imported certificate's SHA-1 fingerprint to Xcode. This avoids asking Xcode to
+match the Developer portal name when Keychain uses the legacy identity name.
 
 ### Create a certificate signing request
 

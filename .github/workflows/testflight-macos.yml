@@ -118,6 +118,21 @@ jobs:
             security list-keychains -d user -s "$KEYCHAIN_PATH"
           fi
 
+          INSTALLER_CERTIFICATE_SHA1=""
+          for certificate_name in "3rd Party Mac Developer Installer" "Mac Installer Distribution"; do
+            INSTALLER_CERTIFICATE_SHA1="$(
+              security find-certificate -a -c "$certificate_name" -Z "$KEYCHAIN_PATH" 2>/dev/null \
+                | awk '/SHA-1 hash:/{print $3; exit}'
+            )"
+            [[ -n "$INSTALLER_CERTIFICATE_SHA1" ]] && break
+          done
+          if [[ -z "$INSTALLER_CERTIFICATE_SHA1" ]]; then
+            echo "::error::The imported installer .p12 does not contain a Mac Installer Distribution certificate. Keychain may display this certificate as '3rd Party Mac Developer Installer'."
+            exit 1
+          fi
+          echo "INSTALLER_CERTIFICATE_SHA1=$INSTALLER_CERTIFICATE_SHA1" >> "$GITHUB_ENV"
+          echo "Mac installer distribution certificate is available for export."
+
       - name: Archive macOS app
         env:
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
@@ -197,7 +212,7 @@ jobs:
             <key>signingCertificate</key>
             <string>Apple Distribution</string>
             <key>installerSigningCertificate</key>
-            <string>Mac Installer Distribution</string>
+            <string>${INSTALLER_CERTIFICATE_SHA1}</string>
             <key>provisioningProfiles</key>
             <dict>
               <key>martinkearn.WiggleRoom</key>
