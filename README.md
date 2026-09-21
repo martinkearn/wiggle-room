@@ -45,6 +45,10 @@ Developer identifiers and capabilities before CloudKit or device builds work.
 ## TestFlight deployment
 
 Pushes to `main` start separate GitHub Actions workflows for iOS and macOS.
+Both workflows also support manual dispatch. During initial verification,
+pushes to `copilot/create-github-actions-pipeline` perform real TestFlight
+deployments before the branch is merged.
+
 Every workflow attempt receives a new build number derived from the repository
 commit count, workflow attempt, and platform. This keeps iOS and macOS archive
 numbers distinct, including reruns. The number is applied consistently to the
@@ -78,11 +82,16 @@ Paste the copied output into the corresponding `*_BASE64` secret. Never commit
 the `.p8`, `.p12`, or their passwords. The workflows use the API key to obtain
 the existing provisioning profiles through Xcode automatic signing.
 
+For complete setup, certificate export, fork configuration, rotation, and
+troubleshooting instructions, see the
+[GitHub Actions TestFlight setup guide](docs/github-actions-setup.md).
+
 ## Project structure
 
 ```text
 wiggle-room/
 ├── docs/
+│   ├── github-actions-setup.md
 │   └── wiggleroom-build-spec.md
 ├── scripts/                    # Project maintenance and icon generation
 ├── src/

@@ -1,9 +1,11 @@
 name: Distribute macOS to TestFlight
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
+      - copilot/create-github-actions-pipeline
 
 permissions:
   contents: read
