@@ -340,7 +340,8 @@ Test the exact exported file and password before creating its Base64 secret.
 This preflight mirrors the workflow's `security import` operation, uses a
 temporary keychain, and does not place the password in shell history.
 
-In Terminal, set `P12_PATH` to the exported file and run:
+In Terminal, start a zsh shell if necessary by running `zsh`. Then set
+`P12_PATH` to the exported file and run this zsh-specific snippet:
 
 ```zsh
 (

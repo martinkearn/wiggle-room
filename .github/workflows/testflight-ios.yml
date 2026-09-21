@@ -66,7 +66,7 @@ jobs:
           security list-keychains -d user \
             | sed -E 's/^[[:space:]]*"//; s/"[[:space:]]*$//' \
             > "$ORIGINAL_KEYCHAINS_PATH"
-          if ! printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH" \
+          if ! printf '%s' "$CERTIFICATE_BASE64" | openssl base64 -d -A > "$CERTIFICATE_PATH" \
             || [[ ! -s "$CERTIFICATE_PATH" ]]; then
             echo "::error::APPLE_DISTRIBUTION_CERTIFICATE_BASE64 is empty or is not valid Base64 for a .p12 file."
             exit 1
