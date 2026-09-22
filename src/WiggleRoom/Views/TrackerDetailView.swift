@@ -590,11 +590,14 @@ struct TrackerDetailView: View {
         ].compactMap { $0 }
     }
 
-    /// Time only when it's today, otherwise date and time.
+    /// Time only when it's today, otherwise day and month (no year) plus time.
     private static func timingText(_ date: Date) -> String {
-        Calendar.current.isDateInToday(date)
-            ? "at " + date.formatted(date: .omitted, time: .shortened)
-            : date.formatted(date: .abbreviated, time: .shortened)
+        guard !Calendar.current.isDateInToday(date) else {
+            return "at " + date.formatted(date: .omitted, time: .shortened)
+        }
+        let day = date.formatted(.dateTime.day().month(.abbreviated))
+        let time = date.formatted(date: .omitted, time: .shortened)
+        return "\(day) at \(time)"
     }
 
     private func figureContent(title: String, value: Decimal, captions: [String] = []) -> some View {
