@@ -46,6 +46,9 @@ A `Tracker` represents one allowance over a date range.
 Each reading is a separate timestamped `ValueSnapshot`. Reading history is
 append-oriented so CloudKit can merge updates made on different devices.
 
+A tracker's `name` must be unique (case-insensitive) among the user's other
+trackers; Add/Edit Tracker blocks Save on a collision.
+
 ### Pace calculation
 
 For a point in time inside the tracking period:
@@ -97,6 +100,14 @@ not operate an intermediary server and does not initiate payments.
 
 Additional providers should conform to `SourceProvider` and remain isolated
 from the core tracker model.
+
+### Safeguards
+
+A connected source's `displayName` must be unique (case-insensitive) among the
+user's other sources; adding, reconnecting, or renaming one blocks on a
+collision. A source cannot be removed while any tracker still points at it —
+its detail/edit screen lists every tracker currently using it, and removal
+must be preceded by deleting or reassigning them.
 
 ## 5. Persistence and sync
 

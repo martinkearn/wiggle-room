@@ -322,8 +322,11 @@ private struct SourceEditorCard: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var didUpdate = false
+    @State private var duplicateNameMessage: String?
     @Query(sort: \StarlingRequestLogEntry.date, order: .reverse) private var starlingRequestLog: [StarlingRequestLogEntry]
     @State private var starlingCooldownUntil: Date?
+    @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
+    private var addedSources: [ConnectedSource]
 
     init(source: ConnectedSource, onRemove: @escaping () -> Void) {
         self.source = source
@@ -351,7 +354,21 @@ private struct SourceEditorCard: View {
                     TextField("Name", text: $source.displayName)
                         .textFieldStyle(.plain)
                         .font(WiggleRoomFont.headline(17, weight: 650))
-                        .onChange(of: source.displayName) {
+                        // Reverts the edit rather than saving it when it
+                        // collides with another source's name — this field
+                        // otherwise saves on every keystroke with no
+                        // separate confirm step, so a duplicate has to be
+                        // caught here, before it ever reaches the model.
+                        .onChange(of: source.displayName) { oldValue, newValue in
+                            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+                            guard trimmed.isEmpty || !addedSources.contains(where: {
+                                $0.id != source.id && $0.displayName.caseInsensitiveCompare(trimmed) == .orderedSame
+                            }) else {
+                                duplicateNameMessage = "A source named \u{201C}\(trimmed)\u{201D} already exists."
+                                source.displayName = oldValue
+                                return
+                            }
+                            duplicateNameMessage = nil
                             try? modelContext.save()
                         }
                     Text(source.providerId.capitalized)
@@ -366,6 +383,24 @@ private struct SourceEditorCard: View {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
+            }
+
+            if let duplicateNameMessage {
+                Text(duplicateNameMessage)
+                    .font(.wiggleText(.caption))
+                    .foregroundStyle(WiggleRoomColors.error)
+            }
+
+            if let trackers = source.trackers, !trackers.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Trackers Using This Source")
+                        .font(.wiggleText(.caption))
+                        .foregroundStyle(.secondary)
+                    ForEach(trackers) { tracker in
+                        Text(tracker.name)
+                            .font(.wiggleText(.subheadline))
+                    }
+                }
             }
 
             Text("Personal Access Token")
@@ -502,9 +537,17 @@ private struct NewSourceCard: View {
     @State private var token = ""
     @State private var isConnecting = false
     @State private var errorMessage: String?
+    @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
+    private var addedSources: [ConnectedSource]
 
     private var trimmedToken: String {
         token.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isDuplicateName: Bool {
+        let trimmed = displayName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return false }
+        return addedSources.contains { $0.displayName.caseInsensitiveCompare(trimmed) == .orderedSame }
     }
 
     var body: some View {
@@ -528,6 +571,11 @@ private struct NewSourceCard: View {
             } else {
             TextField("Name", text: $displayName)
                 .textFieldStyle(.roundedBorder)
+            if isDuplicateName {
+                Text("A source named \u{201C}\(displayName.trimmingCharacters(in: .whitespaces))\u{201D} already exists.")
+                    .font(.wiggleText(.caption))
+                    .foregroundStyle(WiggleRoomColors.error)
+            }
 
             Text("Personal Access Token")
                 .font(.wiggleText(.caption))
@@ -562,7 +610,7 @@ private struct NewSourceCard: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(trimmedToken.isEmpty || isConnecting)
+                .disabled(trimmedToken.isEmpty || isConnecting || isDuplicateName)
             }
             }
         }

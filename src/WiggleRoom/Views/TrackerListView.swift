@@ -155,6 +155,23 @@ private struct TrackerRow: View {
     }
 
     var body: some View {
+        // Same guard as `TrackerDetailView`'s own top-level check, for the
+        // same reason: this `@Query`-sourced row can still be mid-render
+        // with a `Tracker` whose backing data was just detached (deleted
+        // locally, or merged out by CloudKit) — the `@Query` array hasn't
+        // republished yet to drop this row. Reading any property on it
+        // then is a hard SwiftData crash, not a catchable error; a real
+        // TestFlight crash report caught exactly this, one level down in
+        // `RingsView` (which carries its own identical guard).
+        if tracker.modelContext == nil {
+            Color.clear
+                .frame(height: 70)
+        } else {
+            rowBody
+        }
+    }
+
+    private var rowBody: some View {
         HStack(spacing: 12) {
             TrackerBadge(tracker: tracker, size: 42)
 

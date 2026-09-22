@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Foundation
+import SwiftData
 
 /// The primary two-ring visualization (§3.4), functionally accurate rather
 /// than decorative:
@@ -136,6 +137,25 @@ struct RingsView: View {
     private var ringGap: CGFloat { lineWidth + bandGap }
 
     var body: some View {
+        // `tracker` can be a stale reference to a row that's mid-deletion —
+        // its own `@Query` (e.g. `TrackerListView`'s) republishes
+        // asynchronously relative to the actual delete/CloudKit-merge, so
+        // there's a real window where this view re-renders with a
+        // `Tracker` whose backing data has already been detached from its
+        // context. Reading any property on it then (`pace`, `direction`,
+        // …) is a hard, unrecoverable SwiftData crash, not a catchable
+        // error — found via real crash reports (`RingsView.pace` →
+        // `Tracker.direction.getter` → SwiftData `_assertionFailure`) on
+        // both iOS and macOS. Same guard, same reasoning, as
+        // `TrackerDetailView`'s own top-level check.
+        if tracker.modelContext == nil {
+            Color.clear
+        } else {
+            ringsBody
+        }
+    }
+
+    private var ringsBody: some View {
         VStack(spacing: 14) {
             GeometryReader { geometry in
                 let side = min(geometry.size.width, geometry.size.height)

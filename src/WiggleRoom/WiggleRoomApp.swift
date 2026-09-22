@@ -15,6 +15,9 @@ struct WiggleRoomApp: App {
     @State private var deepLinkRouter = DeepLinkRouter()
     @State private var appCommands = AppCommands()
     @Environment(\.scenePhase) private var scenePhase
+    /// Guards the `.active` housekeeping below to once per app session —
+    /// see its own call site for why.
+    @State private var hasRunActivationHousekeeping = false
     #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     #endif
@@ -87,10 +90,22 @@ struct WiggleRoomApp: App {
                     deepLinkRouter.handle(url)
                 }
                 .onChange(of: scenePhase) { _, newPhase in
-                    if newPhase == .active {
-                        Task {
-                            await store.performManualEntryHousekeeping(after: .seconds(3))
-                        }
+                    // Once per session, not every foreground — the
+                    // duplicates this cleans up are a one-time artifact of
+                    // a device's pre-CloudKit-import state (see
+                    // `consolidateManualEntrySources`'s own doc comment),
+                    // so there's nothing to gain from re-running it on
+                    // every single activation, only repeated exposure to a
+                    // real crash: a SwiftData/CloudKit race inside its
+                    // plain `modelContext.fetch()`, hit and confirmed via a
+                    // TestFlight crash report (`_assertionFailure` inside
+                    // `ModelContext.register`, triggered from here). The
+                    // `.task` above already covers the real "just launched"
+                    // case with its own 10s delay.
+                    guard newPhase == .active, !hasRunActivationHousekeeping else { return }
+                    hasRunActivationHousekeeping = true
+                    Task {
+                        await store.performManualEntryHousekeeping(after: .seconds(3))
                     }
                 }
                 #if os(iOS)

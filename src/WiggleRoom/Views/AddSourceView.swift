@@ -34,6 +34,8 @@ struct AddSourceView: View {
     @State private var errorMessage: String?
     @Query(sort: \StarlingRequestLogEntry.date, order: .reverse) private var starlingRequestLog: [StarlingRequestLogEntry]
     @State private var starlingCooldownUntil: Date?
+    @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
+    private var addedSources: [ConnectedSource]
 
     init(existingSource: ConnectedSource? = nil) {
         self.existingSource = existingSource
@@ -61,6 +63,11 @@ struct AddSourceView: View {
 
             Section {
                 TextField("Name", text: $displayName)
+                if isDuplicateName {
+                    Text("A source named \u{201C}\(trimmedDisplayName)\u{201D} already exists.")
+                        .font(.wiggleText(.caption))
+                        .foregroundStyle(WiggleRoomColors.error)
+                }
                 if let existingSource {
                     connectionStatusRow(for: existingSource)
                 }
@@ -79,6 +86,19 @@ struct AddSourceView: View {
                     .font(WiggleRoomFont.headline(15, weight: 650))
             } footer: {
                 Text(tokenFieldFooter)
+            }
+
+            // Only for an existing source — a brand new one has no trackers
+            // yet, so this section would always be empty.
+            if let existingSource, let trackers = existingSource.trackers, !trackers.isEmpty {
+                Section {
+                    ForEach(trackers) { tracker in
+                        Text(tracker.name)
+                    }
+                } header: {
+                    Text("Trackers Using This Source")
+                        .font(WiggleRoomFont.headline(15, weight: 650))
+                }
             }
 
             if let errorMessage {
@@ -128,7 +148,7 @@ struct AddSourceView: View {
                         Text(existingSource == nil ? "Connect" : "Save")
                     }
                 }
-                .disabled(trimmedToken.isEmpty || isConnecting)
+                .disabled(trimmedToken.isEmpty || isConnecting || isDuplicateName)
             }
         }
     }
@@ -139,6 +159,22 @@ struct AddSourceView: View {
 
     private var trimmedToken: String {
         token.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedDisplayName: String {
+        displayName.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Whether `displayName` (trimmed, case-insensitive) matches another
+    /// connected source already in the list — excluding `existingSource`
+    /// itself, so reconnecting/renaming a source without changing its name
+    /// doesn't flag against itself.
+    private var isDuplicateName: Bool {
+        let trimmed = trimmedDisplayName
+        guard !trimmed.isEmpty else { return false }
+        return addedSources.contains {
+            $0.id != existingSource?.id && $0.displayName.caseInsensitiveCompare(trimmed) == .orderedSame
+        }
     }
 
     /// "Connected"/"Not Connected", based on whether `source` actually has

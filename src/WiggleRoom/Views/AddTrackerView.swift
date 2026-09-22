@@ -109,6 +109,11 @@ struct AddTrackerView: View {
             Form {
                 Section {
                     TextField("Name", text: $name)
+                    if isDuplicateName {
+                        Text("A tracker named \u{201C}\(name.trimmingCharacters(in: .whitespaces))\u{201D} already exists.")
+                            .font(.wiggleText(.caption))
+                            .foregroundStyle(WiggleRoomColors.error)
+                    }
                     unitPicker
                     Picker("Direction", selection: $direction) {
                         Text("Decreasing").tag(TrackerDirection.decreasing)
@@ -616,8 +621,20 @@ struct AddTrackerView: View {
         }
     }
 
+    /// Whether `name` (trimmed, case-insensitive) matches another tracker
+    /// already in the list — excluding `existingTracker` itself, so editing
+    /// a tracker without changing its name doesn't flag against itself.
+    private var isDuplicateName: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return false }
+        return allTrackers.contains {
+            $0.id != existingTracker?.id && $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
+        }
+    }
+
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
+            && !isDuplicateName
             && !unit.trimmingCharacters(in: .whitespaces).isEmpty
             && endDate > startDate
             && Self.parseDecimal(startingValueText) != nil
@@ -636,6 +653,12 @@ struct AddTrackerView: View {
     private func save() {
         guard !isSaving else { return }
         isSaving = true
+
+        guard !isDuplicateName else {
+            errorMessage = "A tracker with this name already exists."
+            isSaving = false
+            return
+        }
 
         guard let startingValue = Self.parseDecimal(startingValueText),
               let totalAllowance = Self.parseDecimal(totalAllowanceText)
