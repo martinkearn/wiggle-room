@@ -34,10 +34,23 @@ enum CloudSyncWidgetRefresher {
             object: nil,
             queue: .main
         ) { _ in
-            if let trackers = try? modelContainer.mainContext.fetch(FetchDescriptor<Tracker>()) {
-                TrackerListCache.save(trackers)
+            // Deferred to a later run-loop turn via `Task`, not run inline
+            // here: CoreData's own remote-change delivery
+            // (`_postStoreRemoteChangeNotificationsForStore:andState:`)
+            // waits for this observer to return before it continues, so
+            // doing the fetch/save/widget-reload synchronously in this same
+            // call frame serialized it behind whatever else the main thread
+            // was doing — confirmed via a crash report (2026-09-22) where
+            // tapping into a freshly-created Starling source (CloudKit
+            // reflecting the just-created record back at the same moment as
+            // the NavigationLink push) stalled the main thread past the
+            // OS's 10-second scene-update watchdog and got the app killed.
+            Task { @MainActor in
+                if let trackers = try? modelContainer.mainContext.fetch(FetchDescriptor<Tracker>()) {
+                    TrackerListCache.save(trackers)
+                }
+                WidgetCenter.shared.reloadAllTimelines()
             }
-            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 }
