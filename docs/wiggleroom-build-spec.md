@@ -137,6 +137,30 @@ snapshot cached in the App Group container, refreshed whenever any process
 fetches current tracker data, rather than always waiting on a fresh CloudKit
 round trip before showing a list.
 
+### Live queries and view nesting
+
+A view reads the tracker and source lists with `@Query`, which stays live and
+republishes as the store changes. Two live queries over the **same model type**
+must not be nested across a parent/child view boundary, where the parent builds
+the child inside its own `body` — a `NavigationLink` destination, a `.sheet`,
+or a plain child view.
+
+This is a hang, not a redundancy. The child's query fetches on the shared main
+`ModelContext`; that fetch notifies SwiftData's change observers, which
+invalidates the parent's query on the same type; the parent rebuilds its body,
+which constructs a fresh child (a new query, and new `State(initialValue:)`
+storage, so the child can never compare equal to its predecessor); the child
+fetches again. The loop sustains itself at display-refresh rate with no user
+input, memory grows with every pass, and iOS eventually kills the app on the
+scene-update watchdog.
+
+A transient editor screen therefore takes a **one-shot snapshot** of what it
+needs from a type its presenter already queries — plain values, not model
+references — loaded when the screen appears, and revalidates against a fresh
+fetch at the point of saving, where correctness actually matters. Live queries
+remain correct and preferred for a type the presenting view does not itself
+query.
+
 ## 6. Visual language
 
 The interface should feel calm and informative rather than punitive.

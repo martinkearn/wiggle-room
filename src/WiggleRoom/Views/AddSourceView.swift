@@ -34,8 +34,27 @@ struct AddSourceView: View {
     @State private var errorMessage: String?
     @Query(sort: \StarlingRequestLogEntry.date, order: .reverse) private var starlingRequestLog: [StarlingRequestLogEntry]
     @State private var starlingCooldownUntil: Date?
-    @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
-    private var addedSources: [ConnectedSource]
+
+    /// The *other* connected sources' names, used only by `isDuplicateName`
+    /// — a one-shot snapshot taken when this screen appears, deliberately
+    /// **not** a live `@Query`.
+    ///
+    /// A second live `@Query` over an entity the presenting view already
+    /// queries is an infinite SwiftUI update loop, not merely redundant.
+    /// `ConnectedSourcesView` queries `ConnectedSource`, and
+    /// `NavigationLink`'s destination is built *inside* that parent's body,
+    /// so this view — and its query — is reconstructed on every parent
+    /// pass. This query's own fetch then notifies SwiftData's change
+    /// observers, which invalidates the parent's query on the same entity,
+    /// which rebuilds this view again, forever. Reproduced on iOS at ~750
+    /// body evaluations per second with memory climbing ~4 MB/s until the
+    /// scene-update watchdog killed the app (0x8BADF00D); a live `@Query`
+    /// here was the cause. `AddTrackerView`'s own source picker reaches
+    /// this screen the same way, so this is not specific to one entry
+    /// point. A snapshot is sufficient regardless: this is a transient
+    /// editor, and `connect()` re-checks against a fresh fetch before it
+    /// actually saves anything.
+    @State private var otherSourceNames: [String] = []
 
     init(existingSource: ConnectedSource? = nil) {
         self.existingSource = existingSource
@@ -119,7 +138,10 @@ struct AddSourceView: View {
         .formStyle(.grouped)
         .navigationTitle(existingSource == nil ? "Add Source" : "Edit Source")
         .inlineNavigationBarIfAvailable()
-        .task { await refreshStarlingCooldown() }
+        .task {
+            loadOtherSourceNames()
+            await refreshStarlingCooldown()
+        }
         .toolbar {
             // Only on macOS, where this view is always presented as a
             // sheet (`ConnectedSourcesView`'s `.sheet`) with no other way
@@ -170,11 +192,25 @@ struct AddSourceView: View {
     /// itself, so reconnecting/renaming a source without changing its name
     /// doesn't flag against itself.
     private var isDuplicateName: Bool {
-        let trimmed = trimmedDisplayName
-        guard !trimmed.isEmpty else { return false }
-        return addedSources.contains {
-            $0.id != existingSource?.id && $0.displayName.caseInsensitiveCompare(trimmed) == .orderedSame
-        }
+        nameCollides(with: trimmedDisplayName)
+    }
+
+    private func nameCollides(with name: String) -> Bool {
+        guard !name.isEmpty else { return false }
+        return otherSourceNames.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    /// Refreshes `otherSourceNames`. Excludes `existingSource` itself, so
+    /// reconnecting/renaming a source without changing its name doesn't
+    /// flag against itself, and excludes Manual Entry, which isn't a
+    /// connected source and can't collide with one.
+    private func loadOtherSourceNames() {
+        let descriptor = FetchDescriptor<ConnectedSource>(
+            predicate: #Predicate { $0.providerId != "manual" }
+        )
+        let sources = (try? modelContext.fetch(descriptor)) ?? []
+        let ownID = existingSource?.id
+        otherSourceNames = sources.filter { $0.id != ownID }.map(\.displayName)
     }
 
     /// "Connected"/"Not Connected", based on whether `source` actually has
@@ -218,8 +254,13 @@ struct AddSourceView: View {
         }
     }
 
+    /// Counts against one precomputed start-of-day rather than calling
+    /// `Calendar.isDateInToday` per entry — this runs on every body pass
+    /// over the whole (up to three days of) request log, so the per-element
+    /// calendar work is the expensive part, not the comparison.
     private var starlingRequestsToday: Int {
-        starlingRequestLog.count { Calendar.current.isDateInToday($0.date) }
+        let startOfToday = Calendar.current.startOfDay(for: .now)
+        return starlingRequestLog.count { $0.date >= startOfToday }
     }
 
     private static let timeFormatter: Date.FormatStyle = .init().hour().minute()
@@ -235,6 +276,18 @@ struct AddSourceView: View {
 
         let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName = trimmedName.isEmpty ? "Starling" : trimmedName
+
+        // Re-checked against a fresh fetch rather than trusting the
+        // snapshot behind the inline warning — that snapshot is taken on
+        // appear, so another device's source (or one added through the
+        // nested Add Source flow) could have arrived since. Checked before
+        // the network call so a name collision doesn't spend a Starling
+        // request to then be rejected anyway.
+        loadOtherSourceNames()
+        guard !nameCollides(with: resolvedName) else {
+            errorMessage = "A source named \u{201C}\(resolvedName)\u{201D} already exists."
+            return
+        }
 
         // Validated against a draft, not the persisted `existingSource` —
         // nothing about the real record changes until the token actually

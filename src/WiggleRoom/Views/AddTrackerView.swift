@@ -11,6 +11,15 @@ private enum SourceOption: Hashable {
     case addNew
 }
 
+/// One other tracker's name and colour, as captured by
+/// `AddTrackerView.loadOtherTrackers()` — a plain value, not a `Tracker`
+/// reference, so the form never holds live SwiftData objects it doesn't
+/// own and can't be invalidated by their changes mid-edit.
+private struct TrackerSummary {
+    let name: String
+    let colorIndex: Int
+}
+
 /// Add/Edit tracker screen (§7.1).
 ///
 /// The user picks a **Source** for the tracker: either "Manual Entry" (they
@@ -60,7 +69,20 @@ struct AddTrackerView: View {
     @State private var totalAllowanceText = ""
     @State private var colorIndex = 0
     @State private var glyph = ""
-    @Query private var allTrackers: [Tracker]
+    /// The other trackers' names and colours — a one-shot snapshot taken
+    /// when this screen appears, deliberately **not** a live `@Query`.
+    ///
+    /// Both screens that present this one (`TrackerListView` on iOS,
+    /// `MacRootView` on macOS) already query `Tracker`, and a presented
+    /// view's content is rebuilt inside its presenter's body. A second
+    /// live `@Query` over that same entity therefore loops: this query's
+    /// fetch notifies SwiftData's change observers, invalidating the
+    /// presenter's query, which rebuilds this view, which fetches again.
+    /// See `AddSourceView.otherSourceNames` for the same defect confirmed
+    /// as a watchdog kill on iOS. Both uses here — seeding an unused
+    /// colour, and the duplicate-name warning — only need a snapshot;
+    /// `save()` re-checks against a fresh fetch.
+    @State private var otherTrackers: [TrackerSummary] = []
 
     @State private var sourceSelection: SourceOption?
     @State private var isShowingAddSource = false
@@ -297,6 +319,7 @@ struct AddTrackerView: View {
                 }
             }
             .task {
+                loadOtherTrackers()
                 if let existingTracker {
                     name = existingTracker.name
                     unit = existingTracker.unit
@@ -319,8 +342,8 @@ struct AddTrackerView: View {
                 } else if sourceSelection == nil {
                     // New trackers start on the first colour no other tracker
                     // is using, so a list fills with distinct colours.
-                    let used = Set(allTrackers.map(\.resolvedColorIndex))
-                    colorIndex = TrackerPalette.all.indices.first { !used.contains($0) } ?? (allTrackers.count % TrackerPalette.all.count)
+                    let used = Set(otherTrackers.map(\.colorIndex))
+                    colorIndex = TrackerPalette.all.indices.first { !used.contains($0) } ?? (otherTrackers.count % TrackerPalette.all.count)
                     sourceSelection = .source(store.manualEntrySource.id)
                 }
             }
@@ -625,11 +648,22 @@ struct AddTrackerView: View {
     /// already in the list — excluding `existingTracker` itself, so editing
     /// a tracker without changing its name doesn't flag against itself.
     private var isDuplicateName: Bool {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return false }
-        return allTrackers.contains {
-            $0.id != existingTracker?.id && $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
-        }
+        nameCollides(with: name.trimmingCharacters(in: .whitespaces))
+    }
+
+    private func nameCollides(with candidate: String) -> Bool {
+        guard !candidate.isEmpty else { return false }
+        return otherTrackers.contains { $0.name.caseInsensitiveCompare(candidate) == .orderedSame }
+    }
+
+    /// Refreshes `otherTrackers`, excluding `existingTracker` itself so
+    /// editing a tracker without renaming it doesn't flag against itself.
+    private func loadOtherTrackers() {
+        let trackers = (try? modelContext.fetch(FetchDescriptor<Tracker>())) ?? []
+        let ownID = existingTracker?.id
+        otherTrackers = trackers
+            .filter { $0.id != ownID }
+            .map { TrackerSummary(name: $0.name, colorIndex: $0.resolvedColorIndex) }
     }
 
     private var isValid: Bool {
@@ -654,6 +688,10 @@ struct AddTrackerView: View {
         guard !isSaving else { return }
         isSaving = true
 
+        // Re-checked against a fresh fetch rather than trusting the
+        // snapshot behind the inline warning, which was taken on appear and
+        // can't see a tracker added since (on this device or another).
+        loadOtherTrackers()
         guard !isDuplicateName else {
             errorMessage = "A tracker with this name already exists."
             isSaving = false

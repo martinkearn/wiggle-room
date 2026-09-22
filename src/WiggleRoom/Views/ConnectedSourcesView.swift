@@ -325,8 +325,12 @@ private struct SourceEditorCard: View {
     @State private var duplicateNameMessage: String?
     @Query(sort: \StarlingRequestLogEntry.date, order: .reverse) private var starlingRequestLog: [StarlingRequestLogEntry]
     @State private var starlingCooldownUntil: Date?
-    @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
-    private var addedSources: [ConnectedSource]
+    /// A snapshot, not a live `@Query` — `ConnectedSourcesView` builds this
+    /// card inside its own body and already queries `ConnectedSource`, and
+    /// two live queries over one entity across that boundary is an infinite
+    /// update loop. See `AddSourceView.otherSourceNames` for the full
+    /// explanation and the iOS crash it caused.
+    @State private var otherSourceNames: [String] = []
 
     init(source: ConnectedSource, onRemove: @escaping () -> Void) {
         self.source = source
@@ -361,8 +365,13 @@ private struct SourceEditorCard: View {
                         // caught here, before it ever reaches the model.
                         .onChange(of: source.displayName) { oldValue, newValue in
                             let trimmed = newValue.trimmingCharacters(in: .whitespaces)
-                            guard trimmed.isEmpty || !addedSources.contains(where: {
-                                $0.id != source.id && $0.displayName.caseInsensitiveCompare(trimmed) == .orderedSame
+                            // Re-read here rather than relying on the
+                            // on-appear snapshot: this saves on every
+                            // keystroke, so it has to see a source added
+                            // since this card appeared.
+                            loadOtherSourceNames()
+                            guard trimmed.isEmpty || !otherSourceNames.contains(where: {
+                                $0.caseInsensitiveCompare(trimmed) == .orderedSame
                             }) else {
                                 duplicateNameMessage = "A source named \u{201C}\(trimmed)\u{201D} already exists."
                                 source.displayName = oldValue
@@ -451,7 +460,10 @@ private struct SourceEditorCard: View {
         }
         .padding(14)
         .background(.quinary, in: WobblyCard.shape(0, scale: 0.7))
-        .task { await refreshStarlingCooldown() }
+        .task {
+            loadOtherSourceNames()
+            await refreshStarlingCooldown()
+        }
     }
 
     /// Admin/diagnostic info about this connection's shared Starling
@@ -484,8 +496,21 @@ private struct SourceEditorCard: View {
         }
     }
 
+    /// One precomputed start-of-day rather than `Calendar.isDateInToday`
+    /// per entry — this runs on every body pass over the whole request log.
     private var starlingRequestsToday: Int {
-        starlingRequestLog.count { Calendar.current.isDateInToday($0.date) }
+        let startOfToday = Calendar.current.startOfDay(for: .now)
+        return starlingRequestLog.count { $0.date >= startOfToday }
+    }
+
+    /// Refreshes `otherSourceNames`, excluding this card's own source so
+    /// renaming it without changing the name doesn't flag against itself.
+    private func loadOtherSourceNames() {
+        let descriptor = FetchDescriptor<ConnectedSource>(
+            predicate: #Predicate { $0.providerId != "manual" }
+        )
+        let sources = (try? modelContext.fetch(descriptor)) ?? []
+        otherSourceNames = sources.filter { $0.id != source.id }.map(\.displayName)
     }
 
     private static let timeFormatter: Date.FormatStyle = .init().hour().minute()
@@ -537,8 +562,11 @@ private struct NewSourceCard: View {
     @State private var token = ""
     @State private var isConnecting = false
     @State private var errorMessage: String?
-    @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
-    private var addedSources: [ConnectedSource]
+    @Environment(\.modelContext) private var modelContext
+    /// A snapshot, not a live `@Query` — same reason as `SourceEditorCard`
+    /// above: this card is built inside `ConnectedSourcesView`'s body, and
+    /// that view already queries `ConnectedSource`.
+    @State private var otherSourceNames: [String] = []
 
     private var trimmedToken: String {
         token.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -547,7 +575,14 @@ private struct NewSourceCard: View {
     private var isDuplicateName: Bool {
         let trimmed = displayName.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return false }
-        return addedSources.contains { $0.displayName.caseInsensitiveCompare(trimmed) == .orderedSame }
+        return otherSourceNames.contains { $0.caseInsensitiveCompare(trimmed) == .orderedSame }
+    }
+
+    private func loadOtherSourceNames() {
+        let descriptor = FetchDescriptor<ConnectedSource>(
+            predicate: #Predicate { $0.providerId != "manual" }
+        )
+        otherSourceNames = ((try? modelContext.fetch(descriptor)) ?? []).map(\.displayName)
     }
 
     var body: some View {
@@ -616,6 +651,7 @@ private struct NewSourceCard: View {
         }
         .padding(14)
         .background(.quinary, in: WobblyCard.shape(0, scale: 0.7))
+        .task { loadOtherSourceNames() }
     }
 
     private func connect() async {
