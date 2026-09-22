@@ -11,13 +11,17 @@ import SwiftUI
 struct SettingsLabel: View {
     let title: String
     let symbol: String
-    let colorIndex: Int
+    var colorIndex: Int = 0
+    /// Overrides the palette lookup entirely — used for menus (like Danger
+    /// Zone) whose glyph colour is a fixed semantic colour rather than one
+    /// of the per-tracker identity colours `colorIndex` picks from.
+    var color: Color? = nil
     var size: CGFloat = 32
 
     var body: some View {
         HStack(spacing: 12) {
             WobblyBadge(
-                color: TrackerPalette.color(at: colorIndex),
+                color: color ?? TrackerPalette.color(at: colorIndex),
                 symbol: symbol,
                 seed: Double(colorIndex) * 1.3,
                 size: size

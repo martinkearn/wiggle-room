@@ -141,8 +141,8 @@ without relying on colour or geometry alone.
 - Tracker list and detail navigation
 - Pull-to-refresh/update behavior
 - Add and edit trackers and connected sources
-- Settings for sources, ordering, CloudKit diagnostics, Manual Entry records,
-  Siri phrases, and reset operations
+- Settings for sources, ordering, CloudKit diagnostics, and Siri phrases,
+  with a separate Danger Zone menu for reset operations
 - Spotlight, notification actions, Live Activities, and widgets
 
 ### macOS

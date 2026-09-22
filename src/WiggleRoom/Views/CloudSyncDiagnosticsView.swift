@@ -60,31 +60,44 @@ struct CloudSyncDiagnosticsView: View {
 
     var body: some View {
         #if os(macOS)
-        VStack(alignment: .leading, spacing: 20) {
-            CloudSyncStatusSection(
-                persistenceMode: diagnostics.persistenceMode,
-                accountStatus: snapshot.accountStatus,
-                reachability: snapshot.reachability,
-                zoneCount: snapshot.zoneCount,
-                errorDetails: snapshot.errorDetails
-            )
-            CloudSyncLocalDataSection(
-                trackerCount: snapshot.trackerCount,
-                readingCount: snapshot.readingCount,
-                externalSourceCount: snapshot.externalSourceCount,
-                manualSourceCount: snapshot.manualSourceCount,
-                latestReadingDate: snapshot.latestReadingDate,
-                cleanupResult: manualCleanupResult,
-                requestCleanup: { isPresentingManualCleanupConfirmation = true }
-            )
-            CloudSyncManualRecordsSection(manualSources: manualSources, canonicalID: store.manualEntrySource.persistentModelID)
-            CloudSyncTechnicalSection(
-                containerIdentifier: Self.containerIdentifier,
-                checkedAt: snapshot.checkedAt
-            )
-            CloudSyncRefreshButton(isRefreshing: isRefreshing, refresh: refresh)
+        VStack(alignment: .leading, spacing: 16) {
+            Text("CloudKit Sync")
+                .font(WiggleRoomFont.headline(22, weight: 650))
+
+            // A `Form`, not a bare `VStack` — `Section`/`LabeledContent`
+            // only render with a clear heading/key-value distinction inside
+            // a real `List`/`Form` container (the same reason the iOS
+            // branch below, which already sits in a `List`, has always
+            // looked right). Laying them directly into a `VStack` (as this
+            // pane previously did) left headings and rows visually
+            // indistinguishable — inconsistent with every other settings
+            // pane.
+            Form {
+                CloudSyncStatusSection(
+                    persistenceMode: diagnostics.persistenceMode,
+                    accountStatus: snapshot.accountStatus,
+                    reachability: snapshot.reachability,
+                    zoneCount: snapshot.zoneCount,
+                    errorDetails: snapshot.errorDetails
+                )
+                CloudSyncLocalDataSection(
+                    trackerCount: snapshot.trackerCount,
+                    readingCount: snapshot.readingCount,
+                    externalSourceCount: snapshot.externalSourceCount,
+                    manualSourceCount: snapshot.manualSourceCount,
+                    latestReadingDate: snapshot.latestReadingDate,
+                    cleanupResult: manualCleanupResult,
+                    requestCleanup: { isPresentingManualCleanupConfirmation = true }
+                )
+                CloudSyncManualRecordsSection(manualSources: manualSources, canonicalID: store.manualEntrySource.persistentModelID)
+                CloudSyncTechnicalSection(
+                    containerIdentifier: Self.containerIdentifier,
+                    checkedAt: snapshot.checkedAt
+                )
+                CloudSyncRefreshButton(isRefreshing: isRefreshing, refresh: refresh)
+            }
+            .formStyle(.grouped)
         }
-        .navigationTitle("CloudKit Sync")
         .task { await refresh() }
         .confirmationDialog(
             "Remove Duplicate Manual Records?",

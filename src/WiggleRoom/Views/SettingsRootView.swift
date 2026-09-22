@@ -13,6 +13,7 @@ private enum SettingsPane: String, Hashable {
     case order
     case siri
     case cloudKit
+    case dangerZone
 
     var label: String {
         switch self {
@@ -21,6 +22,7 @@ private enum SettingsPane: String, Hashable {
         case .order: "Tracker Order"
         case .siri: "Siri Phrases"
         case .cloudKit: "CloudKit Sync"
+        case .dangerZone: "Danger Zone"
         }
     }
 
@@ -31,6 +33,17 @@ private enum SettingsPane: String, Hashable {
         case .order: 1
         case .siri: 4
         case .cloudKit: 5
+        case .dangerZone: 0
+        }
+    }
+
+    /// Overrides `colorIndex`'s palette lookup for Danger Zone, which needs
+    /// a fixed, unmistakably red glyph rather than one of the per-tracker
+    /// identity colours every other pane picks from.
+    var color: Color? {
+        switch self {
+        case .dangerZone: WiggleRoomColors.bad
+        default: nil
         }
     }
 
@@ -41,6 +54,7 @@ private enum SettingsPane: String, Hashable {
         case .order: "arrow.up.arrow.down"
         case .siri: "waveform"
         case .cloudKit: "icloud"
+        case .dangerZone: "exclamationmark.triangle.fill"
         }
     }
 }
@@ -62,8 +76,8 @@ struct SettingsRootView: View {
     var body: some View {
         HStack(spacing: 0) {
             List(selection: $selection) {
-                ForEach([SettingsPane.general, .connectedSources, .order, .siri, .cloudKit], id: \.self) { pane in
-                    SettingsLabel(title: pane.label, symbol: pane.systemImage, colorIndex: pane.colorIndex, size: 24)
+                ForEach([SettingsPane.general, .connectedSources, .order, .siri, .cloudKit, .dangerZone], id: \.self) { pane in
+                    SettingsLabel(title: pane.label, symbol: pane.systemImage, colorIndex: pane.colorIndex, color: pane.color, size: 24)
                         .tag(pane)
                 }
             }
@@ -95,6 +109,8 @@ struct SettingsRootView: View {
             SiriPhrasesView()
         case .cloudKit:
             CloudSyncDiagnosticsView()
+        case .dangerZone:
+            DangerZoneView()
         }
     }
 }

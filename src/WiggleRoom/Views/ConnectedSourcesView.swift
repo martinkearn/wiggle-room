@@ -17,15 +17,19 @@ import SwiftData
 /// flow, since adding a tracker is the primary action (§7.1) and managing
 /// sources is occasional, setup-time work.
 ///
-/// **Platforms diverge substantially here, deliberately** (2026-09-18):
-/// iOS keeps a `List` of rows pushing to a full-screen `AddSourceView` via
-/// `NavigationLink` — normal, idiomatic iOS Settings-style navigation.
-/// macOS instead edits each source **inline**, directly in this pane, with
-/// no pop-up sheet/dialog at all, and its own "Add Source" affordance
-/// lives inside the pane's content rather than a shared window toolbar —
-/// per explicit design direction to match modern macOS conventions
-/// (System Settings' own sidebar-plus-inline-content style, also used by
-/// Claude's own desktop app) rather than the sheet-based flow tried first.
+/// **Platforms diverge in presentation, but share the same structure**
+/// (2026-09-18, restructured 2026-09-22): both start on a list of connected
+/// sources and push into a detail view for one specific source — iOS via a
+/// normal `NavigationLink` push to a full-screen `AddSourceView`; macOS via
+/// an in-pane list-to-detail swap (no `NavigationStack` runs through
+/// `SettingsRootView`'s fixed sidebar, so this pane manages its own
+/// selection state instead), editing the selected source **inline** with no
+/// pop-up sheet/dialog, per explicit design direction to match modern macOS
+/// conventions (System Settings' own sidebar-plus-inline-content style,
+/// also used by Claude's own desktop app). Previously macOS skipped the
+/// list step and edited every source inline at once; with more than one
+/// source that read as dropping straight into a single source's details
+/// rather than a menu of sources, so it now lists first like iOS does.
 struct ConnectedSourcesView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
@@ -35,6 +39,7 @@ struct ConnectedSourcesView: View {
     @State private var removalBlockedMessage: String?
     #if os(macOS)
     @State private var isAddingSource = false
+    @State private var selectedSourceID: PersistentIdentifier?
     #endif
 
     var body: some View {
@@ -47,51 +52,12 @@ struct ConnectedSourcesView: View {
 
     #if os(macOS)
     private var macBody: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Connected Sources")
-                .font(WiggleRoomFont.headline(22, weight: 650))
-
-            if addedSources.isEmpty && !isAddingSource {
-                WiggleEmptyState(
-                    symbol: "point.3.filled.connected.trianglepath.dotted",
-                    title: "No Connected Sources",
-                    message: "Add a source like Starling to fetch readings for you.",
-                    actionTitle: "Add Source",
-                    action: { isAddingSource = true }
-                )
-                .frame(minHeight: 260)
+        Group {
+            if let selectedSourceID, let selectedSource = addedSources.first(where: { $0.persistentModelID == selectedSourceID }) {
+                macDetail(for: selectedSource)
             } else {
-                VStack(spacing: 12) {
-                    ForEach(addedSources) { source in
-                        SourceEditorCard(source: source) {
-                            requestRemoval(of: source)
-                        }
-                    }
-                    if isAddingSource {
-                        NewSourceCard(
-                            onCancel: { isAddingSource = false },
-                            onAdd: { newSource in
-                                modelContext.insert(newSource)
-                                try? modelContext.save()
-                                isAddingSource = false
-                            }
-                        )
-                    }
-                }
-
-                // Lives inside this pane's own content, not the window's
-                // shared toolbar — "Add Source" is a Connected Sources
-                // action, not app-wide chrome.
-                if !isAddingSource {
-                    Button {
-                        isAddingSource = true
-                    } label: {
-                        Label("Add Source", systemImage: "plus")
-                    }
-                }
+                macList
             }
-
-            Spacer()
         }
         .confirmationDialog(
             "Remove \u{201C}\(sourcePendingRemoval?.displayName ?? "")\u{201D}?",
@@ -120,6 +86,90 @@ struct ConnectedSourcesView: View {
             Button("OK") { removalBlockedMessage = nil }
         } message: {
             Text(removalBlockedMessage ?? "")
+        }
+    }
+
+    /// The intermediate menu — lists every connected source, same as the
+    /// iOS `List` below, so both platforms present "which source?" before
+    /// "here are its details" rather than macOS jumping straight to one.
+    private var macList: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Connected Sources")
+                .font(WiggleRoomFont.headline(22, weight: 650))
+
+            if addedSources.isEmpty && !isAddingSource {
+                WiggleEmptyState(
+                    symbol: "point.3.filled.connected.trianglepath.dotted",
+                    title: "No Connected Sources",
+                    message: "Add a source like Starling to fetch readings for you.",
+                    actionTitle: "Add Source",
+                    action: { isAddingSource = true }
+                )
+                .frame(minHeight: 260)
+            } else {
+                VStack(spacing: 4) {
+                    ForEach(addedSources) { source in
+                        Button {
+                            selectedSourceID = source.persistentModelID
+                        } label: {
+                            HStack {
+                                row(for: source)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if isAddingSource {
+                        NewSourceCard(
+                            onCancel: { isAddingSource = false },
+                            onAdd: { newSource in
+                                modelContext.insert(newSource)
+                                try? modelContext.save()
+                                isAddingSource = false
+                            }
+                        )
+                    }
+                }
+
+                // Lives inside this pane's own content, not the window's
+                // shared toolbar — "Add Source" is a Connected Sources
+                // action, not app-wide chrome.
+                if !isAddingSource {
+                    Button {
+                        isAddingSource = true
+                    } label: {
+                        Label("Add Source", systemImage: "plus")
+                    }
+                }
+            }
+
+            Spacer()
+        }
+    }
+
+    /// One source's details, edited in place — pushed to by `macList`,
+    /// popped back to it by the back button rather than a `NavigationStack`
+    /// (this pane manages its own selection since `SettingsRootView`'s
+    /// sidebar doesn't run one).
+    private func macDetail(for source: ConnectedSource) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Button {
+                selectedSourceID = nil
+            } label: {
+                Label("Connected Sources", systemImage: "chevron.left")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+
+            SourceEditorCard(source: source) {
+                requestRemoval(of: source)
+            }
+
+            Spacer()
         }
     }
     #else
@@ -193,6 +243,7 @@ struct ConnectedSourcesView: View {
             Text(removalBlockedMessage ?? "")
         }
     }
+    #endif
 
     private func row(for source: ConnectedSource) -> some View {
         HStack(spacing: 12) {
@@ -207,7 +258,6 @@ struct ConnectedSourcesView: View {
         }
         .padding(.vertical, 4)
     }
-    #endif
 
     /// Removing a source out from under trackers that still point at it
     /// would leave them with a `nil` connection (`ConnectedSource`'s
@@ -224,6 +274,11 @@ struct ConnectedSourcesView: View {
     }
 
     private func remove(_ source: ConnectedSource) {
+        #if os(macOS)
+        if selectedSourceID == source.persistentModelID {
+            selectedSourceID = nil
+        }
+        #endif
         modelContext.delete(source)
         try? modelContext.save()
     }
