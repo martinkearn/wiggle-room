@@ -10,19 +10,17 @@ import SwiftData
 private enum SettingsPane: String, Hashable {
     case general
     case connectedSources
-    case manualEntryRecords
     case order
-    case cloudKit
     case siri
+    case cloudKit
 
     var label: String {
         switch self {
         case .general: "General"
         case .connectedSources: "Connected Sources"
-        case .manualEntryRecords: "Manual Records"
         case .order: "Tracker Order"
-        case .cloudKit: "CloudKit Sync"
         case .siri: "Siri Phrases"
+        case .cloudKit: "CloudKit Sync"
         }
     }
 
@@ -30,10 +28,9 @@ private enum SettingsPane: String, Hashable {
         switch self {
         case .general: 2
         case .connectedSources: 3
-        case .manualEntryRecords: 0
         case .order: 1
-        case .cloudKit: 5
         case .siri: 4
+        case .cloudKit: 5
         }
     }
 
@@ -41,10 +38,9 @@ private enum SettingsPane: String, Hashable {
         switch self {
         case .general: "gearshape"
         case .connectedSources: "point.3.filled.connected.trianglepath.dotted"
-        case .manualEntryRecords: "doc.on.doc"
         case .order: "arrow.up.arrow.down"
-        case .cloudKit: "icloud"
         case .siri: "waveform"
+        case .cloudKit: "icloud"
         }
     }
 }
@@ -66,7 +62,7 @@ struct SettingsRootView: View {
     var body: some View {
         HStack(spacing: 0) {
             List(selection: $selection) {
-                ForEach([SettingsPane.general, .connectedSources, .manualEntryRecords, .order, .cloudKit, .siri], id: \.self) { pane in
+                ForEach([SettingsPane.general, .connectedSources, .order, .siri, .cloudKit], id: \.self) { pane in
                     SettingsLabel(title: pane.label, symbol: pane.systemImage, colorIndex: pane.colorIndex, size: 24)
                         .tag(pane)
                 }
@@ -93,14 +89,12 @@ struct SettingsRootView: View {
             GeneralSettingsView()
         case .connectedSources:
             ConnectedSourcesView()
-        case .manualEntryRecords:
-            ManualEntryRecordsView()
         case .order:
             TrackerOrderView()
-        case .cloudKit:
-            CloudSyncDiagnosticsView()
         case .siri:
             SiriPhrasesView()
+        case .cloudKit:
+            CloudSyncDiagnosticsView()
         }
     }
 }

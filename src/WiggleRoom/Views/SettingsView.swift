@@ -31,25 +31,26 @@ struct SettingsView: View {
                     } label: {
                         SettingsLabel(title: "Connected Sources", symbol: "point.3.filled.connected.trianglepath.dotted", colorIndex: 3)
                     }
-                    NavigationLink {
-                        ManualEntryRecordsView()
-                    } label: {
-                        SettingsLabel(title: "Manual Entry Records", symbol: "doc.on.doc", colorIndex: 0)
-                    }
+                }
+                Section {
                     NavigationLink {
                         TrackerOrderView()
                     } label: {
                         SettingsLabel(title: "Tracker Order", symbol: "arrow.up.arrow.down", colorIndex: 1)
                     }
-                    NavigationLink {
-                        CloudSyncDiagnosticsView()
-                    } label: {
-                        SettingsLabel(title: "CloudKit Sync", symbol: "icloud", colorIndex: 5)
-                    }
+                }
+                Section {
                     NavigationLink {
                         SiriPhrasesView()
                     } label: {
                         SettingsLabel(title: "Siri Phrases", symbol: "waveform", colorIndex: 4)
+                    }
+                }
+                Section {
+                    NavigationLink {
+                        CloudSyncDiagnosticsView()
+                    } label: {
+                        SettingsLabel(title: "CloudKit Sync", symbol: "icloud", colorIndex: 5)
                     }
                 }
 

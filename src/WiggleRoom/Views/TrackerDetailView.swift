@@ -226,24 +226,30 @@ struct TrackerDetailView: View {
         .toolbar(removing: .title)
         #endif
         // Header: title and date range in the navigation bar. On iOS the
-        // subtitle only shows one line, so the "connection · account" line
-        // (connected sources only) is a pinned strip directly beneath the
-        // bar — a top safe-area inset, so it stays put while the content
-        // scrolls and the content starts below it rather than under it.
+        // system subtitle only shows one line and leaves reserved space of
+        // its own, so the date range and (connected sources only) the
+        // "connection · account" line are drawn together as a pinned strip
+        // directly beneath the bar instead — a top safe-area inset, so it
+        // stays put while the content scrolls and the content starts below
+        // it rather than under it, with no gap between the two lines.
         #if os(macOS)
         .navigationSubtitle(sourceCaption.map { "\(periodRangeText)\n\($0)" } ?? periodRangeText)
         #else
-        .navigationSubtitle(periodRangeText)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if let sourceCaption {
-                Text(sourceCaption)
+            VStack(spacing: 2) {
+                Text(periodRangeText)
                     .font(.wiggleText(.caption))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(.bar)
+                if let sourceCaption {
+                    Text(sourceCaption)
+                        .font(.wiggleText(.caption))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(.bar)
         }
         #endif
         .inlineNavigationBarIfAvailable()
@@ -590,11 +596,14 @@ struct TrackerDetailView: View {
         ].compactMap { $0 }
     }
 
-    /// Time only when it's today, otherwise date and time.
+    /// Time only when it's today, otherwise day and month (no year) plus time.
     private static func timingText(_ date: Date) -> String {
-        Calendar.current.isDateInToday(date)
-            ? "at " + date.formatted(date: .omitted, time: .shortened)
-            : date.formatted(date: .abbreviated, time: .shortened)
+        guard !Calendar.current.isDateInToday(date) else {
+            return "at " + date.formatted(date: .omitted, time: .shortened)
+        }
+        let day = date.formatted(.dateTime.day().month(.abbreviated))
+        let time = date.formatted(date: .omitted, time: .shortened)
+        return "\(day) at \(time)"
     }
 
     private func figureContent(title: String, value: Decimal, captions: [String] = []) -> some View {
