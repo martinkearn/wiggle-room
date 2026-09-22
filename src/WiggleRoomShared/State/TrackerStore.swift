@@ -309,6 +309,14 @@ final class TrackerStore {
     /// same shared file) but never calls this — reloading its own timeline
     /// from inside itself would be pointless.
     private func reloadWidgets() {
+        // Keeps the widget/complication configuration picker's cache
+        // (`TrackerListCache`) current the instant a mutation happens here,
+        // so the next time that picker opens — on this device or, once
+        // CloudKit has synced, another — it has an up-to-date list to show
+        // immediately instead of blocking on a fresh fetch.
+        if let trackers = try? modelContext.fetch(FetchDescriptor<Tracker>()) {
+            TrackerListCache.save(trackers)
+        }
         WidgetCenter.shared.reloadAllTimelines()
     }
 

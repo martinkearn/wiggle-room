@@ -5,6 +5,7 @@
 
 import CoreData
 import Foundation
+import SwiftData
 import WidgetKit
 
 /// Watches for CloudKit importing remote changes into the local SwiftData
@@ -15,20 +16,27 @@ import WidgetKit
 /// through any `TrackerStore` method at all; without this, a widget would
 /// only pick it up on its own refresh schedule (up to an hour away per
 /// `TrackerTimelineProvider`), showing stale figures even though the app,
-/// freshly opened, is already current.
+/// freshly opened, is already current. Also refreshes `TrackerListCache` for
+/// the same reason: a tracker created on another device syncing in here
+/// should update the shared picker cache too, not just widget content.
 enum CloudSyncWidgetRefresher {
     private static var observer: NSObjectProtocol?
 
     /// Call once per app process (the main app and the watch app each start
-    /// their own). Safe to call more than once — only the first call
-    /// actually registers the observer.
-    static func start() {
+    /// their own), passing that process's own `ModelContainer`. Safe to call
+    /// more than once — only the first call actually registers the
+    /// observer.
+    @MainActor
+    static func start(modelContainer: ModelContainer) {
         guard observer == nil else { return }
         observer = NotificationCenter.default.addObserver(
             forName: .NSPersistentStoreRemoteChange,
             object: nil,
             queue: .main
         ) { _ in
+            if let trackers = try? modelContainer.mainContext.fetch(FetchDescriptor<Tracker>()) {
+                TrackerListCache.save(trackers)
+            }
             WidgetCenter.shared.reloadAllTimelines()
         }
     }

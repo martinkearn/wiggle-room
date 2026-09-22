@@ -47,7 +47,12 @@ enum IntentDataStore {
     static func fetchAllTrackers() throws -> [Tracker] {
         let container = try makeContainer()
         let descriptor = FetchDescriptor<Tracker>(sortBy: [SortDescriptor(\.name)])
-        return try container.mainContext.fetch(descriptor)
+        let trackers = try container.mainContext.fetch(descriptor)
+        // Shortcuts/Siri can run in their own process with no `TrackerStore`
+        // mutation involved (e.g. just reading trackers) — keep the shared
+        // picker cache (`TrackerListCache`) current here too.
+        TrackerListCache.save(trackers)
+        return trackers
     }
 
     @MainActor

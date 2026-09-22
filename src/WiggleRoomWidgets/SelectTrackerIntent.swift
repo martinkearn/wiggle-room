@@ -36,29 +36,41 @@ struct TrackerEntityQuery: EntityQuery {
     /// Resolves the tracker(s) a widget is *already* configured with — the
     /// call the system makes to show the current selection's real name
     /// (both in the "Edit Widget" sheet and the widget gallery summary)
-    /// rather than the placeholder "Tracker" text. This needs the same
-    /// generous CloudKit wait as `suggestedEntities()` below, not the
-    /// short one `fetchAllTrackers()` gives the timeline provider — that
-    /// shorter wait exists to protect WidgetKit's own render budget, which
-    /// doesn't apply to this interactive, already-"Loading"-aware UI, and
-    /// using it here was resolving too fast, before CloudKit had actually
-    /// synced the tracker down to this extension's own local store, and
-    /// falling back to the unresolved placeholder instead.
+    /// rather than the placeholder "Tracker" text. Tries the shared picker
+    /// cache (`TrackerListCache`) first — a cached-but-possibly-slightly-
+    /// stale name is still a better result than blocking this interactive
+    /// UI on a full CloudKit wait — and only falls back to that wait when
+    /// the requested id(s) aren't in the cache yet (e.g. a tracker picked on
+    /// another device moments ago that hasn't synced down here yet).
     @MainActor
     func entities(for identifiers: [TrackerEntity.ID]) async throws -> [TrackerEntity] {
         // The placeholder needs no fetch — return it immediately so the picker
         // never waits on (or fails with) a CloudKit-backed lookup just to
         // say "Choose a tracker".
         if identifiers == [TrackerEntity.placeholder.id] { return [TrackerEntity.placeholder] }
-        let real = try await WidgetDataStore.fetchAllTrackersForConfiguration()
-            .filter { identifiers.contains($0.id) }
+        let requestedIds = identifiers.filter { $0 != TrackerEntity.placeholder.id }
+        let cachedMatches = TrackerListCache.load()
+            .filter { requestedIds.contains($0.id) }
             .map { TrackerEntity(id: $0.id, name: $0.name) }
+        let real: [TrackerEntity]
+        if cachedMatches.count == requestedIds.count {
+            Task.detached(priority: .utility) {
+                _ = try? await WidgetDataStore.fetchAllTrackersForConfiguration()
+            }
+            real = cachedMatches
+        } else {
+            real = try await WidgetDataStore.fetchAllTrackersForConfiguration()
+                .filter { requestedIds.contains($0.id) }
+                .map { TrackerEntity(id: $0.id, name: $0.name) }
+        }
         return identifiers.contains(TrackerEntity.placeholder.id) ? [TrackerEntity.placeholder] + real : real
     }
 
+    /// Cache-first: see `WidgetDataStore.fetchTrackerListForConfiguration()`
+    /// for why this no longer blocks the picker on a full CloudKit wait.
     @MainActor
     func suggestedEntities() async throws -> [TrackerEntity] {
-        try await WidgetDataStore.fetchAllTrackersForConfiguration().map { TrackerEntity(id: $0.id, name: $0.name) }
+        try await WidgetDataStore.fetchTrackerListForConfiguration().map { TrackerEntity(id: $0.id, name: $0.name) }
     }
 }
 

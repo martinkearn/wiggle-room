@@ -43,7 +43,7 @@ struct WiggleRoomWatchApp: App {
         }
         let trackerStore = TrackerStore(modelContext: modelContainer.mainContext)
         _store = State(initialValue: trackerStore)
-        CloudSyncWidgetRefresher.start()
+        CloudSyncWidgetRefresher.start(modelContainer: modelContainer)
     }
 
     var body: some Scene {

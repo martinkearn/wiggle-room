@@ -55,7 +55,7 @@ struct WiggleRoomApp: App {
 
         let trackerStore = TrackerStore(modelContext: modelContainer.mainContext)
         _store = State(initialValue: trackerStore)
-        CloudSyncWidgetRefresher.start()
+        CloudSyncWidgetRefresher.start(modelContainer: modelContainer)
         NotificationActionHandler.shared.register()
         StarlingRequestLogger.configure(container: modelContainer)
 

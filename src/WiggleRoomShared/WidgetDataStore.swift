@@ -85,7 +85,13 @@ enum WidgetDataStore {
     static func fetchAllTrackersImmediately() throws -> [Tracker] {
         let container = try makeContainer()
         let descriptor = FetchDescriptor<Tracker>(sortBy: [SortDescriptor(\.name)])
-        return try container.mainContext.fetch(descriptor)
+        let trackers = try container.mainContext.fetch(descriptor)
+        // Opportunistic: any process that manages a real fetch (an
+        // extension's own cold-start wait, or the host app after a
+        // mutation) keeps the shared picker cache (`TrackerListCache`)
+        // fresh, regardless of which process happened to do the fetching.
+        TrackerListCache.save(trackers)
+        return trackers
     }
 
     /// The very first time this extension's sandboxed container talks to
@@ -254,6 +260,30 @@ enum WidgetDataStore {
             logger.error("Failed to fetch trackers for configuration: \(error, privacy: .public)")
             throw error
         }
+    }
+
+    /// Cache-first read for the interactive "choose a tracker" picker
+    /// (`TrackerEntityQuery.suggestedEntities()`): returns the last known
+    /// snapshot from `TrackerListCache` instantly when one exists, instead
+    /// of always blocking on `fetchAllTrackersForConfiguration()`'s CloudKit
+    /// wait — this is what fixes the picker's long "Loading" state and, on
+    /// watchOS, the system picker timing out and bouncing back to the edit
+    /// screen before that wait ever finished. A real fetch still runs in the
+    /// background afterwards so the cache (and the picker, next time it's
+    /// opened) reflects anything that's changed since the cached snapshot
+    /// was written — this call just no longer makes the *current* picker
+    /// open wait on it. Only falls back to waiting on the real fetch when no
+    /// cache exists at all yet (e.g. this device's very first picker open).
+    @MainActor
+    static func fetchTrackerListForConfiguration() async throws -> [TrackerListCache.Entry] {
+        let cached = TrackerListCache.load()
+        guard !cached.isEmpty else {
+            return try await fetchAllTrackersForConfiguration().map { TrackerListCache.Entry(id: $0.id, name: $0.name) }
+        }
+        Task.detached(priority: .utility) {
+            _ = try? await fetchAllTrackersForConfiguration()
+        }
+        return cached
     }
 
     /// Suspends until CloudKit reports an import has finished (successful or

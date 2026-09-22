@@ -117,6 +117,11 @@ or stale local stores and must not treat a short delay as data loss.
 If the CloudKit-backed container cannot be created, the app records that state
 in its diagnostics and may fall back to local persistence rather than crash.
 
+Widget and complication configuration pickers read tracker names from a small
+snapshot cached in the App Group container, refreshed whenever any process
+fetches current tracker data, rather than always waiting on a fresh CloudKit
+round trip before showing a list.
+
 ## 6. Visual language
 
 The interface should feel calm and informative rather than punitive.
