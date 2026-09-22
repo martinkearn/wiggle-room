@@ -50,6 +50,8 @@ struct CloudSyncDiagnosticsView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(TrackerStore.self) private var store
+    @Query(filter: #Predicate<ConnectedSource> { $0.providerId == "manual" })
+    private var manualSources: [ConnectedSource]
     @State private var diagnostics = CloudSyncDiagnostics.shared
     @State private var snapshot = CloudSyncSnapshot()
     @State private var isRefreshing = false
@@ -75,6 +77,7 @@ struct CloudSyncDiagnosticsView: View {
                 cleanupResult: manualCleanupResult,
                 requestCleanup: { isPresentingManualCleanupConfirmation = true }
             )
+            CloudSyncManualRecordsSection(manualSources: manualSources, canonicalID: store.manualEntrySource.persistentModelID)
             CloudSyncTechnicalSection(
                 containerIdentifier: Self.containerIdentifier,
                 checkedAt: snapshot.checkedAt
@@ -112,6 +115,7 @@ struct CloudSyncDiagnosticsView: View {
                 cleanupResult: manualCleanupResult,
                 requestCleanup: { isPresentingManualCleanupConfirmation = true }
             )
+            CloudSyncManualRecordsSection(manualSources: manualSources, canonicalID: store.manualEntrySource.persistentModelID)
             CloudSyncTechnicalSection(
                 containerIdentifier: Self.containerIdentifier,
                 checkedAt: snapshot.checkedAt
@@ -288,6 +292,50 @@ private struct CloudSyncLocalDataSection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+private struct CloudSyncManualRecordsSection: View {
+    let manualSources: [ConnectedSource]
+    let canonicalID: PersistentIdentifier
+
+    var body: some View {
+        Section("Manual Entry Records") {
+            Text("Manual Entry records are internal links used by manual trackers. They are not external connections and normally only one is needed.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(manualSources) { source in
+                CloudSyncManualRecordRow(
+                    id: source.id,
+                    trackerCount: source.trackers?.count ?? 0,
+                    isCanonical: source.persistentModelID == canonicalID
+                )
+            }
+        }
+    }
+}
+
+private struct CloudSyncManualRecordRow: View {
+    let id: UUID
+    let trackerCount: Int
+    let isCanonical: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label(
+                    isCanonical ? "Canonical Manual Entry" : "Duplicate Manual Entry",
+                    systemImage: isCanonical ? "checkmark.circle.fill" : "doc.on.doc"
+                )
+                Spacer()
+                Text("\(trackerCount) tracker\(trackerCount == 1 ? "" : "s")")
+                    .foregroundStyle(.secondary)
+            }
+            Text(id.uuidString)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
         }
     }
 }
