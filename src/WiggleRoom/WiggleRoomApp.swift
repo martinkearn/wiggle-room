@@ -20,6 +20,8 @@ struct WiggleRoomApp: App {
     @State private var hasRunActivationHousekeeping = false
     #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #elseif os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     #endif
 
     init() {

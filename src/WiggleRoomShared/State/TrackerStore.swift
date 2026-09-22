@@ -67,9 +67,11 @@ final class TrackerStore {
         reloadWidgets()
     }
 
-    /// Wipes every tracker (and, via its cascade delete rule, every
-    /// reading), every real connected source, and every Starling request
-    /// log entry — a full reset back to a blank app. This is an explicitly
+    /// Wipes every tracker, every reading (fetched and deleted explicitly,
+    /// not left to `Tracker.readings`' cascade rule alone — a reading
+    /// already orphaned from its tracker would otherwise survive), every
+    /// real connected source, and every Starling request log entry — a full
+    /// reset back to a blank app. This is an explicitly
     /// confirmed clean-slate escape hatch for corrupted or unwanted data, not
     /// routine maintenance. The fixed "Manual Entry" pseudo-source
     /// (`manualEntrySource`)
@@ -99,6 +101,16 @@ final class TrackerStore {
             for tracker in trackers {
                 ReminderScheduler.cancel(tracker)
                 modelContext.delete(tracker)
+            }
+
+            // Explicit, not left to `Tracker.readings`' cascade rule alone:
+            // a `ValueSnapshot` whose `tracker` is already nil (orphaned by
+            // an earlier edit, or by SwiftData/CloudKit's known cascade
+            // gaps during merge) is invisible to that cascade and would
+            // otherwise survive a "full" reset indefinitely.
+            let readings = try modelContext.fetch(FetchDescriptor<ValueSnapshot>())
+            for reading in readings {
+                modelContext.delete(reading)
             }
 
             let sources = try modelContext.fetch(FetchDescriptor<ConnectedSource>())

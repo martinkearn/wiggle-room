@@ -125,6 +125,10 @@ widgets, and related extensions share current data on one device.
 CloudKit synchronization is asynchronous. UI must tolerate temporarily empty
 or stale local stores and must not treat a short delay as data loss.
 
+Every process registers for remote (silent push) notifications so an
+already-running, foregrounded app picks up another device's changes promptly
+rather than only on its own next periodic or opportunistic import.
+
 If the CloudKit-backed container cannot be created, the app records that state
 in its diagnostics and may fall back to local persistence rather than crash.
 
