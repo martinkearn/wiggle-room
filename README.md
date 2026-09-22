@@ -47,11 +47,11 @@ Developer identifiers and capabilities before CloudKit or device builds work.
 Pushes to `main` start separate GitHub Actions workflows for iOS and macOS.
 Both workflows also support manual dispatch from the GitHub Actions interface.
 
-Every workflow attempt receives a new build number derived from the repository
-commit count, workflow attempt, and platform. This keeps iOS and macOS archive
-numbers distinct, including reruns. The number is applied consistently to the
-app and all embedded extensions before the workflow creates a signed archive
-and uploads it to the existing App Store Connect record.
+Every workflow attempt receives a new build number derived from the monotonic
+GitHub Actions workflow run number, workflow attempt, and platform. This keeps
+iOS and macOS archive numbers distinct, including reruns. The number is applied
+consistently to the app and all embedded extensions before the workflow creates
+a signed archive and uploads it to the existing App Store Connect record.
 
 The workflows require GitHub repository secrets for App Store Connect
 authentication and signing. For the complete list, purpose, setup, certificate

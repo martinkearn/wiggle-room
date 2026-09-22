@@ -525,7 +525,8 @@ After all fourteen secrets are present:
    under TestFlight.
 
 Workflow runs perform real TestFlight uploads. Each attempt receives a unique,
-platform-specific build number, including reruns.
+platform-specific build number from the monotonic GitHub Actions workflow run
+number, including reruns.
 
 Feature branches may be added temporarily to a workflow's `push.branches` list
 for pre-merge verification. Because every push then performs a real upload,
