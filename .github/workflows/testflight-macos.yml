@@ -35,9 +35,9 @@ jobs:
       - name: Set build number
         run: |
           # Reserve lower build numbers for archives produced outside GitHub Actions.
+          # GitHub's workflow run number is monotonic, unlike commit counts after squash merges.
           # The final component distinguishes iOS (1) from macOS (2).
-          COMMIT_COUNT="$(git rev-list --count HEAD)"
-          echo "BUILD_NUMBER=$((1000 + COMMIT_COUNT)).${GITHUB_RUN_ATTEMPT}.2" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$((2000 + GITHUB_RUN_NUMBER)).${GITHUB_RUN_ATTEMPT}.2" >> "$GITHUB_ENV"
 
       - name: Install App Store Connect API key
         env:
