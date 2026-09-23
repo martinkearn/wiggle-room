@@ -132,25 +132,6 @@ jobs:
           echo "INSTALLER_CERTIFICATE_SHA1=$INSTALLER_CERTIFICATE_SHA1" >> "$GITHUB_ENV"
           echo "Mac installer distribution certificate is available for export."
 
-      - name: Archive macOS app
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          xcodebuild archive \
-            -project "$PROJECT_PATH" \
-            -scheme "$SCHEME" \
-            -configuration Release \
-            -destination "generic/platform=macOS" \
-            -archivePath "$RUNNER_TEMP/WiggleRoom-macOS.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$API_KEY_PATH" \
-            -authenticationKeyID "$API_KEY_ID" \
-            -authenticationKeyIssuerID "$API_ISSUER_ID" \
-            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            DEVELOPMENT_TEAM="$TEAM_ID"
-
       - name: Install Mac App Store provisioning profiles
         env:
           APP_PROFILE_BASE64: ${{ secrets.MAC_APP_STORE_PROFILE_BASE64 }}
@@ -188,6 +169,27 @@ jobs:
 
           install_profile "$APP_PROFILE_BASE64" "martinkearn.WiggleRoom" "MAC_APP_PROFILE_UUID"
           install_profile "$WIDGET_PROFILE_BASE64" "martinkearn.WiggleRoom.WiggleRoomWidgets" "MAC_WIDGET_PROFILE_UUID"
+
+      - name: Archive macOS app
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcodebuild archive \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -archivePath "$RUNNER_TEMP/WiggleRoom-macOS.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$API_KEY_PATH" \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_STYLE=Manual \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            DEVELOPMENT_TEAM="$TEAM_ID"
 
       - name: Upload macOS archive to TestFlight
         env:
