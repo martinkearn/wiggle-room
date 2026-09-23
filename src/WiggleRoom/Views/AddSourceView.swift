@@ -59,6 +59,10 @@ struct AddSourceView: View {
     @State private var starlingRequestsToday = 0
     @State private var starlingCooldownUntil: Date?
 
+    /// Names of the trackers pointed at this source, also captured once in
+    /// `.task`. See `namesOfTrackersUsingThisSource()`.
+    @State private var trackerNames: [String] = []
+
     /// Captured once, so `body` never has to ask `existingSource` whether
     /// this is an edit or a fresh connection.
     private let isEditing: Bool
@@ -113,6 +117,20 @@ struct AddSourceView: View {
                 Text(tokenFieldFooter)
             }
 
+            if !trackerNames.isEmpty {
+                Section {
+                    // Indexed rather than identified by name: these are
+                    // display strings, and two trackers could in principle
+                    // share one, which would collide as a ForEach id.
+                    ForEach(Array(trackerNames.enumerated()), id: \.offset) { _, name in
+                        Text(name)
+                    }
+                } header: {
+                    Text("Trackers Using This Source")
+                        .font(WiggleRoomFont.headline(15, weight: 650))
+                }
+            }
+
             if let errorMessage {
                 Section {
                     Text(errorMessage)
@@ -127,7 +145,10 @@ struct AddSourceView: View {
                 starlingRateLimitSection
             }
         }
-        .task { await refreshStarlingStatus() }
+        .task {
+            trackerNames = namesOfTrackersUsingThisSource()
+            await refreshStarlingStatus()
+        }
         .formStyle(.grouped)
         .navigationTitle(isEditing ? "Edit Source" : "Add Source")
         .inlineNavigationBarIfAvailable()
@@ -219,6 +240,26 @@ struct AddSourceView: View {
     private func refreshStarlingStatus() async {
         starlingRequestsToday = requestCountToday()
         starlingCooldownUntil = await StarlingProvider.sharedBudget.status.cooldownUntil
+    }
+
+    /// The trackers pointed at this source, captured as plain names when the
+    /// screen appears.
+    ///
+    /// Reading `existingSource.trackers` from `body` was the worst of the
+    /// things this screen used to do: traversing a to-many relationship
+    /// faults it in, which is a fetch on the main context — structurally the
+    /// same act as a live `@Query`. Read once here instead.
+    ///
+    /// Kept as `String`s so this view holds no `Tracker` references at all,
+    /// which additionally rules out rendering a model whose backing data has
+    /// since been deleted or merged away — the separate hard crash
+    /// `RingsView` and `TrackerRow` carry their own guards for.
+    ///
+    /// Sorted for a stable order; the relationship's own order is arbitrary.
+    private func namesOfTrackersUsingThisSource() -> [String] {
+        (existingSource?.trackers ?? [])
+            .map(\.name)
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     /// Counted in the store rather than by fetching and filtering every

@@ -127,3 +127,12 @@ Then measure rather than infer:
   no fetch at all, and nothing can change it while the screen is open, since
   saving a token dismisses. Re-verified inert (zero `AddSourceView` frames in
   4,130 samples).
+- **2026-09-23** — The tracker list was restored last, as a `.task` read of
+  `existingSource.trackers` mapped straight to `[String]`. Traversing a
+  to-many relationship from `body` faults it in, which is a fetch on the main
+  context and therefore structurally the same act as a live `@Query` — so it
+  has to happen outside `body` like any other store read. Holding only names
+  has a second benefit: the view keeps no `Tracker` references, so it cannot
+  render a model whose backing data has since been deleted or merged away.
+  Re-verified inert (zero frames in 4,850 samples). The screen is now back to
+  its full content with every store-derived value a one-time read.
