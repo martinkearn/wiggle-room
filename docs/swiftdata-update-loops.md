@@ -114,4 +114,16 @@ Then measure rather than infer:
 - **2026-09-23** — The hang recurred on TestFlight build 2027.1.1. The
   remaining live query over `StarlingRequestLogEntry` was enough to sustain
   it. The iOS connected-source editor was reduced to a name field, a token
-  field, and save, so its `body` observes nothing from SwiftData.
+  field, and save, so its `body` observes nothing from SwiftData. Confirmed
+  fixed on build 2028.1.1.
+- **2026-09-23** — The request counter was restored to that screen as a
+  `.task` snapshot rather than a live `@Query`: read once on appear, so the
+  figure doesn't tick while the screen is open. Verified inert afterwards —
+  zero `AddSourceView` frames in a five-second sample under a store being
+  written to twice a second. This is the pattern for putting store-derived
+  detail back on such a screen.
+- **2026-09-23** — The Connected/Not Connected indicator was restored the
+  same way, as a `let` captured in `init`. Cheaper still than the counter:
+  no fetch at all, and nothing can change it while the screen is open, since
+  saving a token dismisses. Re-verified inert (zero `AddSourceView` frames in
+  4,130 samples).

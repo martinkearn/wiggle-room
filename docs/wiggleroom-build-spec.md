@@ -184,11 +184,18 @@ without relying on colour or geometry alone.
   with a separate Danger Zone menu for reset operations
 - Spotlight, notification actions, Live Activities, and widgets
 
-The connected-source editor on iOS is a name field, a personal-access-token
-field, and save — no provider badge, connection-status row, list of trackers
-using the source, or request counter. It is reached from a `@Query`-backed
-list, so its body observes no SwiftData at all (see Persistence and sync).
-macOS keeps the richer inline editor, which is not reached that way.
+The connected-source editor on iOS shows a name field, a Connected/Not
+Connected indicator, a personal-access-token field, save, and the shared
+Starling request count. It carries no provider badge and no list of trackers
+using the source.
+
+It is reached from a `@Query`-backed list, so its body observes no SwiftData
+at all (see Persistence and sync). Both store-derived figures are snapshots:
+the connection state is captured when the screen opens, and the request count
+is read once as the screen appears rather than tracked live, so neither
+changes while the screen is open. Neither can change underneath the user in
+practice — saving a token dismisses the screen. macOS keeps the richer inline
+editor, which is not reached that way and does show both live.
 
 ### macOS
 

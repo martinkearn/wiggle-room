@@ -21,23 +21,22 @@ import SwiftData
 /// actually revoking/rotating the token at Starling, not because of a
 /// cross-device sync gap.
 ///
-/// **Deliberately just two fields.** This screen previously also showed a
-/// Starling badge, a Connected/Not Connected row, the trackers using the
-/// source, and the shared daily request counter. It is pushed from
-/// `ConnectedSourcesView`, which holds a live `@Query`, and everything in
-/// that list put this view's `body` in a SwiftUI update loop that ran until
-/// iOS killed the app on the watchdog.
+/// **Deliberately minimal.** This screen once showed a Starling badge, a
+/// Connected/Not Connected row, and the trackers using the source as well.
+/// It is pushed from `ConnectedSourcesView`, which holds a live `@Query`, and
+/// every one of those put this view's `body` in a SwiftUI update loop that
+/// ran until iOS killed the app on the watchdog.
 ///
-/// So this body observes **nothing** from SwiftData: only local `@State`
-/// seeded once in `init`. No live query, no relationship traversal, no model
-/// property read during `body`. The duplicate-name check that used to need a
-/// query now happens in `connect()`, against a one-shot fetch, at the moment
-/// of saving.
+/// So this body observes **nothing** from SwiftData: no live query, no
+/// relationship traversal, no model property read during `body` — only local
+/// `@State`, seeded in `init` or once in `.task`. Everything that needs the
+/// store reads it outside `body`: the request count in `.task`, the
+/// duplicate-name check in `connect()`.
 ///
-/// See `docs/swiftdata-update-loops.md` before restoring any of the removed
-/// detail here — it belongs on a screen that isn't rebuilt by a
-/// `@Query`-backed parent. macOS keeps the richer editor (`SourceEditorCard`),
-/// which is not reached that way.
+/// See `docs/swiftdata-update-loops.md` before adding anything back here.
+/// Anything genuinely needing a *live* view of the store belongs on a screen
+/// that isn't rebuilt by a `@Query`-backed parent; macOS keeps the richer
+/// editor (`SourceEditorCard`), which is not reached that way.
 struct AddSourceView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -54,13 +53,32 @@ struct AddSourceView: View {
     @State private var isConnecting = false
     @State private var errorMessage: String?
 
+    /// The shared Starling request budget, read once in `.task`. Snapshots,
+    /// deliberately — a live `@Query` here is what got the app killed; see
+    /// the type note above.
+    @State private var starlingRequestsToday = 0
+    @State private var starlingCooldownUntil: Date?
+
     /// Captured once, so `body` never has to ask `existingSource` whether
     /// this is an edit or a fresh connection.
     private let isEditing: Bool
 
+    /// Whether the source already has a token stored, captured in `init`.
+    ///
+    /// Deliberately reflects what is actually **stored**, not whether the
+    /// token field currently has text in it — that only shows what is about
+    /// to be saved, possibly still unedited, possibly cleared.
+    ///
+    /// A snapshot rather than a model read in `body`, for the reason in the
+    /// type note. Nothing can change it while this screen is open except
+    /// `connect()`, which dismisses on success, so the captured value stays
+    /// accurate for the screen's lifetime.
+    private let isConnected: Bool
+
     init(existingSource: ConnectedSource? = nil) {
         self.existingSource = existingSource
         self.isEditing = existingSource != nil
+        self.isConnected = !(existingSource?.credentialToken ?? "").isEmpty
         _displayName = State(initialValue: existingSource?.displayName ?? "My Starling Account")
         // Pre-filled from the stored token (not left blank) — a Starling
         // personal access token is user-entered, not a system secret, so
@@ -75,6 +93,9 @@ struct AddSourceView: View {
         Form {
             Section {
                 TextField("Name", text: $displayName)
+                if isEditing {
+                    connectionStatusRow
+                }
                 // axis: .vertical grows the field to fit a token's real
                 // length (Starling's are long strings) rather than
                 // scrolling it sideways in a single-line box.
@@ -98,7 +119,15 @@ struct AddSourceView: View {
                         .foregroundStyle(WiggleRoomColors.error)
                 }
             }
+
+            // Only for an existing source — a brand new one has no usage to
+            // report, and this is the only place an iOS user can see the
+            // figure at all, since iOS has no Settings scene (§7.2).
+            if isEditing {
+                starlingRateLimitSection
+            }
         }
+        .task { await refreshStarlingStatus() }
         .formStyle(.grouped)
         .navigationTitle(isEditing ? "Edit Source" : "Add Source")
         .inlineNavigationBarIfAvailable()
@@ -131,6 +160,76 @@ struct AddSourceView: View {
                 .disabled(trimmedToken.isEmpty || isConnecting)
             }
         }
+    }
+
+    /// "Connected"/"Not Connected" — the same wording, symbols and colours as
+    /// the macOS editor's `connectionStatusBadge`, at the text size this
+    /// screen's own form rows use rather than the compact card size that card
+    /// is tuned for.
+    private var connectionStatusRow: some View {
+        Label(
+            isConnected ? "Connected" : "Not Connected",
+            systemImage: isConnected ? "checkmark.circle.fill" : "exclamationmark.circle"
+        )
+        .font(.wiggleText(.subheadline, weight: .medium))
+        .foregroundStyle(isConnected ? WiggleRoomColors.good : WiggleRoomColors.warning)
+    }
+
+    /// The shared daily request budget for this token, worded exactly as the
+    /// macOS editor words it (`SourceEditorCard.starlingRateLimitSection`) so
+    /// the same figure reads the same on both platforms. The caption sits in
+    /// the section footer rather than inline, which is where a Form puts
+    /// explanatory text on iOS.
+    ///
+    /// The count is per *token*, not per source or per device — see
+    /// `StarlingRequestLogEntry` for why it is a synced set of records rather
+    /// than a counter, and `StarlingRequestBudget` for why the number shown
+    /// can't come from this process's own budget actor.
+    private var starlingRateLimitSection: some View {
+        Section {
+            HStack {
+                Text("Starling Requests Today")
+                    .font(WiggleRoomFont.cardLabel)
+                Spacer()
+                Text("\(starlingRequestsToday) / \(StarlingRequestBudget.dailyLimit)")
+                    .foregroundStyle(.secondary)
+            }
+            if let starlingCooldownUntil {
+                Text("Taking a breather until \(starlingCooldownUntil.formatted(Self.timeFormatter)) — Starling's rate limit was hit.")
+                    .font(.wiggleText(.caption))
+                    .foregroundStyle(WiggleRoomColors.warning)
+            }
+        } footer: {
+            Text(StarlingRequestBudget.requestCaption)
+        }
+    }
+
+    private static let timeFormatter: Date.FormatStyle = .init().hour().minute()
+
+    /// Reads the request count and any active cool-down **once**, when the
+    /// screen appears. `.task` is keyed to view identity, so a rebuild of
+    /// this view's value doesn't re-run it — which is exactly what keeps this
+    /// off the update treadmill described in the type note.
+    ///
+    /// The figure therefore doesn't tick upward while the screen sits open.
+    /// That's the deliberate trade: this is a diagnostic number on a screen
+    /// the user opens, reads, and leaves, and a live count is what made the
+    /// screen unusable. macOS, which isn't reached through a `@Query`-backed
+    /// parent, still shows it live.
+    private func refreshStarlingStatus() async {
+        starlingRequestsToday = requestCountToday()
+        starlingCooldownUntil = await StarlingProvider.sharedBudget.status.cooldownUntil
+    }
+
+    /// Counted in the store rather than by fetching and filtering every
+    /// entry — the log holds up to three days of records and only today's
+    /// are wanted.
+    private func requestCountToday() -> Int {
+        let startOfToday = Calendar.current.startOfDay(for: .now)
+        let descriptor = FetchDescriptor<StarlingRequestLogEntry>(
+            predicate: #Predicate { $0.date >= startOfToday }
+        )
+        return (try? modelContext.fetchCount(descriptor)) ?? 0
     }
 
     private var tokenFieldFooter: String {
