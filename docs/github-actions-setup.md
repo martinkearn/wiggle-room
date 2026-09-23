@@ -1,19 +1,10 @@
 # GitHub Actions TestFlight setup
 
-This guide explains how to configure the GitHub Actions secrets used to sign,
-archive, and upload Wiggle Room builds to TestFlight. It is intended for
-maintainers of this repository and developers configuring their own fork.
+This guide explains how to configure the GitHub Actions secrets used to sign, archive, and upload Wiggle Room builds to TestFlight. It is intended for maintainers of this repository and developers configuring their own fork.
 
-The workflows create separate iOS and macOS archives. The iOS workflow installs
-explicit App Store provisioning profiles before archive creation and signs with
-the imported Apple Distribution certificate. Distribution export uses the same
-explicit profiles, and, for macOS, a Mac Installer Distribution certificate.
-Never commit any private key, profile, certificate export, password, or secret
-value to the repository.
+The workflows create separate iOS and macOS archives. The iOS workflow installs explicit App Store provisioning profiles before archive creation and signs with the imported Apple Distribution certificate. Distribution export uses the same explicit profiles, and, for macOS, a Mac Installer Distribution certificate. Never commit any private key, profile, certificate export, password, or secret value to the repository.
 
-Explicit export signing avoids relying on access to Apple's separate
-cloud-managed distribution certificate. The API key remains responsible for
-authentication during archive creation and upload.
+Explicit export signing avoids relying on access to Apple's separate cloud-managed distribution certificate. The API key remains responsible for authentication during archive creation and upload.
 
 ## Prerequisites
 
@@ -21,16 +12,11 @@ Before configuring the secrets, ensure that:
 
 - You have an active Apple Developer Program membership.
 - An app record exists in App Store Connect for both supported platforms.
-- Your Apple Developer account has identifiers and capabilities for the main
-  app and its embedded watch and widget targets.
-- Your fork uses bundle identifiers, App Groups, and CloudKit containers owned
-  by your Apple Developer team.
-- You can access the repository's **Settings → Secrets and variables →
-  Actions** page.
+- Your Apple Developer account has identifiers and capabilities for the main app and its embedded watch and widget targets.
+- Your fork uses bundle identifiers, App Groups, and CloudKit containers owned by your Apple Developer team.
+- You can access the repository's **Settings → Secrets and variables → Actions** page.
 
-The repository workflows expect all fourteen secrets listed below. GitHub does not
-allow empty Actions secrets, and it does not display a secret again after it is
-saved.
+The repository workflows expect all fourteen secrets listed below. GitHub does not allow empty Actions secrets, and it does not display a secret again after it is saved.
 
 ## Required secrets
 
@@ -62,17 +48,13 @@ Repeat these steps for each secret:
 5. Enter the exact secret name shown in this guide.
 6. Enter its value and select **Add secret**.
 
-Use repository secrets rather than repository variables. Do not put actual
-values in workflow files, documentation, issues, pull requests, or logs.
+Use repository secrets rather than repository variables. Do not put actual values in workflow files, documentation, issues, pull requests, or logs.
 
 ## `APPLE_TEAM_ID`
 
 ### What it is for
 
-The Team ID uniquely identifies the Apple Developer team that owns the signing
-certificates, bundle identifiers, capabilities, and provisioning profiles.
-Both workflows pass it to Xcode as `DEVELOPMENT_TEAM` and include it in the
-archive export configuration.
+The Team ID uniquely identifies the Apple Developer team that owns the signing certificates, bundle identifiers, capabilities, and provisioning profiles. Both workflows pass it to Xcode as `DEVELOPMENT_TEAM` and include it in the archive export configuration.
 
 ### How to obtain it
 
@@ -82,15 +64,11 @@ archive export configuration.
 4. Copy the Team ID exactly.
 5. Add it to GitHub as `APPLE_TEAM_ID`.
 
-Do not use the App Store Connect provider ID, an individual Apple ID, or the
-team name. If your account belongs to multiple teams, select the team that owns
-the app identifiers and App Store Connect app record.
+Do not use the App Store Connect provider ID, an individual Apple ID, or the team name. If your account belongs to multiple teams, select the team that owns the app identifiers and App Store Connect app record.
 
 ## App Store Connect API secrets
 
-The three App Store Connect API secrets belong to one team API key. The
-workflows use the key to let Xcode manage provisioning and upload archives
-without storing an Apple ID password or app-specific password.
+The three App Store Connect API secrets belong to one team API key. The workflows use the key to let Xcode manage provisioning and upload archives without storing an Apple ID password or app-specific password.
 
 ### Create the API key
 
@@ -104,16 +82,13 @@ without storing an Apple ID password or app-specific password.
 8. Create the key.
 9. Download its `.p8` private key immediately.
 
-Apple permits the `.p8` file to be downloaded only once. Store the original in
-an approved secure location. If it is lost, revoke the key and create a new
-one; it cannot be downloaded again.
+Apple permits the `.p8` file to be downloaded only once. Store the original in an approved secure location. If it is lost, revoke the key and create a new one; it cannot be downloaded again.
 
 ### `APP_STORE_CONNECT_API_KEY_ID`
 
 #### What it is for
 
-The Key ID tells App Store Connect which public API key corresponds to the
-private `.p8` key installed by the workflow.
+The Key ID tells App Store Connect which public API key corresponds to the private `.p8` key installed by the workflow.
 
 #### How to obtain it
 
@@ -128,8 +103,7 @@ The Key ID is not the key name and is not the Issuer ID.
 
 #### What it is for
 
-The Issuer ID identifies the App Store Connect organization that issued the API
-key. Xcode requires it alongside the Key ID and private key.
+The Issuer ID identifies the App Store Connect organization that issued the API key. Xcode requires it alongside the Key ID and private key.
 
 #### How to obtain it
 
@@ -142,15 +116,11 @@ key. Xcode requires it alongside the Key ID and private key.
 
 #### What it is for
 
-This is the private half of the App Store Connect API key. During a workflow,
-it is written to a temporary `AuthKey_<key-id>.p8` file with restricted
-permissions. Xcode uses it to authenticate provisioning and upload operations,
-and the workflow removes it during cleanup.
+This is the private half of the App Store Connect API key. During a workflow, it is written to a temporary `AuthKey_<key-id>.p8` file with restricted permissions. Xcode uses it to authenticate provisioning and upload operations, and the workflow removes it during cleanup.
 
 #### How to obtain and store it
 
-1. Locate the `AuthKey_<key-id>.p8` file downloaded when the API key was
-   created.
+1. Locate the `AuthKey_<key-id>.p8` file downloaded when the API key was created.
 2. Open it in a plain-text editor.
 3. Copy its complete contents, including:
 
@@ -160,18 +130,13 @@ and the workflow removes it during cleanup.
    -----END PRIVATE KEY-----
    ```
 
-4. Add the complete text to GitHub as
-   `APP_STORE_CONNECT_API_PRIVATE_KEY`.
+4. Add the complete text to GitHub as `APP_STORE_CONNECT_API_PRIVATE_KEY`.
 
-Do not Base64-encode this value. Do not remove its header, footer, or line
-breaks. Never commit or share the `.p8` file.
+Do not Base64-encode this value. Do not remove its header, footer, or line breaks. Never commit or share the `.p8` file.
 
 ## Apple Distribution certificate secrets
 
-The Apple Distribution certificate signs the app and embedded extensions for
-App Store distribution. The workflow needs a `.p12` containing both the
-certificate and its matching private key. A downloaded `.cer` file alone is
-not sufficient.
+The Apple Distribution certificate signs the app and embedded extensions for App Store distribution. The workflow needs a `.p12` containing both the certificate and its matching private key. A downloaded `.cer` file alone is not sufficient.
 
 ### Create and install the certificate
 
@@ -187,49 +152,28 @@ The simplest approach is to let Xcode create the certificate:
 8. Find **Apple Distribution: …**.
 9. Expand it and confirm that a private key appears underneath.
 
-If Xcode cannot create the certificate, create a certificate signing request
-with **Keychain Access → Certificate Assistant → Request a Certificate From a
-Certificate Authority**, choose **Saved to disk**, and upload it when creating
-an **Apple Distribution** certificate in
-[Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/certificates/list).
-Download and open the resulting `.cer` file on the same Mac that generated the
-request.
+If Xcode cannot create the certificate, create a certificate signing request with **Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority**, choose **Saved to disk**, and upload it when creating an **Apple Distribution** certificate in [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/certificates/list). Download and open the resulting `.cer` file on the same Mac that generated the request.
 
-If no private key appears under the installed certificate, its certificate
-signing request was created on another Mac. Obtain a secure `.p12` export from
-the person or system that holds the private key, or create a new certificate
-using a request generated on your Mac.
+If no private key appears under the installed certificate, its certificate signing request was created on another Mac. Obtain a secure `.p12` export from the person or system that holds the private key, or create a new certificate using a request generated on your Mac.
 
 ### Export the `.p12`
 
-1. In **Keychain Access → login → My Certificates**, expand the
-   **Apple Distribution: …** entry.
+1. In **Keychain Access → login → My Certificates**, expand the **Apple Distribution: …** entry.
 2. Confirm its private key is visible beneath it.
-3. Select the certificate, then Command-click its private key so both items are
-   highlighted.
-4. Select **File → Export 2 Items…**. If Keychain Access does not offer the
-   Personal Information Exchange (`.p12`) format, stop: the matching private
-   key is not selected or is not available on this Mac.
-5. Save the export with a descriptive temporary filename and the `.p12`
-   extension.
-6. At the export-password prompt, choose a non-empty, strong password and enter
-   it identically in both fields. This is the value required by
-   `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`.
-7. Keychain Access may then separately request the Mac login password or
-   Touch ID to authorize access to the private key. That authorization is not
-   the `.p12` export password and must not be saved in GitHub.
+3. Select the certificate, then Command-click its private key so both items are highlighted.
+4. Select **File → Export 2 Items…**. If Keychain Access does not offer the Personal Information Exchange (`.p12`) format, stop: the matching private key is not selected or is not available on this Mac.
+5. Save the export with a descriptive temporary filename and the `.p12` extension.
+6. At the export-password prompt, choose a non-empty, strong password and enter it identically in both fields. This is the value required by `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`.
+7. Keychain Access may then separately request the Mac login password or Touch ID to authorize access to the private key. That authorization is not the `.p12` export password and must not be saved in GitHub.
 8. Store the `.p12` export password securely until it has been added to GitHub.
 
-Before encoding the file, use the
-[local import preflight](#test-each-p12-locally-before-uploading-it) below.
+Before encoding the file, use the [local import preflight](#test-each-p12-locally-before-uploading-it) below.
 
 ### `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`
 
 #### What it is for
 
-GitHub secrets contain text, so the binary `.p12` export is converted to a
-single-line Base64 value. The workflow decodes it into a temporary file and
-imports the certificate and private key into a temporary keychain.
+GitHub secrets contain text, so the binary `.p12` export is converted to a single-line Base64 value. The workflow decodes it into a temporary file and imports the certificate and private key into a temporary keychain.
 
 #### Create the value
 
@@ -239,44 +183,28 @@ In Terminal, replace the filename with the actual path to the export:
 base64 -i AppleDistribution.p12 | tr -d '\n' | pbcopy
 ```
 
-This copies the encoded value to the clipboard. Add the clipboard contents to
-GitHub as `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`.
+This copies the encoded value to the clipboard. Add the clipboard contents to GitHub as `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`.
 
-Do not paste the original binary `.p12`, the `.cer`, or command output that
-contains extra prompts. The secret should be one uninterrupted Base64 string.
+Do not paste the original binary `.p12`, the `.cer`, or command output that contains extra prompts. The secret should be one uninterrupted Base64 string.
 
 ### `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`
 
 #### What it is for
 
-This password unlocks the `.p12` while the workflow imports its signing
-identity into the temporary keychain.
+This password unlocks the `.p12` while the workflow imports its signing identity into the temporary keychain.
 
-Add the exact password chosen during export to GitHub as
-`APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`. This is the `.p12` export password,
-not the later Mac login/Touch ID authorization, Apple ID password, or API key.
-Do not use a blank export password.
+Add the exact password chosen during export to GitHub as `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`. This is the `.p12` export password, not the later Mac login/Touch ID authorization, Apple ID password, or API key. Do not use a blank export password.
 
 ## Mac Installer Distribution certificate secrets
 
-The Mac Installer Distribution certificate signs the installer package
-produced for Mac App Store and macOS TestFlight distribution. Apple calls the
-certificate type **Mac Installer Distribution** in the Developer portal, but
-Keychain Access may display an issued certificate using the legacy identity
-name **3rd Party Mac Developer Installer: _account holder_ (_team ID_)**. These
-names refer to the same certificate type.
+The Mac Installer Distribution certificate signs the installer package produced for Mac App Store and macOS TestFlight distribution. Apple calls the certificate type **Mac Installer Distribution** in the Developer portal, but Keychain Access may display an issued certificate using the legacy identity name **3rd Party Mac Developer Installer: _account holder_ (_team ID_)**. These names refer to the same certificate type.
 
-It is distinct from Apple Distribution, Mac App Distribution, and Developer ID
-Installer. The workflow needs a `.p12` containing both this certificate and its
-private key. During CI, the workflow finds either Keychain name and passes the
-imported certificate's SHA-1 fingerprint to Xcode. This avoids asking Xcode to
-match the Developer portal name when Keychain uses the legacy identity name.
+It is distinct from Apple Distribution, Mac App Distribution, and Developer ID Installer. The workflow needs a `.p12` containing both this certificate and its private key. During CI, the workflow finds either Keychain name and passes the imported certificate's SHA-1 fingerprint to Xcode. This avoids asking Xcode to match the Developer portal name when Keychain uses the legacy identity name.
 
 ### Create a certificate signing request
 
 1. On a trusted Mac, open **Keychain Access**.
-2. Select **Keychain Access → Certificate Assistant → Request a Certificate
-   From a Certificate Authority**.
+2. Select **Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority**.
 3. Enter the email address associated with the Apple Developer account.
 4. Enter a descriptive common name.
 5. Select **Saved to disk**.
@@ -284,60 +212,41 @@ match the Developer portal name when Keychain uses the legacy identity name.
 
 ### Create and install the certificate
 
-1. Open
-   [Apple Developer Certificates](https://developer.apple.com/account/resources/certificates/list).
+1. Open [Apple Developer Certificates](https://developer.apple.com/account/resources/certificates/list).
 2. Select **+** to create a certificate.
 3. Under **Software**, select **Mac Installer Distribution**.
 4. Continue and upload the `.certSigningRequest` file.
 5. Download the resulting `.cer` file.
 6. Double-click the `.cer` file to install it in Keychain Access.
 7. Open **Keychain Access → login → My Certificates**.
-8. Find the issued installer certificate. Depending on the macOS and
-   certificate version, Keychain Access may show either:
-   - **Mac Installer Distribution: …**
-   - **3rd Party Mac Developer Installer: … (_team ID_)**
+8. Find the issued installer certificate. Depending on the macOS and certificate version, Keychain Access may show either:
+- **Mac Installer Distribution: …**
+- **3rd Party Mac Developer Installer: … (_team ID_)**
 9. Confirm that the team ID in the certificate name matches `APPLE_TEAM_ID`.
 10. Expand the certificate and confirm that a private key appears underneath.
 
-Do not choose **Developer ID Installer**; that certificate is for distribution
-outside the Mac App Store. Do not use **Mac App Distribution** in place of the
-installer certificate. The presence of **3rd Party** in the legacy Keychain
-name does not mean it is a Developer ID certificate.
+Do not choose **Developer ID Installer**; that certificate is for distribution outside the Mac App Store. Do not use **Mac App Distribution** in place of the installer certificate. The presence of **3rd Party** in the legacy Keychain name does not mean it is a Developer ID certificate.
 
-If no private key appears, the certificate signing request was generated on a
-different Mac. Recreate the certificate using a request generated on the Mac
-that will export it, or securely obtain a `.p12` from the private-key holder.
+If no private key appears, the certificate signing request was generated on a different Mac. Recreate the certificate using a request generated on the Mac that will export it, or securely obtain a `.p12` from the private-key holder.
 
 ### Export the `.p12`
 
-1. In **Keychain Access → login → My Certificates**, expand the
-   **Mac Installer Distribution: …** or
-   **3rd Party Mac Developer Installer: …** entry.
+1. In **Keychain Access → login → My Certificates**, expand the **Mac Installer Distribution: …** or **3rd Party Mac Developer Installer: …** entry.
 2. Confirm its private key is visible beneath it.
-3. Select the certificate, then Command-click its private key so both items are
-   highlighted.
-4. Select **File → Export 2 Items…**. If `.p12` is unavailable, stop and
-   confirm that the matching private key is selected and stored on this Mac.
-5. Save the export with a descriptive temporary filename and the `.p12`
-   extension.
-6. At the export-password prompt, choose a non-empty, strong password and enter
-   it identically in both fields. This is the value required by
-   `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD`.
-7. If Keychain Access subsequently requests the Mac login password or Touch ID,
-   that is only authorization to export the private key. It is not the `.p12`
-   password and must not be saved in GitHub.
+3. Select the certificate, then Command-click its private key so both items are highlighted.
+4. Select **File → Export 2 Items…**. If `.p12` is unavailable, stop and confirm that the matching private key is selected and stored on this Mac.
+5. Save the export with a descriptive temporary filename and the `.p12` extension.
+6. At the export-password prompt, choose a non-empty, strong password and enter it identically in both fields. This is the value required by `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD`.
+7. If Keychain Access subsequently requests the Mac login password or Touch ID, that is only authorization to export the private key. It is not the `.p12` password and must not be saved in GitHub.
 8. Store the `.p12` export password securely until it has been added to GitHub.
 
-Before encoding the file, use the
-[local import preflight](#test-each-p12-locally-before-uploading-it) below.
+Before encoding the file, use the [local import preflight](#test-each-p12-locally-before-uploading-it) below.
 
 ### `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_BASE64`
 
 #### What it is for
 
-This secret transports the binary installer certificate and private key to the
-macOS workflow as text. The workflow decodes and imports it only for the
-duration of the job.
+This secret transports the binary installer certificate and private key to the macOS workflow as text. The workflow decodes and imports it only for the duration of the job.
 
 Create the value in Terminal:
 
@@ -345,8 +254,7 @@ Create the value in Terminal:
 base64 -i MacInstallerDistribution.p12 | tr -d '\n' | pbcopy
 ```
 
-Add the clipboard contents to GitHub as
-`MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_BASE64`.
+Add the clipboard contents to GitHub as `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_BASE64`.
 
 ### `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD`
 
@@ -354,19 +262,13 @@ Add the clipboard contents to GitHub as
 
 This password unlocks the Mac Installer Distribution `.p12` during import.
 
-Add the exact export password to GitHub as
-`MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD`. It is independent of the
-Apple Distribution certificate password and may be different. Do not use the
-Mac login password or a blank export password.
+Add the exact export password to GitHub as `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD`. It is independent of the Apple Distribution certificate password and may be different. Do not use the Mac login password or a blank export password.
 
 ## Test each `.p12` locally before uploading it
 
-Test the exact exported file and password before creating its Base64 secret.
-This preflight mirrors the workflow's `security import` operation, uses a
-temporary keychain, and does not place the password in shell history.
+Test the exact exported file and password before creating its Base64 secret. This preflight mirrors the workflow's `security import` operation, uses a temporary keychain, and does not place the password in shell history.
 
-In Terminal, start a zsh shell if necessary by running `zsh`. Then set
-`P12_PATH` to the exported file and run this zsh-specific snippet:
+In Terminal, start a zsh shell if necessary by running `zsh`. Then set `P12_PATH` to the exported file and run this zsh-specific snippet:
 
 ```zsh
 (
@@ -396,48 +298,27 @@ In Terminal, start a zsh shell if necessary by running `zsh`. Then set
 )
 ```
 
-A valid file/password pair prints `SUCCESS: The .p12 file and export password
-are valid.` If that message does not appear, the test did not succeed. If it
-reports `The user name or passphrase you entered is not correct`, do not encode
-or upload that file. Re-export it and carefully distinguish:
+A valid file/password pair prints `SUCCESS: The .p12 file and export password are valid.` If that message does not appear, the test did not succeed. If it reports `The user name or passphrase you entered is not correct`, do not encode or upload that file. Re-export it and carefully distinguish:
 
 1. the new `.p12` export password, which belongs in the GitHub password secret;
-2. the Mac login password or Touch ID prompt that merely authorizes Keychain
-   Access to export the private key.
+2. the Mac login password or Touch ID prompt that merely authorizes Keychain Access to export the private key.
 
-Run the preflight separately for the Apple Distribution `.p12` and Mac
-Installer Distribution `.p12`. After each successful test, encode that exact
-file and pair it with that exact export password in GitHub. The parentheses run
-the commands in a subshell, so the password leaves the environment and the
-temporary keychain is deleted as soon as the test finishes.
+Run the preflight separately for the Apple Distribution `.p12` and Mac Installer Distribution `.p12`. After each successful test, encode that exact file and pair it with that exact export password in GitHub. The parentheses run the commands in a subshell, so the password leaves the environment and the temporary keychain is deleted as soon as the test finishes.
 
 ## Certificate import failures
 
-Both workflows import `APPLE_DISTRIBUTION_CERTIFICATE_BASE64` first. Therefore,
-if iOS and macOS both fail at their certificate step with
-`SecKeychainItemImport: The user name or passphrase you entered is not
-correct`, replace and retest this shared pair first:
+Both workflows import `APPLE_DISTRIBUTION_CERTIFICATE_BASE64` first. Therefore, if iOS and macOS both fail at their certificate step with `SecKeychainItemImport: The user name or passphrase you entered is not correct`, replace and retest this shared pair first:
 
 - `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`
 - `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`
 
-That failure does not yet test the Mac Installer Distribution secrets. The
-macOS workflow imports those only after the Apple Distribution identity
-succeeds.
+That failure does not yet test the Mac Installer Distribution secrets. The macOS workflow imports those only after the Apple Distribution identity succeeds.
 
-The workflow passes secret values through environment variables and decodes
-the Base64 data into a temporary file. Password punctuation does not require
-shell escaping. The error means that the decoded file and password are not a
-valid matching PKCS#12 pair—for example, the wrong password was saved, the Mac
-login password was confused with the export password, or the wrong file was
-encoded.
+The workflow passes secret values through environment variables and decodes the Base64 data into a temporary file. Password punctuation does not require shell escaping. The error means that the decoded file and password are not a valid matching PKCS#12 pair—for example, the wrong password was saved, the Mac login password was confused with the export password, or the wrong file was encoded.
 
 ## App Store provisioning profile secrets
 
-The App Store Connect API key can upload builds, but API-key authentication
-cannot use a cloud-managed distribution certificate during export. The
-workflows therefore install explicit App Store distribution profiles associated
-with the imported Apple Distribution certificate.
+The App Store Connect API key can upload builds, but API-key authentication cannot use a cloud-managed distribution certificate during export. The workflows therefore install explicit App Store distribution profiles associated with the imported Apple Distribution certificate.
 
 Create a separate profile for every distributed bundle:
 
@@ -454,26 +335,16 @@ Fork maintainers must use their replacement bundle identifiers instead.
 
 ### Create each profile
 
-1. Open
-   [Apple Developer Profiles](https://developer.apple.com/account/resources/profiles/list).
+1. Open [Apple Developer Profiles](https://developer.apple.com/account/resources/profiles/list).
 2. Select **+**.
-3. Choose the App Store distribution profile type for the profile's platform:
-   **App Store** for iOS/watchOS bundles or **Mac App Store** for macOS
-   bundles.
-4. Select the explicit App ID whose bundle identifier exactly matches the table
-   above.
-5. Select the Apple Distribution certificate exported earlier. All profiles
-   must contain the same distribution certificate installed by the workflows.
+3. Choose the App Store distribution profile type for the profile's platform: **App Store** for iOS/watchOS bundles or **Mac App Store** for macOS bundles.
+4. Select the explicit App ID whose bundle identifier exactly matches the table above.
+5. Select the Apple Distribution certificate exported earlier. All profiles must contain the same distribution certificate installed by the workflows.
 6. Give the profile a descriptive name identifying its platform and target.
 7. Generate and download the profile.
-8. Keep each downloaded file clearly associated with its bundle identifier;
-   iOS and watchOS files normally use `.mobileprovision`, while macOS files
-   normally use `.provisionprofile`.
+8. Keep each downloaded file clearly associated with its bundle identifier; iOS and watchOS files normally use `.mobileprovision`, while macOS files normally use `.provisionprofile`.
 
-If a required App ID is missing, create it under **Certificates, Identifiers &
-Profiles → Identifiers** with the capabilities used by the corresponding
-target. App Groups, CloudKit, push notifications, and other entitlements in the
-profile must agree with the Xcode target.
+If a required App ID is missing, create it under **Certificates, Identifiers & Profiles → Identifiers** with the capabilities used by the corresponding target. App Groups, CloudKit, push notifications, and other entitlements in the profile must agree with the Xcode target.
 
 ### Verify and encode each profile
 
@@ -483,10 +354,7 @@ To inspect a downloaded profile before uploading it:
 security cms -D -i Profile.mobileprovision | plutil -p -
 ```
 
-Use the actual `.provisionprofile` filename for a macOS profile. Confirm that
-the `application-identifier` entitlement ends with the expected bundle
-identifier. For macOS, the equivalent entitlement may be named
-`com.apple.application-identifier`.
+Use the actual `.provisionprofile` filename for a macOS profile. Confirm that the `application-identifier` entitlement ends with the expected bundle identifier. For macOS, the equivalent entitlement may be named `com.apple.application-identifier`.
 
 Encode each verified profile:
 
@@ -494,55 +362,33 @@ Encode each verified profile:
 base64 -i Profile.mobileprovision | tr -d '\n' | pbcopy
 ```
 
-Create the matching GitHub secret and paste the copied single-line value. The
-profiles have no separate password secret. Repeat for all six profiles.
+Create the matching GitHub secret and paste the copied single-line value. The profiles have no separate password secret. Repeat for all six profiles.
 
-The workflows decode each profile, verify its bundle identifier, install it
-under its UUID, and configure manual distribution signing where required. The
-iOS archive uses Release build settings that select those installed profile UUIDs
-for the app, widget, watch app, and complication targets. This prevents Xcode
-from falling back to cloud-managed distribution signing or creating development
-signing assets during CI archives.
+The workflows decode each profile, verify its bundle identifier, install it under its UUID, and configure manual distribution signing where required. The iOS archive uses Release build settings that select those installed profile UUIDs for the app, widget, watch app, and complication targets. This prevents Xcode from falling back to cloud-managed distribution signing or creating development signing assets during CI archives.
 
 ## Verify the configuration
 
 After all fourteen secrets are present:
 
 1. Confirm every secret name exactly matches this guide.
-2. Confirm both Base64 secrets were created from `.p12` files that include
-   their private keys.
+2. Confirm both Base64 secrets were created from `.p12` files that include their private keys.
 3. Confirm each password matches its corresponding `.p12`.
-4. Confirm the API Key ID, Issuer ID, and `.p8` all belong to the same team API
-   key.
-5. Confirm `APPLE_TEAM_ID` identifies the team that owns the app and
-   capabilities.
-6. Confirm every provisioning profile targets the expected bundle identifier
-   and contains the same Apple Distribution certificate imported by CI.
+4. Confirm the API Key ID, Issuer ID, and `.p8` all belong to the same team API key.
+5. Confirm `APPLE_TEAM_ID` identifies the team that owns the app and capabilities.
+6. Confirm every provisioning profile targets the expected bundle identifier and contains the same Apple Distribution certificate imported by CI.
 7. Run the iOS and macOS workflows manually or push to `main`.
-8. Inspect failures only through GitHub Actions logs; never print secret values
-   while troubleshooting.
-9. After successful uploads, confirm both builds appear in App Store Connect
-   under TestFlight.
+8. Inspect failures only through GitHub Actions logs; never print secret values while troubleshooting.
+9. After successful uploads, confirm both builds appear in App Store Connect under TestFlight.
 
-Workflow runs perform real TestFlight uploads. Each attempt receives a unique,
-platform-specific build number from the monotonic GitHub Actions workflow run
-number, including reruns.
+Workflow runs perform real TestFlight uploads. Each attempt receives a unique, platform-specific build number from the monotonic GitHub Actions workflow run number, including reruns.
 
-Feature branches may be added temporarily to a workflow's `push.branches` list
-for pre-merge verification. Because every push then performs a real upload,
-remove temporary branch entries from both platform workflows after verification
-and before merging. Permanent automatic deployments should run only from
-`main`; use `workflow_dispatch` for later ad hoc tests.
+Feature branches may be added temporarily to a workflow's `push.branches` list for pre-merge verification. Because every push then performs a real upload, remove temporary branch entries from both platform workflows after verification and before merging. Permanent automatic deployments should run only from `main`; use `workflow_dispatch` for later ad hoc tests.
 
 ## Secret rotation and cleanup
 
-- Revoke and replace an App Store Connect API key immediately if its `.p8`
-  private key may have been exposed.
-- Replace the Key ID, Issuer ID, and private-key secrets together when rotating
-  the API key.
+- Revoke and replace an App Store Connect API key immediately if its `.p8` private key may have been exposed.
+- Replace the Key ID, Issuer ID, and private-key secrets together when rotating the API key.
 - Replace both the Base64 and password secrets when rotating a `.p12`.
 - Re-export certificate secrets before their Apple certificates expire.
-- Delete temporary local `.p12`, `.cer`, CSR, and clipboard contents when they
-  are no longer needed, while retaining approved secure backups where required.
-- Never expose values in screenshots, support requests, issues, or workflow
-  debugging output.
+- Delete temporary local `.p12`, `.cer`, CSR, and clipboard contents when they are no longer needed, while retaining approved secure backups where required.
+- Never expose values in screenshots, support requests, issues, or workflow debugging output.
