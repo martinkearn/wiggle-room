@@ -20,44 +20,47 @@ import SwiftData
 /// of the app's data, so reconnecting is normally only needed after
 /// actually revoking/rotating the token at Starling, not because of a
 /// cross-device sync gap.
+///
+/// **Deliberately just two fields.** This screen previously also showed a
+/// Starling badge, a Connected/Not Connected row, the trackers using the
+/// source, and the shared daily request counter. It is pushed from
+/// `ConnectedSourcesView`, which holds a live `@Query`, and everything in
+/// that list put this view's `body` in a SwiftUI update loop that ran until
+/// iOS killed the app on the watchdog.
+///
+/// So this body observes **nothing** from SwiftData: only local `@State`
+/// seeded once in `init`. No live query, no relationship traversal, no model
+/// property read during `body`. The duplicate-name check that used to need a
+/// query now happens in `connect()`, against a one-shot fetch, at the moment
+/// of saving.
+///
+/// See `docs/swiftdata-update-loops.md` before restoring any of the removed
+/// detail here — it belongs on a screen that isn't rebuilt by a
+/// `@Query`-backed parent. macOS keeps the richer editor (`SourceEditorCard`),
+/// which is not reached that way.
 struct AddSourceView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     /// When set, this view reconnects an existing source in place (new
     /// token, same `ConnectedSource` record) instead of creating a new one.
+    ///
+    /// Read in `init` and in `connect()`, never in `body` — see the type
+    /// note above.
     var existingSource: ConnectedSource?
 
     @State private var displayName: String
-    @State private var token = ""
+    @State private var token: String
     @State private var isConnecting = false
     @State private var errorMessage: String?
-    @Query(sort: \StarlingRequestLogEntry.date, order: .reverse) private var starlingRequestLog: [StarlingRequestLogEntry]
-    @State private var starlingCooldownUntil: Date?
 
-    /// The *other* connected sources' names, used only by `isDuplicateName`
-    /// — a one-shot snapshot taken when this screen appears, deliberately
-    /// **not** a live `@Query`.
-    ///
-    /// A second live `@Query` over an entity the presenting view already
-    /// queries is an infinite SwiftUI update loop, not merely redundant.
-    /// `ConnectedSourcesView` queries `ConnectedSource`, and
-    /// `NavigationLink`'s destination is built *inside* that parent's body,
-    /// so this view — and its query — is reconstructed on every parent
-    /// pass. This query's own fetch then notifies SwiftData's change
-    /// observers, which invalidates the parent's query on the same entity,
-    /// which rebuilds this view again, forever. Reproduced on iOS at ~750
-    /// body evaluations per second with memory climbing ~4 MB/s until the
-    /// scene-update watchdog killed the app (0x8BADF00D); a live `@Query`
-    /// here was the cause. `AddTrackerView`'s own source picker reaches
-    /// this screen the same way, so this is not specific to one entry
-    /// point. A snapshot is sufficient regardless: this is a transient
-    /// editor, and `connect()` re-checks against a fresh fetch before it
-    /// actually saves anything.
-    @State private var otherSourceNames: [String] = []
+    /// Captured once, so `body` never has to ask `existingSource` whether
+    /// this is an edit or a fresh connection.
+    private let isEditing: Bool
 
     init(existingSource: ConnectedSource? = nil) {
         self.existingSource = existingSource
+        self.isEditing = existingSource != nil
         _displayName = State(initialValue: existingSource?.displayName ?? "My Starling Account")
         // Pre-filled from the stored token (not left blank) — a Starling
         // personal access token is user-entered, not a system secret, so
@@ -71,25 +74,7 @@ struct AddSourceView: View {
     var body: some View {
         Form {
             Section {
-                HStack(spacing: 12) {
-                    ProviderBadge(providerId: existingSource?.providerId ?? "starling", size: 46)
-                    Text("Starling")
-                        .font(WiggleRoomFont.headline(22, weight: 650))
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
-            }
-
-            Section {
                 TextField("Name", text: $displayName)
-                if isDuplicateName {
-                    Text("A source named \u{201C}\(trimmedDisplayName)\u{201D} already exists.")
-                        .font(.wiggleText(.caption))
-                        .foregroundStyle(WiggleRoomColors.error)
-                }
-                if let existingSource {
-                    connectionStatusRow(for: existingSource)
-                }
                 // axis: .vertical grows the field to fit a token's real
                 // length (Starling's are long strings) rather than
                 // scrolling it sideways in a single-line box.
@@ -107,48 +92,21 @@ struct AddSourceView: View {
                 Text(tokenFieldFooter)
             }
 
-            // Only for an existing source — a brand new one has no trackers
-            // yet, so this section would always be empty.
-            if let existingSource, let trackers = existingSource.trackers, !trackers.isEmpty {
-                Section {
-                    ForEach(trackers) { tracker in
-                        Text(tracker.name)
-                    }
-                } header: {
-                    Text("Trackers Using This Source")
-                        .font(WiggleRoomFont.headline(15, weight: 650))
-                }
-            }
-
             if let errorMessage {
                 Section {
                     Text(errorMessage)
                         .foregroundStyle(WiggleRoomColors.error)
                 }
             }
-
-            // Admin/diagnostic info, not part of setting up the connection
-            // itself — kept in its own section at the bottom, and only for
-            // an existing (already-connected) source, since there's nothing
-            // meaningful to show before a token has ever been used.
-            if existingSource != nil {
-                starlingRateLimitSection
-            }
         }
         .formStyle(.grouped)
-        .navigationTitle(existingSource == nil ? "Add Source" : "Edit Source")
+        .navigationTitle(isEditing ? "Edit Source" : "Add Source")
         .inlineNavigationBarIfAvailable()
-        .task {
-            loadOtherSourceNames()
-            await refreshStarlingCooldown()
-        }
         .toolbar {
             // Only on macOS, where this view is always presented as a
-            // sheet (`ConnectedSourcesView`'s `.sheet`) with no other way
-            // to dismiss it — Esc aside — now that it's no longer a pushed
-            // NavigationLink destination there. iOS keeps the push, which
-            // already has a free back button, so an explicit Cancel here
-            // would just be redundant with it.
+            // sheet with no other way to dismiss it — Esc aside. iOS keeps
+            // the push, which already has a free back button, so an
+            // explicit Cancel here would just be redundant with it.
             #if os(macOS)
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -167,10 +125,10 @@ struct AddSourceView: View {
                         // actually disconnected). Saving still validates
                         // the token against Starling either way (§5.3) and
                         // reports a failure inline if it's no longer valid.
-                        Text(existingSource == nil ? "Connect" : "Save")
+                        Text(isEditing ? "Save" : "Connect")
                     }
                 }
-                .disabled(trimmedToken.isEmpty || isConnecting || isDuplicateName)
+                .disabled(trimmedToken.isEmpty || isConnecting)
             }
         }
     }
@@ -183,90 +141,22 @@ struct AddSourceView: View {
         token.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var trimmedDisplayName: String {
-        displayName.trimmingCharacters(in: .whitespaces)
-    }
-
-    /// Whether `displayName` (trimmed, case-insensitive) matches another
-    /// connected source already in the list — excluding `existingSource`
-    /// itself, so reconnecting/renaming a source without changing its name
-    /// doesn't flag against itself.
-    private var isDuplicateName: Bool {
-        nameCollides(with: trimmedDisplayName)
-    }
-
-    private func nameCollides(with name: String) -> Bool {
+    /// Whether another connected source already uses `name`, ignoring case
+    /// and excluding `existingSource` itself so renaming a source without
+    /// changing its name doesn't flag against itself. A one-shot fetch made
+    /// at save time rather than a live `@Query` — the inline
+    /// "already exists" warning this used to drive is gone, because keeping
+    /// it meant observing SwiftData from `body`; see the type note above.
+    private func nameIsTaken(_ name: String) -> Bool {
         guard !name.isEmpty else { return false }
-        return otherSourceNames.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
-    }
-
-    /// Refreshes `otherSourceNames`. Excludes `existingSource` itself, so
-    /// reconnecting/renaming a source without changing its name doesn't
-    /// flag against itself, and excludes Manual Entry, which isn't a
-    /// connected source and can't collide with one.
-    private func loadOtherSourceNames() {
         let descriptor = FetchDescriptor<ConnectedSource>(
             predicate: #Predicate { $0.providerId != "manual" }
         )
         let sources = (try? modelContext.fetch(descriptor)) ?? []
         let ownID = existingSource?.id
-        otherSourceNames = sources.filter { $0.id != ownID }.map(\.displayName)
-    }
-
-    /// "Connected"/"Not Connected", based on whether `source` actually has
-    /// a stored token right now — not whether this screen's own `token`
-    /// field currently has text in it, which just reflects what's about to
-    /// be saved (possibly still unedited, possibly cleared).
-    private func connectionStatusRow(for source: ConnectedSource) -> some View {
-        let isConnected = !(source.credentialToken ?? "").isEmpty
-        return Label(isConnected ? "Connected" : "Not Connected", systemImage: isConnected ? "checkmark.circle.fill" : "exclamationmark.circle")
-            .font(.wiggleText(.subheadline, weight: .medium))
-            .foregroundStyle(isConnected ? WiggleRoomColors.good : WiggleRoomColors.warning)
-    }
-
-    /// Admin/diagnostic info about this specific Starling connection's
-    /// shared request budget — this screen is the only place an iOS user
-    /// can see it at all, since iOS has no dedicated Settings scene (§7.2).
-    /// Deliberately lives here (Connected Sources → this source), not on
-    /// any individual tracker — the figure is the same regardless of which
-    /// tracker asked, since Starling's limit applies per personal access
-    /// token, not per tracker (§4.4), so showing it per-tracker would just
-    /// repeat the same number in several places. The request count is a
-    /// live, CloudKit-synced `StarlingRequestLogEntry` query — see that
-    /// model's own doc comment for why it reflects every device sharing
-    /// this token, not just this one.
-    private var starlingRateLimitSection: some View {
-        Section {
-            HStack {
-                Text("Starling Requests Today")
-                    .font(WiggleRoomFont.cardLabel)
-                Spacer()
-                Text("\(starlingRequestsToday) / \(StarlingRequestBudget.dailyLimit)")
-                    .foregroundStyle(.secondary)
-            }
-            if let starlingCooldownUntil {
-                Text("Taking a breather until \(starlingCooldownUntil.formatted(Self.timeFormatter)) — Starling's rate limit was hit.")
-                    .font(.wiggleText(.caption))
-                    .foregroundStyle(WiggleRoomColors.warning)
-            }
-        } footer: {
-            Text(StarlingRequestBudget.requestCaption)
+        return sources.contains {
+            $0.id != ownID && $0.displayName.caseInsensitiveCompare(name) == .orderedSame
         }
-    }
-
-    /// Counts against one precomputed start-of-day rather than calling
-    /// `Calendar.isDateInToday` per entry — this runs on every body pass
-    /// over the whole (up to three days of) request log, so the per-element
-    /// calendar work is the expensive part, not the comparison.
-    private var starlingRequestsToday: Int {
-        let startOfToday = Calendar.current.startOfDay(for: .now)
-        return starlingRequestLog.count { $0.date >= startOfToday }
-    }
-
-    private static let timeFormatter: Date.FormatStyle = .init().hour().minute()
-
-    private func refreshStarlingCooldown() async {
-        starlingCooldownUntil = await StarlingProvider.sharedBudget.status.cooldownUntil
     }
 
     private func connect() async {
@@ -277,14 +167,9 @@ struct AddSourceView: View {
         let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName = trimmedName.isEmpty ? "Starling" : trimmedName
 
-        // Re-checked against a fresh fetch rather than trusting the
-        // snapshot behind the inline warning — that snapshot is taken on
-        // appear, so another device's source (or one added through the
-        // nested Add Source flow) could have arrived since. Checked before
-        // the network call so a name collision doesn't spend a Starling
-        // request to then be rejected anyway.
-        loadOtherSourceNames()
-        guard !nameCollides(with: resolvedName) else {
+        // Checked before the network call so a name collision doesn't spend
+        // a Starling request only to be rejected anyway.
+        guard !nameIsTaken(resolvedName) else {
             errorMessage = "A source named \u{201C}\(resolvedName)\u{201D} already exists."
             return
         }

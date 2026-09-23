@@ -139,27 +139,22 @@ round trip before showing a list.
 
 ### Live queries and view nesting
 
-A view reads the tracker and source lists with `@Query`, which stays live and
-republishes as the store changes. Two live queries over the **same model type**
-must not be nested across a parent/child view boundary, where the parent builds
-the child inside its own `body` — a `NavigationLink` destination, a `.sheet`,
-or a plain child view.
+Views read the tracker and source lists with `@Query`, which stays live and
+republishes as the store changes.
 
-This is a hang, not a redundancy. The child's query fetches on the shared main
-`ModelContext`; that fetch notifies SwiftData's change observers, which
-invalidates the parent's query on the same type; the parent rebuilds its body,
-which constructs a fresh child (a new query, and new `State(initialValue:)`
-storage, so the child can never compare equal to its predecessor); the child
-fetches again. The loop sustains itself at display-refresh rate with no user
-input, memory grows with every pass, and iOS eventually kills the app on the
-scene-update watchdog.
+A screen pushed or presented from a `@Query`-backed view must not observe
+SwiftData from its `body` — no live query, no relationship traversal, no
+model property read during `body`. Such a screen seeds local state in `init`
+or on appear, and reads the model only in the action that saves; validation
+needing current data uses a one-shot fetch at that point.
 
-A transient editor screen therefore takes a **one-shot snapshot** of what it
-needs from a type its presenter already queries — plain values, not model
-references — loaded when the screen appears, and revalidates against a fresh
-fetch at the point of saving, where correctness actually matters. Live queries
-remain correct and preferred for a type the presenting view does not itself
-query.
+Breaking this rule is a hang, not a redundancy: the two views rebuild each
+other indefinitely and iOS kills the app on the watchdog. See
+[`swiftdata-update-loops.md`](swiftdata-update-loops.md) for the mechanism,
+the diagnostic signature, and how to reproduce it.
+
+Live `@Query` remains correct and preferred for a view that is not itself
+rebuilt by another view's query.
 
 ## 6. Visual language
 
@@ -188,6 +183,12 @@ without relying on colour or geometry alone.
 - Settings for sources, ordering, CloudKit diagnostics, and Siri phrases,
   with a separate Danger Zone menu for reset operations
 - Spotlight, notification actions, Live Activities, and widgets
+
+The connected-source editor on iOS is a name field, a personal-access-token
+field, and save — no provider badge, connection-status row, list of trackers
+using the source, or request counter. It is reached from a `@Query`-backed
+list, so its body observes no SwiftData at all (see Persistence and sync).
+macOS keeps the richer inline editor, which is not reached that way.
 
 ### macOS
 
