@@ -19,8 +19,7 @@ final class TrackerStoreTests: XCTestCase {
         let tracker = Tracker(
             id: id,
             name: "Test",
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
             connectedSource: source,
             sourceTargetId: id.uuidString,
             startDate: Date(),
@@ -43,8 +42,7 @@ final class TrackerStoreTests: XCTestCase {
         let tracker = Tracker(
             id: id,
             name: "Test",
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
             connectedSource: store.manualEntrySource,
             sourceTargetId: id.uuidString,
             startDate: Date(),
@@ -68,8 +66,7 @@ final class TrackerStoreTests: XCTestCase {
         context.insert(externalSource)
         let tracker = Tracker(
             name: "Test",
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
             connectedSource: externalSource,
             startDate: .now,
             endDate: .now.addingTimeInterval(3600),
@@ -100,8 +97,7 @@ final class TrackerStoreTests: XCTestCase {
         let tracker = Tracker(
             id: id,
             name: "Test",
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
             connectedSource: store.manualEntrySource,
             sourceTargetId: id.uuidString,
             startDate: Date(),
@@ -146,7 +142,7 @@ final class TrackerStoreTests: XCTestCase {
         let store = TrackerStore(modelContext: context)
         let id = UUID()
         let tracker = Tracker(
-            id: id, name: "Test", unit: "£", direction: .decreasing,
+            id: id, name: "Test", type: .spendingMoney,
             connectedSource: store.manualEntrySource, sourceTargetId: id.uuidString,
             startDate: Date(), endDate: Date().addingTimeInterval(3600),
             startingValue: 100, totalAllowance: 100
@@ -165,7 +161,7 @@ final class TrackerStoreTests: XCTestCase {
         let store = TrackerStore(modelContext: context)
         let id = UUID()
         let tracker = Tracker(
-            id: id, name: "Test", unit: "£", direction: .decreasing,
+            id: id, name: "Test", type: .spendingMoney,
             connectedSource: starlingSource, sourceTargetId: "abc-123",
             startDate: Date(), endDate: Date().addingTimeInterval(3600),
             startingValue: 100, totalAllowance: 100
@@ -184,7 +180,7 @@ final class TrackerStoreTests: XCTestCase {
         let store = TrackerStore(modelContext: context)
         let id = UUID()
         let tracker = Tracker(
-            id: id, name: "Test", unit: "mi", direction: .increasing,
+            id: id, name: "Test", type: .mileage,
             connectedSource: unknownSource, sourceTargetId: "vehicle-1",
             startDate: Date(), endDate: Date().addingTimeInterval(3600),
             startingValue: 100, totalAllowance: 100
@@ -199,7 +195,7 @@ final class TrackerStoreTests: XCTestCase {
         let store = TrackerStore(modelContext: context)
         let id = UUID()
         let tracker = Tracker(
-            id: id, name: "Test", unit: "£", direction: .decreasing,
+            id: id, name: "Test", type: .spendingMoney,
             connectedSource: store.manualEntrySource, sourceTargetId: id.uuidString,
             startDate: Date(), endDate: Date().addingTimeInterval(3600),
             startingValue: 100, totalAllowance: 100
@@ -221,7 +217,7 @@ final class TrackerStoreTests: XCTestCase {
         let store = TrackerStore(modelContext: context)
         let id = UUID()
         let tracker = Tracker(
-            id: id, name: "Test", unit: "£", direction: .decreasing,
+            id: id, name: "Test", type: .spendingMoney,
             connectedSource: starlingSource, sourceTargetId: "abc-123",
             startDate: Date(), endDate: Date().addingTimeInterval(3600),
             startingValue: 100, totalAllowance: 100

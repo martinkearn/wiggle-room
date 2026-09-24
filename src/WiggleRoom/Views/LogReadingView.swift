@@ -43,7 +43,15 @@ struct LogReadingView: View {
                     DatePicker("Date", selection: $date)
                         .datePickerStyle(.compact)
                 } footer: {
-                    Text(footerHint)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tracker.trackerType.logHint)
+                        // A unit that can't hold decimals rounds what's typed
+                        // rather than silently dropping precision — say so
+                        // where the typing happens.
+                        if let roundingHint = tracker.trackerUnit.roundingHint {
+                            Text(roundingHint)
+                        }
+                    }
                 }
 
                 if existingReading != nil {
@@ -96,8 +104,8 @@ struct LogReadingView: View {
     /// visual weight than a standard form row.
     private var valueInput: some View {
         HStack(spacing: 6) {
-            if tracker.isCurrencyUnit {
-                Text(tracker.unit)
+            if tracker.trackerUnit.placement == .prefix {
+                Text(tracker.trackerUnit.symbol)
                     .font(.wiggleNumber(size: 34))
                     .foregroundStyle(.secondary)
             }
@@ -125,8 +133,8 @@ struct LogReadingView: View {
                     .textFieldStyle(.plain)
             }
             .frame(minWidth: 80, maxWidth: 160)
-            if !tracker.isCurrencyUnit {
-                Text(tracker.unit)
+            if tracker.trackerUnit.placement == .suffix {
+                Text(tracker.trackerUnit.symbol)
                     .font(.wiggleNumber(size: 34))
                     .foregroundStyle(.secondary)
             }
@@ -134,15 +142,6 @@ struct LogReadingView: View {
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onTapGesture { isValueFieldFocused = true }
-    }
-
-    private var footerHint: String {
-        switch tracker.direction {
-        case .decreasing:
-            return "Enter your remaining balance now (e.g. 2400 after spending 600 of a 3000 budget)."
-        case .increasing:
-            return "Enter your current reading, e.g. today's odometer."
-        }
     }
 
     /// See `AddTrackerView.parseDecimal` — plain `Decimal(string:)` silently
@@ -158,7 +157,10 @@ struct LogReadingView: View {
     }
 
     private func save() {
-        guard let value = Self.parseDecimal(valueText) else { return }
+        guard let typed = Self.parseDecimal(valueText) else { return }
+        // A zero-precision unit stores whole numbers only — see
+        // `TrackerUnit.rounded(_:)` and the rounding hint shown above.
+        let value = tracker.trackerUnit.rounded(typed)
         if let existingReading {
             existingReading.value = value
             existingReading.date = date

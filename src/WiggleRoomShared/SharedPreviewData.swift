@@ -28,8 +28,8 @@ enum SharedPreviewData {
 
         let tracker = Tracker(
             name: "Joint account — September",
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
+            unit: .sterling,
             connectedSource: source,
             sourceTargetId: UUID().uuidString,
             startDate: Calendar.current.date(byAdding: .day, value: -10, to: .now) ?? .now,

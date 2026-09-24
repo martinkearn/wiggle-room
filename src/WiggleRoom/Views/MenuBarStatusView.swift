@@ -81,7 +81,7 @@ struct MenuBarStatusView: View {
                         )
                     VStack(spacing: 6) {
                         HStack {
-                            Text(tracker.currentValueLabel)
+                            Text(tracker.terminology.currentFigure)
                                 .font(WiggleRoomFont.cardLabel)
                             Spacer()
                             Text(tracker.formattedValue(pace.currentValue))
@@ -89,7 +89,7 @@ struct MenuBarStatusView: View {
                                 .foregroundStyle(pace.status.color)
                         }
                         HStack {
-                            Text("Current Budget")
+                            Text(tracker.terminology.paceFigure)
                                 .font(WiggleRoomFont.cardLabel)
                             Spacer()
                             Text(tracker.formattedValue(pace.targetValueToday))

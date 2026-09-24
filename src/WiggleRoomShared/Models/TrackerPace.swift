@@ -17,6 +17,13 @@ struct TrackerPace: Equatable {
     let hoursElapsed: Double
     let consumedSoFar: Decimal
     let expectedConsumedByNow: Decimal
+
+    /// Expected consumption minus actual — how much of the allowance is
+    /// still unspent relative to the clock. Still the figure the ring fill
+    /// and the chart are built from, but **not** the one that decides
+    /// good/bad: consumption is the *point* for a goal type (saving, losing
+    /// weight), so consuming faster than planned is the good case there.
+    /// `goodness` is the polarity-aware figure.
     let difference: Decimal
 
     /// The `actualValue` this snapshot was computed from, in the tracker's
@@ -28,89 +35,107 @@ struct TrackerPace: Equatable {
     let targetValueToday: Decimal
 
     /// The tracker's total allowance for the period — carried alongside the
-    /// other figures so `status` can express "behind" as a percentage of
-    /// the whole, rather than an absolute amount that means very different
-    /// things for a £50 tracker and a £5,000 one.
+    /// other figures so `amberBand` can express "drifting" as a proportion
+    /// of the whole, rather than an absolute amount that means very
+    /// different things for a £50 tracker and a £5,000 one.
     let totalAllowance: Decimal
 
-    /// `difference >= 0` means ahead of pace; `< 0` means behind.
-    var isAheadOfPace: Bool { difference >= 0 }
+    /// Which side of the pace line is the good side, from the tracker's type.
+    let higherIsBetter: Bool
 
-    /// How far behind pace, as a percentage of the total allowance —
-    /// `0` when on pace or ahead.
-    private var percentBehind: Double {
-        guard totalAllowance != 0 else { return 0 }
-        let behindAmount = max(-difference, 0)
-        return ((behindAmount / abs(totalAllowance)) as NSDecimalNumber).doubleValue * 100
+    /// The narrowest the amber band may be, from the tracker's unit.
+    let amberFloor: Decimal
+
+    /// How far ahead of pace the tracker is, in its own units, with the
+    /// tracker's polarity already applied — the single sign flip that
+    /// replaces every `direction ==` branch the wording used to carry.
+    ///
+    /// `>= 0` is on or ahead of pace. For a decreasing "higher is better"
+    /// tracker (Spending) this reduces algebraically to
+    /// `expectedConsumedByNow - consumedSoFar`, so that type's behaviour is
+    /// unchanged; for Saving and Weight loss it inverts, which is exactly the
+    /// bug it exists to fix (a savings balance £400 above target used to read
+    /// red).
+    var goodness: Decimal {
+        higherIsBetter ? currentValue - targetValueToday : targetValueToday - currentValue
+    }
+
+    /// `goodness >= 0` means ahead of pace; `< 0` means behind.
+    var isAheadOfPace: Bool { goodness >= 0 }
+
+    /// The early-warning band (§7): 5% of the whole allowance, but never
+    /// narrower than the unit's own floor.
+    ///
+    /// In practice only weight is affected. Day-to-day body weight swings
+    /// about ±1 kg from water, food in transit and sodium, so a bare 5% band
+    /// (0.5 kg on a 10 kg goal) would show red — the app's loudest signal —
+    /// for someone exactly on pace who happened to weigh in on a retained-water
+    /// morning. Weighing less often doesn't help: cadence changes how many
+    /// noisy readings you see, not the spread of each one.
+    var amberBand: Decimal {
+        max(abs(totalAllowance) * Decimal(string: "0.05")!, amberFloor)
     }
 
     /// Traffic-light status (§3.2): on pace, drifting behind, or badly
-    /// behind. Amber is a genuine early-warning band — behind pace by up to
-    /// 5% of the total allowance — not an exact "landed on the target"
-    /// match: ahead of pace, or exactly on it, reads as green; behind by
-    /// more than 5% reads as red. Unlike the amber/red split, there's no
-    /// grace zone before green turns amber — any shortfall at all, however
-    /// small a percentage of the total allowance, means the actual figure
-    /// has already slipped behind the target figure shown right next to
-    /// it, and showing that pair as "green"/"on track" would contradict
-    /// what's plainly printed on screen.
+    /// behind. Ahead of pace, or exactly on it, reads as green; behind by up
+    /// to `amberBand` reads as amber; further behind reads as red. Unlike the
+    /// amber/red split, there's no grace zone before green turns amber — any
+    /// shortfall at all means the actual figure has already slipped past the
+    /// target figure printed right next to it, and showing that pair as
+    /// "green" would contradict what's plainly on screen.
     var status: PaceStatus {
-        guard difference < 0 else { return .good }
-        return percentBehind > 5 ? .bad : .warning
+        let goodness = goodness
+        guard goodness < 0 else { return .good }
+        return -goodness > amberBand ? .bad : .warning
     }
 
-    /// The at-a-glance difference figure, formatted for `tracker`. For a
-    /// budget tracker that's genuinely over or under (not just at), this
-    /// drops the +/- sign: the color and status word already say which
-    /// direction, so a sign on top of that is redundant, not clarifying.
+    /// The at-a-glance difference figure, formatted for `tracker`. When the
+    /// tracker is clearly on one side or the other this drops the +/- sign:
+    /// the colour and the status word already say which direction, so a sign
+    /// on top of that is redundant rather than clarifying.
     ///
-    /// For an increasing tracker, `difference` itself is negated first —
-    /// `difference` is "expected minus actual," so a positive `difference`
-    /// already reads naturally as a plus for a decreasing tracker (using
-    /// less than planned, a good thing), but for an increasing tracker a
-    /// positive `difference` means using *less* than planned too, which is
-    /// still the good case — the sign convention users actually expect,
-    /// though, mirrors direction: over the target (the bad case, a higher
-    /// actual number) shown without a minus, under it (the good case, a
-    /// lower actual number) shown with one.
+    /// In the amber band there's no clean over/under to name yet, so the
+    /// signed distance from today's target is shown instead — signed the way
+    /// the number itself moved, not the way the news reads. Above the target
+    /// takes a "+" and below it a "−", whether that's a mileage figure
+    /// running hot or a savings balance running cold.
     func displayDifference(for tracker: Tracker) -> String {
-        let orientedDifference = tracker.direction == .increasing ? -difference : difference
-        guard tracker.usesBudgetLanguage, status != .warning else {
-            return tracker.formattedValue(orientedDifference, signed: true)
+        guard status == .warning else {
+            return tracker.formattedValue(abs(goodness))
         }
-        return tracker.formattedValue(abs(difference))
+        return tracker.formattedValue(currentValue - targetValueToday, signed: true)
     }
 
-    /// The status wording shown alongside the difference figure — "Over
-    /// Budget by", "Under Budget by" for a budget tracker that's genuinely
-    /// over/under (not just close), or the plain status label otherwise.
-    /// Shared by the dashboard ring's center content and the tracker list
-    /// row so the two read identically rather than the list using a bare
-    /// number with no status word at all.
+    /// The status wording shown alongside the difference figure — the type's
+    /// own good/bad label followed by "by" ("Below Budget by", "Behind Target
+    /// by"), or the amber label on its own, which already reads as a complete
+    /// phrase. Shared by the dashboard ring's centre content and the tracker
+    /// list row so the two read identically rather than the list showing a
+    /// bare number with no status word at all.
     func statusLine(for tracker: Tracker) -> String {
         let label = status.label(for: tracker)
-        guard tracker.usesBudgetLanguage, status != .warning else { return label }
+        guard status != .warning else { return label }
         return "\(label) by"
     }
 
-    /// How much of the total allowance is left to use *right now* — e.g.
-    /// "£100 left in this budget" after spending £400 of a £500 budget.
-    /// This moves as readings come in, unlike `Tracker.projectedRemainder`,
-    /// which projects a fixed starting-value-vs-budget gap independent of
-    /// actual spending. `nil` once the allowance is already used up or
-    /// exceeded — the ring/status wording already covers being over.
+    /// How much of the allowance is left to use *right now* — "£100 left in
+    /// this budget" after spending £400 of a £500 budget, "£1,800 still to
+    /// save", "3.2 kg still to lose". This moves as readings come in, unlike
+    /// `Tracker.projectedRemainder`, which projects a fixed
+    /// starting-value-vs-allowance gap independent of actual progress. `nil`
+    /// once the allowance is used up, reached or exceeded — the ring/status
+    /// wording already covers being past it.
     func remainingInAllowanceCaption(for tracker: Tracker) -> String? {
         let remaining = totalAllowance - consumedSoFar
         guard remaining > 0 else { return nil }
-        let formatted = tracker.formattedValue(remaining)
-        return tracker.usesBudgetLanguage ? "\(formatted) left in this budget" : "\(formatted) left to use"
+        return "\(tracker.formattedValue(remaining)) \(tracker.terminology.remainingCaption)"
     }
 }
 
-/// Traffic-light reading of a tracker's pace (§3.2), independent of
-/// direction — `.good` always means "green", regardless of whether that's a
-/// decreasing tracker running under budget or an increasing one running
-/// under its cap.
+/// Traffic-light reading of a tracker's pace (§3.2), independent of type —
+/// `.good` always means "green", whether that's a spending tracker running
+/// below budget, a savings balance running ahead of target, or a weight
+/// tracker below where it's meant to be today.
 enum PaceStatus {
     case good
     case warning
@@ -124,26 +149,15 @@ enum PaceStatus {
         }
     }
 
-    /// A decreasing tracker denominated in currency reads naturally as a
-    /// budget ("under/over budget"), which draws a much clearer good/bad
-    /// line for money than the generic on-track language does. An
-    /// increasing tracker (regardless of unit — mileage included) reads
-    /// just as naturally as a budget once it's over: a higher number than
-    /// planned literally *is* going over whatever cap the allowance
-    /// represents, so the warning/bad wording matches the decreasing
-    /// budget case even though `usesBudgetLanguage` itself only covers
-    /// decreasing currency trackers. Only a non-currency decreasing
-    /// tracker keeps the neutral "on track"/"needs attention" wording.
+    /// The tracker type's own wording for this status — the only place the
+    /// app decides what "green" is called, so every surface says the same
+    /// thing about the same tracker. See `TrackerTerminology`.
     func label(for tracker: Tracker) -> String {
+        let terminology = tracker.terminology
         switch self {
-        case .good:
-            return tracker.usesBudgetLanguage ? "Under Budget" : "On Track"
-        case .warning:
-            if tracker.usesBudgetLanguage { return "Just Over Budget" }
-            return tracker.direction == .increasing ? "Slightly Over Budget" : "Slightly Behind"
-        case .bad:
-            if tracker.usesBudgetLanguage { return "Over Budget" }
-            return tracker.direction == .increasing ? "Over Budget" : "Needs Attention"
+        case .good: return terminology.goodLabel
+        case .warning: return terminology.amberLabel
+        case .bad: return terminology.badLabel
         }
     }
 }
@@ -203,7 +217,9 @@ extension Tracker {
             difference: difference,
             currentValue: actualValue,
             targetValueToday: targetValueToday,
-            totalAllowance: totalAllowance
+            totalAllowance: totalAllowance,
+            higherIsBetter: higherIsBetter,
+            amberFloor: trackerUnit.amberFloor
         )
     }
 }

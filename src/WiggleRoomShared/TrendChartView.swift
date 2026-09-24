@@ -221,7 +221,7 @@ struct TrendChartView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(colors: [tracker.accentColor], label: "Budget")
+            legendItem(colors: [tracker.accentColor], label: tracker.terminology.paceNoun)
             legendItem(colors: [WiggleRoomColors.good, WiggleRoomColors.bad], label: "Actual")
             legendItem(colors: [WiggleRoomColors.brand], label: "Trend")
         }

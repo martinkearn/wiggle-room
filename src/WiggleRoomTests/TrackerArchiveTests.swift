@@ -24,8 +24,7 @@ final class TrackerArchiveTests: XCTestCase {
         let tracker = Tracker(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!,
             name: "Fictional Holiday",
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
             connectedSource: store.manualEntrySource,
             sourceTargetId: "00000000-0000-0000-0000-000000000101",
             startDate: Date(timeIntervalSince1970: 1_700_000_000),
@@ -55,13 +54,13 @@ final class TrackerArchiveTests: XCTestCase {
         )
         let decoded = try TrackerArchiveService.decode(encoded)
 
-        XCTAssertEqual(decoded.version, 1)
+        XCTAssertEqual(decoded.version, 2)
         XCTAssertEqual(decoded.trackers.count, 1)
         let archived = try XCTUnwrap(decoded.trackers.first)
         XCTAssertEqual(archived.id, tracker.id)
         XCTAssertEqual(archived.name, tracker.name)
         XCTAssertEqual(archived.unit, tracker.unit)
-        XCTAssertEqual(archived.direction, tracker.direction)
+        XCTAssertEqual(archived.type, tracker.typeRawValue)
         XCTAssertEqual(archived.sourceTargetId, tracker.sourceTargetId)
         XCTAssertEqual(archived.startDate, tracker.startDate)
         XCTAssertEqual(archived.endDate, tracker.endDate)
@@ -92,8 +91,7 @@ final class TrackerArchiveTests: XCTestCase {
         sourceContext.insert(originalSource)
         let tracker = Tracker(
             name: "Fictional Budget",
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
             connectedSource: originalSource,
             sourceTargetId: "synthetic-account",
             startDate: .now,
@@ -139,8 +137,7 @@ final class TrackerArchiveTests: XCTestCase {
         sourceContext.insert(externalSource)
         let tracker = Tracker(
             name: "Read Only Example",
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
             connectedSource: externalSource,
             sourceTargetId: "synthetic-account",
             startDate: .now,
@@ -170,8 +167,7 @@ final class TrackerArchiveTests: XCTestCase {
     private func makeTracker(name: String, source: ConnectedSource) -> Tracker {
         Tracker(
             name: name,
-            unit: "mi",
-            direction: .increasing,
+            type: .mileage,
             connectedSource: source,
             startDate: .now,
             endDate: .now.addingTimeInterval(3600),

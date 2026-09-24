@@ -91,18 +91,20 @@ struct WatchTrackerDetailView: View {
             let final = finalPace
             card(
                 tint: (final?.status ?? .warning).color,
-                title: "Final \(tracker.currentValueLabel)",
+                title: "Final \(tracker.terminology.currentFigure)",
                 value: final?.currentValue ?? tracker.startingValue,
                 captions: [final.map { "\($0.statusLine(for: tracker)) \($0.displayDifference(for: tracker))" }].compactMap { $0 }
             )
         } else {
-            card(tint: pace.status.color, title: tracker.currentValueLabel,
+            card(tint: pace.status.color, title: tracker.terminology.currentFigure,
                  value: pace.currentValue,
                  captions: [pace.remainingInAllowanceCaption(for: tracker)].compactMap { $0 } + sourceTimingCaptions)
-            card(tint: tracker.accentColor, title: "Current Budget",
+            card(tint: tracker.accentColor, title: tracker.terminology.paceFigure,
                  value: pace.targetValueToday,
-                 captions: ["Tracker budget \(tracker.formattedValue(tracker.totalAllowance))",
-                           "Final budget \(tracker.formattedValue(tracker.projectedFinalValue))",
+                 captions: ["\(tracker.terminology.wholePeriodFigure) \(tracker.formattedValue(tracker.wholePeriodValue))",
+                           tracker.trackerType.orientation == .allowance
+                               ? "\(tracker.terminology.finalFigure) \(tracker.formattedValue(tracker.projectedFinalValue))"
+                               : nil,
                            tracker.sortedReadings.count > 1 ? tracker.estimatedFinalValue.map { "Estimated final \(tracker.formattedValue($0))" } : nil]
                     .compactMap { $0 },
                  variant: 1)

@@ -27,8 +27,8 @@ enum PreviewData {
         let context = container.mainContext
         let tracker = Tracker(
             name: "Joint account — September",
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
+            unit: .sterling,
             connectedSource: store.manualEntrySource,
             sourceTargetId: UUID().uuidString,
             startDate: Calendar.current.date(byAdding: .day, value: -10, to: .now) ?? .now,

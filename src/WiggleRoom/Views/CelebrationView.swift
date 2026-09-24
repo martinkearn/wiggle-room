@@ -23,14 +23,11 @@ struct CelebrationView: View {
     @State private var isAnimating = false
 
     private var headline: String {
-        tracker.usesBudgetLanguage ? "Closed Under Budget!" : "Closed On Track!"
+        tracker.terminology.celebration
     }
 
     private var subheadline: String {
-        let name = tracker.name
-        return tracker.usesBudgetLanguage
-            ? "\(name) wrapped up with room to spare. Nicely done."
-            : "\(name) wrapped up right on budget. Nicely done."
+        "\(tracker.name) wrapped up with room to spare. Nicely done."
     }
 
     var body: some View {

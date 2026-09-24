@@ -57,8 +57,11 @@ struct AddTrackerView: View {
     private var addedSources: [ConnectedSource]
 
     @State private var name = ""
-    @State private var unit = ""
-    @State private var direction: TrackerDirection = .decreasing
+    /// What the tracker tracks. Chosen first, required, and locked once the
+    /// tracker exists — it sets the units, the direction, which side of the
+    /// pace line is good, all the wording, and which sources can back it.
+    @State private var trackerType: TrackerType = .spendingMoney
+    @State private var unit: TrackerUnit = TrackerType.spendingMoney.defaultUnit
     @State private var startDate = Date.now
     @State private var endDate = Calendar.current.date(byAdding: .month, value: 1, to: .now) ?? .now
     /// Whether the period's start/end carry a specific time of day. Off by
@@ -66,7 +69,11 @@ struct AddTrackerView: View {
     /// `startDate`/`endDate` are normalized to midnight.
     @State private var includesTime = false
     @State private var startingValueText = ""
-    @State private var totalAllowanceText = ""
+    /// The type's second figure as the user enters it — a movement for an
+    /// allowance type ("a £500 budget"), an end value for a goal type
+    /// ("£5,000", "85 kg"). `Tracker.totalAllowance` is derived from it on
+    /// save; see `TrackerType.totalAllowance(startingValue:targetValue:)`.
+    @State private var targetValueText = ""
     @State private var colorIndex = 0
     @State private var glyph = ""
     /// The other trackers' names and colours — a one-shot snapshot taken
@@ -122,7 +129,7 @@ struct AddTrackerView: View {
     @State private var isPresentingDeleteConfirmation = false
 
     private enum NumberField {
-        case startingValue, totalAllowance
+        case startingValue, targetValue
     }
     @FocusState private var focusedNumberField: NumberField?
 
@@ -136,23 +143,38 @@ struct AddTrackerView: View {
                             .font(.wiggleText(.caption))
                             .foregroundStyle(WiggleRoomColors.error)
                     }
-                    unitPicker
-                    Picker("Direction", selection: $direction) {
-                        Text("Decreasing").tag(TrackerDirection.decreasing)
-                        Text("Increasing").tag(TrackerDirection.increasing)
+                    if existingTracker == nil {
+                        Picker("Type", selection: $trackerType) {
+                            ForEach(TrackerType.allCases) { type in
+                                Text(type.displayName).tag(type)
+                            }
+                        }
+                        .onChange(of: trackerType) { _, newValue in
+                            applyTypeDefaults(newValue)
+                        }
+                    } else {
+                        LabeledContent("Type", value: trackerType.displayName)
                     }
-                    .pickerStyle(.segmented)
+                    unitPicker
                 } header: {
                     Text("Details")
                         .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
-                    Text(directionFooter)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(trackerType.summary)
+                        if let formFooter = trackerType.formFooter {
+                            Text(formFooter)
+                        }
+                        if existingTracker != nil {
+                            Text("A tracker's type is fixed once it's created.")
+                        }
+                    }
                 }
 
                 TrackerAppearancePicker(
                     colorIndex: $colorIndex,
                     glyph: $glyph,
-                    defaultGlyph: Tracker.isCurrencyUnit(unit) ? "creditcard.fill" : "gauge.with.dots.needle.33percent"
+                    defaultGlyph: trackerType.defaultGlyph
                 )
 
                 Section {
@@ -176,7 +198,7 @@ struct AddTrackerView: View {
                 }
 
                 Section {
-                    LabeledContent("Starting balance") {
+                    LabeledContent(trackerType.startingValueLabel) {
                         unitValueField(text: $startingValueText, field: .startingValue)
                     }
                     if isPrefillingStartingValue {
@@ -187,17 +209,27 @@ struct AddTrackerView: View {
                         .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                     } else {
-                        Text(startingValueHint)
+                        Text(trackerType.startingValueHint)
                             .font(.wiggleText(.caption))
                             .foregroundStyle(.secondary)
                     }
 
-                    LabeledContent("Tracker budget") {
-                        unitValueField(text: $totalAllowanceText, field: .totalAllowance)
+                    LabeledContent(trackerType.targetValueLabel) {
+                        unitValueField(text: $targetValueText, field: .targetValue)
                     }
-                    Text(totalBudgetHint)
+                    Text(trackerType.targetValueHint)
                         .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
+                    if let roundingHint = unit.roundingHint {
+                        Text(roundingHint)
+                            .font(.wiggleText(.caption))
+                            .foregroundStyle(.secondary)
+                    }
+                    if hasBothValues && !isValuePairValid {
+                        Text(trackerType.validationMessage)
+                            .font(.wiggleText(.caption))
+                            .foregroundStyle(WiggleRoomColors.error)
+                    }
 
                     if let hourlyPaceDescription {
                         Text(hourlyPaceDescription)
@@ -215,7 +247,7 @@ struct AddTrackerView: View {
                             .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("Budget")
+                    Text(trackerType.targetValueLabel)
                         .font(WiggleRoomFont.headline(15, weight: 650))
                 }
 
@@ -223,7 +255,7 @@ struct AddTrackerView: View {
                     Section {
                         Picker("Source", selection: $sourceSelection) {
                             Text("Manual Entry").tag(SourceOption.source(store.manualEntrySource.id) as SourceOption?)
-                            ForEach(addedSources) { source in
+                            ForEach(compatibleSources) { source in
                                 Text(source.displayName).tag(SourceOption.source(source.id) as SourceOption?)
                             }
                             Text("Add New Source…").tag(SourceOption.addNew as SourceOption?)
@@ -235,6 +267,8 @@ struct AddTrackerView: View {
                             // selection — restore whatever was chosen before.
                             sourceSelection = oldValue
                         }
+                    } footer: {
+                        Text("Only sources that can supply a \(trackerType.displayName.lowercased()) reading are listed. Manual Entry suits every type.")
                     }
 
                     if selectedSourceId != nil && !isManualEntrySelected {
@@ -261,12 +295,9 @@ struct AddTrackerView: View {
                     Section {
                         Picker("Reminder", selection: $reminderCadenceMinutes) {
                             Text("None").tag(nil as Int?)
-                            Text("Every Minute").tag(1 as Int?)
-                            Text("Hourly").tag(60 as Int?)
-                            Text("Daily").tag(1440 as Int?)
-                            Text("Weekly").tag(10080 as Int?)
-                            Text("Every 2 Weeks").tag(20160 as Int?)
-                            Text("Monthly").tag(43200 as Int?)
+                            ForEach(trackerType.reminderPresets, id: \.minutes) { preset in
+                                Text(preset.label).tag(preset.minutes as Int?)
+                            }
                         }
                     } header: {
                         Text("Reminder")
@@ -322,8 +353,8 @@ struct AddTrackerView: View {
                 loadOtherTrackers()
                 if let existingTracker {
                     name = existingTracker.name
-                    unit = existingTracker.unit
-                    direction = existingTracker.direction
+                    trackerType = existingTracker.trackerType
+                    unit = existingTracker.trackerUnit
                     startDate = existingTracker.startDate
                     endDate = existingTracker.endDate
                     let calendar = Calendar.current
@@ -332,8 +363,11 @@ struct AddTrackerView: View {
                     // No grouping separator here: it round-trips through
                     // `Decimal(string:)` on save, which doesn't understand
                     // "3,000" and would silently truncate it to "3".
-                    startingValueText = existingTracker.startingValue.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
-                    totalAllowanceText = existingTracker.totalAllowance.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+                    startingValueText = Self.editableText(existingTracker.startingValue, unit: existingTracker.trackerUnit)
+                    // The *stated* figure, not the stored one: a goal type is
+                    // entered as an end value, so the form has to hand back
+                    // the goal the user typed rather than the distance to it.
+                    targetValueText = Self.editableText(existingTracker.wholePeriodValue, unit: existingTracker.trackerUnit)
                     sourceSelection = existingTracker.connectedSource.map { .source($0.id) }
                     reminderCadenceMinutes = existingTracker.reminderCadenceMinutes
                     colorIndex = existingTracker.resolvedColorIndex
@@ -345,6 +379,7 @@ struct AddTrackerView: View {
                     let used = Set(otherTrackers.map(\.colorIndex))
                     colorIndex = TrackerPalette.all.indices.first { !used.contains($0) } ?? (otherTrackers.count % TrackerPalette.all.count)
                     sourceSelection = .source(store.manualEntrySource.id)
+                    applyTypeDefaults(trackerType)
                 }
             }
             .navigationDestination(isPresented: $isShowingAddSource) {
@@ -477,35 +512,63 @@ struct AddTrackerView: View {
         startingValueText = value.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
     }
 
-    /// The only units a tracker can be created with — picking from a fixed
-    /// set (rather than free text) means `Tracker.isCurrencyUnit` and every
-    /// piece of currency-aware formatting/wording can rely on an exact
-    /// match, with no risk of a typo'd or inconsistent unit string. Just the
-    /// three most common currencies, plus a few other everyday
-    /// depleting/accumulating allowances beyond money and mileage.
-    private static let unitOptions = ["£", "$", "€", "mi", "km", "kg", "L", "hrs"]
-
+    /// The units the chosen type permits — never free text, so
+    /// `Tracker.trackerUnit` and every piece of unit-aware
+    /// formatting/precision can rely on an exact match. A single permitted
+    /// unit needs no picker at all.
+    @ViewBuilder
     private var unitPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(Self.unitOptions, id: \.self) { symbol in
-                    Button {
-                        unit = symbol
-                    } label: {
-                        Text(symbol)
-                            .font(.wiggleText(.subheadline, weight: .medium))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(unit == symbol ? WiggleRoomColors.brand : Color.secondary.opacity(0.15), in: Capsule())
-                            .foregroundStyle(unit == symbol ? .white : .primary)
+        if trackerType.permittedUnits.count > 1 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(trackerType.permittedUnits) { option in
+                        Button {
+                            unit = option
+                        } label: {
+                            Text(option.symbol)
+                                .font(.wiggleText(.subheadline, weight: .medium))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(unit == option ? WiggleRoomColors.brand : Color.secondary.opacity(0.15), in: Capsule())
+                                .foregroundStyle(unit == option ? .white : .primary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
+            .listRowInsets(EdgeInsets())
+            .padding(.horizontal)
+            .padding(.vertical, 2)
         }
-        .listRowInsets(EdgeInsets())
-        .padding(.horizontal)
-        .padding(.vertical, 2)
+    }
+
+    /// Resets everything the type owns. Called when the type picker changes
+    /// and once for a brand new tracker, so the unit, the badge glyph and
+    /// the reminder always match the type rather than trailing the previous
+    /// selection. A source that can't back the new type falls back to Manual
+    /// Entry, which backs them all.
+    private func applyTypeDefaults(_ type: TrackerType) {
+        unit = type.defaultUnit
+        reminderCadenceMinutes = type.defaultReminderCadenceMinutes
+        if let selectedSourceId,
+           selectedSourceId != store.manualEntrySource.id,
+           !compatibleSources.contains(where: { $0.id == selectedSourceId }) {
+            sourceSelection = .source(store.manualEntrySource.id)
+        }
+    }
+
+    /// The added sources whose provider can actually supply a reading for
+    /// the chosen type (§8) — declared by the provider, not hard-coded per
+    /// type. Manual Entry is listed separately and always applies.
+    private var compatibleSources: [ConnectedSource] {
+        addedSources.filter { store.provider(for: $0)?.supportedTrackerTypes.contains(trackerType) ?? false }
+    }
+
+    /// A stored figure rendered back into the form's text field. No grouping
+    /// separator: it round-trips through `parseDecimal` on save, and a
+    /// locale that groups with "." would otherwise mangle it.
+    private static func editableText(_ value: Decimal, unit: TrackerUnit) -> String {
+        value.formatted(.number.grouping(.never).precision(.fractionLength(0...unit.precision)))
     }
 
     /// A budget number field with the chosen unit shown alongside it —
@@ -518,8 +581,8 @@ struct AddTrackerView: View {
     private func unitValueField(text: Binding<String>, field: NumberField) -> some View {
         HStack(spacing: 4) {
             Spacer(minLength: 0)
-            if Tracker.isCurrencyUnit(unit) {
-                Text(unit)
+            if unit.placement == .prefix {
+                Text(unit.symbol)
                     .foregroundStyle(.secondary)
             }
             // Manual placeholder, not `TextField`'s own — same fix as
@@ -540,8 +603,8 @@ struct AddTrackerView: View {
                     .focused($focusedNumberField, equals: field)
             }
             .frame(minWidth: 60, maxWidth: 120)
-            if !unit.isEmpty && !Tracker.isCurrencyUnit(unit) {
-                Text(unit)
+            if unit.placement == .suffix {
+                Text(unit.symbol)
                     .foregroundStyle(.secondary)
             }
         }
@@ -565,33 +628,6 @@ struct AddTrackerView: View {
         return selectedSourceId == store.manualEntrySource.id
     }
 
-    private var startingValueHint: String {
-        switch direction {
-        case .decreasing:
-            return "What you're starting with, e.g. 3000 for a £3000 budget."
-        case .increasing:
-            return "Where your reading starts, e.g. 0 miles or today's odometer."
-        }
-    }
-
-    private var totalBudgetHint: String {
-        switch direction {
-        case .decreasing:
-            return "How much you can use across the whole period, usually the same as the starting value."
-        case .increasing:
-            return "How much more you can add across the whole period."
-        }
-    }
-
-    private var directionFooter: String {
-        switch direction {
-        case .decreasing:
-            return "Decreasing: start with an amount and use it up, like a £3000 budget running down to £0."
-        case .increasing:
-            return "Increasing: a reading that climbs towards a limit, like mileage counting up against a 10000 mile allowance."
-        }
-    }
-
     /// Parses a decimal typed or pasted by the user. Plain `Decimal(string:)`
     /// doesn't understand grouping separators ("3,000") and silently
     /// truncates at the comma instead of failing — this tries locale-aware
@@ -607,40 +643,66 @@ struct AddTrackerView: View {
         return Decimal(string: text)
     }
 
+    /// The two figures the form collects, parsed and rounded to what the
+    /// unit can actually hold.
+    private var parsedStartingValue: Decimal? {
+        Self.parseDecimal(startingValueText).map { unit.rounded($0) }
+    }
+
+    private var parsedTargetValue: Decimal? {
+        Self.parseDecimal(targetValueText).map { unit.rounded($0) }
+    }
+
+    private var hasBothValues: Bool {
+        parsedStartingValue != nil && parsedTargetValue != nil
+    }
+
+    private var isValuePairValid: Bool {
+        guard let startingValue = parsedStartingValue, let targetValue = parsedTargetValue else { return false }
+        return trackerType.isValidPair(startingValue: startingValue, targetValue: targetValue)
+    }
+
+    /// The canonical figure that actually gets stored — see
+    /// `TrackerType.totalAllowance(startingValue:targetValue:)`. For a goal
+    /// type this is recomputed from whatever the starting value currently
+    /// is, so editing the starting value later keeps the user's stated goal
+    /// fixed rather than letting it drift (§6).
+    private var derivedTotalAllowance: Decimal? {
+        guard let startingValue = parsedStartingValue, let targetValue = parsedTargetValue else { return nil }
+        return trackerType.totalAllowance(startingValue: startingValue, targetValue: targetValue)
+    }
+
     private var hourlyPaceDescription: String? {
-        guard let totalAllowance = Self.parseDecimal(totalAllowanceText), endDate > startDate else { return nil }
+        guard let totalAllowance = derivedTotalAllowance, endDate > startDate else { return nil }
         let periodHours = endDate.timeIntervalSince(startDate) / 3600
         guard periodHours > 0 else { return nil }
         let hourlyRate = totalAllowance / Decimal(periodHours)
-        let displayUnit = unit.isEmpty ? "units" : unit
-        return "≈ \(hourlyRate.formatted(.number.precision(.fractionLength(0...2)))) \(displayUnit) / hour"
+        return "≈ \(hourlyRate.formatted(.number.precision(.fractionLength(0...2)))) \(unit.symbol) / hour"
     }
 
     /// Only worth showing alongside the hourly rate once a tracker runs
     /// longer than a day — for anything shorter, "per day" isn't a
     /// meaningful way to think about the pace.
     private var dailyPaceDescription: String? {
-        guard let totalAllowance = Self.parseDecimal(totalAllowanceText), endDate > startDate else { return nil }
+        guard let totalAllowance = derivedTotalAllowance, endDate > startDate else { return nil }
         let periodHours = endDate.timeIntervalSince(startDate) / 3600
         guard periodHours > 24 else { return nil }
         let dailyRate = totalAllowance / Decimal(periodHours / 24)
-        let displayUnit = unit.isEmpty ? "units" : unit
-        return "≈ \(dailyRate.formatted(.number.precision(.fractionLength(0...2)))) \(displayUnit) / day"
+        return "≈ \(dailyRate.formatted(.number.precision(.fractionLength(0...2)))) \(unit.symbol) / day"
     }
 
     /// See `Tracker.projectedRemainder` — how much would be left over at the
     /// end given the current form values, shown only when starting value and
     /// total budget actually differ.
     private var remainingAtEndDescription: String? {
-        guard let startingValue = Self.parseDecimal(startingValueText),
-              let totalAllowance = Self.parseDecimal(totalAllowanceText),
-              let remainder = Tracker.projectedRemainder(direction: direction, startingValue: startingValue, totalAllowance: totalAllowance)
+        guard let startingValue = parsedStartingValue,
+              let totalAllowance = derivedTotalAllowance,
+              let remainder = Tracker.projectedRemainder(type: trackerType, startingValue: startingValue, totalAllowance: totalAllowance)
         else { return nil }
-        let displayUnit = unit.isEmpty ? "units" : unit
         if remainder > 0 {
-            return "\(Tracker.formattedValue(remainder, unit: displayUnit)) left at the end."
+            return "\(Tracker.formattedValue(remainder, unit: unit)) left at the end."
         } else {
-            return "This budget is \(Tracker.formattedValue(abs(remainder), unit: displayUnit)) more than the starting value."
+            return "This \(trackerType.targetValueLabel.lowercased()) is \(Tracker.formattedValue(abs(remainder), unit: unit)) more than the starting value."
         }
     }
 
@@ -669,10 +731,8 @@ struct AddTrackerView: View {
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
             && !isDuplicateName
-            && !unit.trimmingCharacters(in: .whitespaces).isEmpty
             && endDate > startDate
-            && Self.parseDecimal(startingValueText) != nil
-            && Self.parseDecimal(totalAllowanceText) != nil
+            && isValuePairValid
             && selectedSourceId != nil
             // `selectedTargetId` is only ever populated by
             // `loadAvailableTargetsIfNeeded()`, which deliberately does
@@ -698,16 +758,16 @@ struct AddTrackerView: View {
             return
         }
 
-        guard let startingValue = Self.parseDecimal(startingValueText),
-              let totalAllowance = Self.parseDecimal(totalAllowanceText)
+        guard let startingValue = parsedStartingValue,
+              let totalAllowance = derivedTotalAllowance,
+              isValuePairValid
         else {
-            errorMessage = "Please fill in all fields correctly."
+            errorMessage = trackerType.validationMessage
             isSaving = false
             return
         }
 
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        let trimmedUnit = unit.trimmingCharacters(in: .whitespaces)
 
         // When no specific time was set, the period should run midnight to
         // midnight — not whatever time the form happened to be created at.
@@ -719,10 +779,12 @@ struct AddTrackerView: View {
 
         if let existingTracker {
             existingTracker.name = trimmedName
-            existingTracker.unit = trimmedUnit
+            existingTracker.trackerUnit = unit
             existingTracker.colorIndex = colorIndex
             existingTracker.glyph = glyph
-            existingTracker.direction = direction
+            // `trackerType` is deliberately not written back: the type is
+            // locked once a tracker exists, since changing it would
+            // reinterpret every reading already logged.
             existingTracker.startDate = startDate
             existingTracker.endDate = endDate
             existingTracker.startingValue = startingValue
@@ -774,8 +836,8 @@ struct AddTrackerView: View {
         let tracker = Tracker(
             id: trackerId,
             name: trimmedName,
-            unit: trimmedUnit,
-            direction: direction,
+            type: trackerType,
+            unit: unit,
             connectedSource: source,
             sourceTargetId: resolvedTargetId,
             startDate: startDate,

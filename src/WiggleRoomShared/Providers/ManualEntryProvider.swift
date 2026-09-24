@@ -35,6 +35,8 @@ final class ManualEntryProvider: SourceProvider {
     nonisolated let providerId = "manual"
     nonisolated let displayName = "Manual entry"
     nonisolated let requiresConnection = false
+    /// Anything can be logged by hand.
+    nonisolated let supportedTrackerTypes = Set(TrackerType.allCases)
 
     private let modelContext: ModelContext
 
