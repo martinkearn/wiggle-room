@@ -57,22 +57,7 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            Divider()
-
-            buildInfoSection
-
             Spacer()
-        }
-    }
-
-    /// Confirms this device is running the exact same code as another —
-    /// see `AppBuildInfo`'s own doc comment for why this is a git commit
-    /// hash, not a build date/time or version number.
-    private var buildInfoSection: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Build \(AppBuildInfo.gitCommitDescription)")
-                .font(.wiggleText(.caption))
-                .foregroundStyle(.secondary)
         }
     }
 }

@@ -360,7 +360,7 @@
 				EF63B1143056875D0092FD24 /* Resources */,
 				55273DB0609129562CC867EA /* Embed Foundation Extensions */,
 				5A87B6A9F195D51A9434406D /* Embed Watch Content */,
-				4E552DBA7D7CC4D66D4C0B8F /* Write Git Commit Resource */,
+				4E552DBA7D7CC4D66D4C0B8F /* Write Build Info Resource */,
 			);
 			buildRules = (
 			);
@@ -512,7 +512,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		4E552DBA7D7CC4D66D4C0B8F /* Write Git Commit Resource */ = {
+		4E552DBA7D7CC4D66D4C0B8F /* Write Build Info Resource */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -523,15 +523,15 @@
 				"$(SRCROOT)/../.git/HEAD",
 				"$(SRCROOT)/../.git/index",
 			);
-			name = "Write Git Commit Resource";
+			name = "Write Build Info Resource";
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/git-commit.txt",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/build-info.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Writes a plain text resource with the current git commit, read at\n# runtime by AppBuildInfo.swift so Settings can show \"are these two\n# devices actually running the same code\" instead of just \"did I\n# rebuild recently\". A brand-new file (not the app's real Info.plist)\n# specifically because User Script Sandboxing forbids two different\n# build steps writing the same file — writing directly into Info.plist\n# here conflicted with Xcode's own Info.plist generation step\n# (\"invalid task ... mutable output but no other virtual output\n# node\"); this file has exactly one producer, this script. A plain\n# resource (not a generated .swift source compiled into Sources) since\n# this project's file-system-synchronized source groups didn't pick up\n# a script-generated derived .swift file as a compile input the way a\n# classic explicit-file-list Sources phase would (\"cannot find\n# 'GeneratedGitInfo' in scope\" even though the file existed on disk).\n#\n# Declared inputs (.git/HEAD, .git/index) make Xcode's real dependency\n# analysis re-run this whenever the checked-out commit or the working\n# tree's staged/unstaged state actually changes.\nGIT_HASH=$(git -C \"${SRCROOT}\" rev-parse --short HEAD 2>/dev/null)\nif [ -z \"$GIT_HASH\" ]; then\n  GIT_HASH=\"unknown\"\nfi\nif [ -n \"$(git -C \"${SRCROOT}\" status --porcelain 2>/dev/null)\" ]; then\n  GIT_HASH=\"${GIT_HASH}-dirty\"\nfi\nmkdir -p \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nprintf '%s' \"$GIT_HASH\" > \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/git-commit.txt\"\n";
+			shellScript = "# Writes a plain text resource describing the build's source commit, read\n# at runtime by AppBuildInfo.swift so the About screen can answer \"are\n# these two devices actually running the same code\" — and, for TestFlight\n# builds, \"what changed in this one\". A brand-new file (not the app's real\n# Info.plist) specifically because User Script Sandboxing forbids two\n# different build steps writing the same file — writing directly into\n# Info.plist here conflicted with Xcode's own Info.plist generation step\n# (\"invalid task ... mutable output but no other virtual output node\");\n# this file has exactly one producer, this script. A plain resource (not a\n# generated .swift source compiled into Sources) since this project's\n# file-system-synchronized source groups didn't pick up a script-generated\n# derived .swift file as a compile input the way a classic\n# explicit-file-list Sources phase would (\"cannot find 'GeneratedGitInfo'\n# in scope\" even though the file existed on disk).\n#\n# One \"key=value\" pair per line. Values are single-line by construction\n# (%s is the commit subject only), so no escaping or quoting is needed and\n# the reader can split on the first \"=\" alone.\n#\n# Declared inputs (.git/HEAD, .git/index) make Xcode's real dependency\n# analysis re-run this whenever the checked-out commit or the working\n# tree's staged/unstaged state actually changes.\nCOMMIT=$(git -C \"${SRCROOT}\" rev-parse --short HEAD 2>/dev/null)\nif [ -z \"$COMMIT\" ]; then\n  COMMIT=\"unknown\"\nfi\nif [ -n \"$(git -C \"${SRCROOT}\" status --porcelain 2>/dev/null)\" ]; then\n  COMMIT=\"${COMMIT}-dirty\"\nfi\nSUBJECT=$(git -C \"${SRCROOT}\" log -1 --pretty=format:%s 2>/dev/null)\nCOMMIT_DATE=$(git -C \"${SRCROOT}\" log -1 --pretty=format:%cI 2>/dev/null)\n# In CI the checkout is detached, so rev-parse reports \"HEAD\" rather than\n# the branch that triggered the run; GITHUB_REF_NAME has the real name.\nBRANCH=\"${GITHUB_REF_NAME}\"\nif [ -z \"$BRANCH\" ]; then\n  BRANCH=$(git -C \"${SRCROOT}\" rev-parse --abbrev-ref HEAD 2>/dev/null)\nfi\nRESOURCE_DIRECTORY=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$RESOURCE_DIRECTORY\"\n{\n  printf 'commit=%s\\n' \"$COMMIT\"\n  printf 'subject=%s\\n' \"$SUBJECT\"\n  printf 'date=%s\\n' \"$COMMIT_DATE\"\n  printf 'branch=%s\\n' \"$BRANCH\"\n  # Only present for builds produced by GitHub Actions, which is what\n  # distinguishes a TestFlight build from a local one on the About screen.\n  if [ -n \"${GITHUB_RUN_NUMBER}\" ]; then\n    printf 'runNumber=%s\\n' \"${GITHUB_RUN_NUMBER}\"\n    printf 'runURL=%s/%s/actions/runs/%s\\n' \"${GITHUB_SERVER_URL}\" \"${GITHUB_REPOSITORY}\" \"${GITHUB_RUN_ID}\"\n  fi\n} > \"$RESOURCE_DIRECTORY/build-info.txt\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
