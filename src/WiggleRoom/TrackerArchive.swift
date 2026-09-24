@@ -81,13 +81,14 @@ enum TrackerArchiveError: LocalizedError {
 enum TrackerArchiveService {
     static func makeArchive(trackers: [Tracker]) -> TrackerArchive {
         let sources = Dictionary(
-            uniqueKeysWithValues: trackers.compactMap(\.connectedSource).map { source in
+            trackers.compactMap(\.connectedSource).map { source in
                 (source.id, TrackerArchive.Source(
                     id: source.id,
                     providerId: source.providerId,
                     displayName: source.displayName
                 ))
-            }
+            },
+            uniquingKeysWith: { first, _ in first }
         )
         return TrackerArchive(
             version: TrackerArchive.currentVersion,

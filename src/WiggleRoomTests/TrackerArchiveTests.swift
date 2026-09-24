@@ -4,6 +4,19 @@ import XCTest
 
 @MainActor
 final class TrackerArchiveTests: XCTestCase {
+    func testExportDeduplicatesSourceSharedByMultipleTrackers() {
+        let container = makeInMemoryModelContainer()
+        let store = TrackerStore(modelContext: container.mainContext)
+        let first = makeTracker(name: "First", source: store.manualEntrySource)
+        let second = makeTracker(name: "Second", source: store.manualEntrySource)
+
+        let archive = TrackerArchiveService.makeArchive(trackers: [first, second])
+
+        XCTAssertEqual(archive.trackers.count, 2)
+        XCTAssertEqual(archive.sources.count, 1)
+        XCTAssertEqual(archive.sources.first?.id, store.manualEntrySource.id)
+    }
+
     func testArchiveRoundTripPreservesEveryTrackerDetailAndReading() throws {
         let container = makeInMemoryModelContainer()
         let context = container.mainContext
@@ -152,5 +165,18 @@ final class TrackerArchiveTests: XCTestCase {
         XCTAssertNil(imported.connectedSource)
         XCTAssertFalse(imported.isManualEntry)
         XCTAssertEqual(imported.sourceTargetId, "synthetic-account")
+    }
+
+    private func makeTracker(name: String, source: ConnectedSource) -> Tracker {
+        Tracker(
+            name: name,
+            unit: "mi",
+            direction: .increasing,
+            connectedSource: source,
+            startDate: .now,
+            endDate: .now.addingTimeInterval(3600),
+            startingValue: 0,
+            totalAllowance: 100
+        )
     }
 }

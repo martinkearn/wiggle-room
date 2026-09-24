@@ -728,6 +728,7 @@ struct AddTrackerView: View {
             existingTracker.startingValue = startingValue
             existingTracker.totalAllowance = totalAllowance
             existingTracker.reminderCadenceMinutes = reminderCadenceMinutes
+            var newlyConnectedToExternalSource = false
             if existingTracker.connectedSource == nil,
                let selectedSourceId,
                let source = resolveSource(withId: selectedSourceId) {
@@ -735,8 +736,13 @@ struct AddTrackerView: View {
                 existingTracker.sourceTargetId = source.providerId == store.manualProvider.providerId
                     ? existingTracker.id.uuidString
                     : selectedTargetId
+                newlyConnectedToExternalSource = source.providerId != store.manualProvider.providerId
             }
             store.saveChanges(reminderTracker: existingTracker)
+            if newlyConnectedToExternalSource {
+                let store = store
+                Task { _ = try? await store.refreshFromSource(existingTracker, force: true) }
+            }
             dismiss()
             return
         }
