@@ -125,8 +125,9 @@ struct ReadingHistoryView: View {
     }
 
     private func deleteReadings(at offsets: IndexSet) {
-        for index in offsets {
-            store.deleteReading(readingsNewestFirst[index])
+        let readingsToDelete = offsets.map { readingsNewestFirst[$0] }
+        for reading in readingsToDelete {
+            store.deleteReading(reading)
         }
     }
 }
