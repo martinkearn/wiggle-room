@@ -37,6 +37,10 @@ CloudKit, App Groups, signing identities, and bundle identifiers are tied to the
 
 Tracker backups and transfers are available under **Settings → Export & Import**. Exports contain tracker configuration and reading history, but never connected-source credentials. During import, external trackers can be reassigned to an existing source of the same type or imported read-only until a source is connected from Edit Tracker.
 
+## Continuous integration
+
+Pull requests targeting `main` run a build check that compiles the app for iOS and macOS in the Release configuration, unsigned. It needs no repository secrets, so it also covers pull requests raised from forks and by coding agents. Merging a branch that does not compile is what this check exists to prevent, since the distribution workflows below only run after a merge has already landed.
+
 ## TestFlight deployment
 
 Pushes to `main` start separate GitHub Actions workflows for iOS and macOS. Both workflows also support manual dispatch from the GitHub Actions interface.
