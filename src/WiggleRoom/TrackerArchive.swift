@@ -3,13 +3,15 @@ import SwiftData
 import UniformTypeIdentifiers
 import SwiftUI
 
-struct TrackerArchive: Codable {
+struct TrackerArchive: Codable, Identifiable {
     static let currentVersion = 1
 
     let version: Int
     let exportedAt: Date
     let sources: [Source]
     let trackers: [ArchivedTracker]
+
+    var id: Date { exportedAt }
 
     struct Source: Codable, Identifiable, Hashable {
         let id: UUID
@@ -54,6 +56,7 @@ enum TrackerArchiveError: LocalizedError {
     case invalidDecimal
     case duplicateTracker
     case duplicateName(String)
+    case invalidArchive
     case invalidSourceMapping
 
     var errorDescription: String? {
@@ -66,6 +69,8 @@ enum TrackerArchiveError: LocalizedError {
             "A tracker in this archive has already been imported."
         case .duplicateName(let name):
             "A tracker named “\(name)” already exists."
+        case .invalidArchive:
+            "The archive is incomplete or contains duplicate records."
         case .invalidSourceMapping:
             "A selected connected source has the wrong type."
         }
@@ -147,6 +152,17 @@ enum TrackerArchiveService {
         let existing = try modelContext.fetch(FetchDescriptor<Tracker>())
         let existingIDs = Set(existing.map(\.id))
         let existingNames = existing.map(\.name)
+        let archiveSourceIDs = archive.sources.map(\.id)
+        let archiveTrackerIDs = archive.trackers.map(\.id)
+        let archiveReadingIDs = archive.trackers.flatMap { $0.readings.map(\.id) }
+        let archiveNames = archive.trackers.map { $0.name.lowercased() }
+        guard Set(archiveSourceIDs).count == archiveSourceIDs.count,
+              Set(archiveTrackerIDs).count == archiveTrackerIDs.count,
+              Set(archiveReadingIDs).count == archiveReadingIDs.count,
+              Set(archiveNames).count == archiveNames.count
+        else {
+            throw TrackerArchiveError.invalidArchive
+        }
         let archiveSourceByID = Dictionary(uniqueKeysWithValues: archive.sources.map { ($0.id, $0) })
 
         for tracker in archive.trackers {
@@ -162,15 +178,19 @@ enum TrackerArchiveService {
             }) else {
                 throw TrackerArchiveError.duplicateName(tracker.name)
             }
-            if let sourceId = tracker.sourceId,
-               let archivedSource = archiveSourceByID[sourceId],
-               archivedSource.providerId != "manual",
-               let mappedSource = sourceMappings[sourceId],
-               mappedSource.providerId != archivedSource.providerId {
-                throw TrackerArchiveError.invalidSourceMapping
+            if let sourceId = tracker.sourceId {
+                guard let archivedSource = archiveSourceByID[sourceId] else {
+                    throw TrackerArchiveError.invalidArchive
+                }
+                if archivedSource.providerId != "manual",
+                   let mappedSource = sourceMappings[sourceId],
+                   mappedSource.providerId != archivedSource.providerId {
+                    throw TrackerArchiveError.invalidSourceMapping
+                }
             }
         }
 
+        var importedTrackers: [Tracker] = []
         for archived in archive.trackers {
             let archivedSource = archived.sourceId.flatMap { archiveSourceByID[$0] }
             let source: ConnectedSource?
@@ -202,6 +222,7 @@ enum TrackerArchiveService {
             tracker.colorIndex = archived.colorIndex
             tracker.glyph = archived.glyph
             modelContext.insert(tracker)
+            importedTrackers.append(tracker)
 
             for archivedReading in archived.readings {
                 let reading = ValueSnapshot(
@@ -212,11 +233,13 @@ enum TrackerArchiveService {
                 reading.tracker = tracker
                 modelContext.insert(reading)
             }
-            ReminderScheduler.sync(tracker)
         }
 
         do {
             try modelContext.save()
+            for tracker in importedTrackers {
+                ReminderScheduler.sync(tracker)
+            }
             store.saveChanges()
             return archive.trackers.count
         } catch {

@@ -237,7 +237,7 @@ struct AddTrackerView: View {
                         }
                     }
 
-                    if !isManualEntrySelected {
+                    if selectedSourceId != nil && !isManualEntrySelected {
                         targetPickerSection
                     }
                 } else {

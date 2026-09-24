@@ -144,7 +144,7 @@ struct TrackerTransferView: View {
                 }
             }
         }
-        .frame(minWidth: 420, minHeight: 360)
+        .frame(minHeight: 360)
     }
 
     private func choiceBinding(for sourceId: UUID) -> Binding<String> {

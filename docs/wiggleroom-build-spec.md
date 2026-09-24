@@ -146,9 +146,12 @@ The app's rings, cards, and chart strokes use a deliberately irregular, hand-dra
 - Pull-to-refresh/update behavior
 - Add and edit trackers and connected sources
 - Settings for sources, ordering, CloudKit diagnostics, and Siri phrases, with a separate Danger Zone menu for reset operations
+- JSON export and import of tracker configuration and complete reading history
 - Spotlight, notification actions, Live Activities, and widgets
 
 The connected-source editor on iOS shows a name field, a Connected/Not Connected indicator, a personal-access-token field, save, the trackers using the source, and the shared Starling request count. It carries no provider badge.
+
+Tracker exports contain every field needed to preserve appearance, pace, completion state, ordering, reminders, and reading history. They identify external source types but exclude credentials. Import requires each external source to be mapped to an existing source of the same type or explicitly imported read-only; a read-only tracker can later be connected from Edit Tracker.
 
 It is reached from a `@Query`-backed list, so its body observes no SwiftData at all (see Persistence and sync). Every store-derived value on it is a one-time read taken as the screen opens — connection state, tracker names, and request count alike — held as plain values rather than model references, and none of them updates while the screen stays open. That is intentional rather than a limitation: nothing can change them underneath the user in practice, since saving dismisses the screen. macOS keeps the richer inline editor, which is not reached that way and does show them live.
 
@@ -185,6 +188,7 @@ It is reached from a `@Query`-backed list, so its body observes no SwiftData at 
 - Never commit credentials or real financial data.
 - Provider credentials are stored on the user's private CloudKit-synced `ConnectedSource` record so the connection can work across their devices.
 - Credentials must never be logged or included in diagnostics.
+- Credentials must never be included in tracker exports.
 - Starling traffic is sent only to Starling's HTTPS API.
 - The macOS app requires the outbound network client sandbox entitlement.
 - Reset operations require explicit user confirmation.

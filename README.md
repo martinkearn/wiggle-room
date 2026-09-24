@@ -13,6 +13,7 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 - iOS and macOS apps, Apple Watch companion app, widgets, complications, Live Activities, Siri Shortcuts, and Spotlight integration
 - Cross-device sync through the user's private CloudKit database
 - Per-tracker colours, symbols, reminders, and custom ordering
+- JSON export and import of complete trackers and reading history
 
 ## Requirements
 
@@ -31,6 +32,8 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 The app can be used entirely with manual trackers. Starling credentials are entered at runtime under **Settings → Connected Sources**. Never hard-code or commit personal access tokens.
 
 CloudKit, App Groups, signing identities, and bundle identifiers are tied to the original developer account. Forks must configure their own Apple Developer identifiers and capabilities before CloudKit or device builds work.
+
+Tracker backups and transfers are available under **Settings → Export & Import**. Exports contain tracker configuration and reading history, but never connected-source credentials. During import, external trackers can be reassigned to an existing source of the same type or imported read-only until a source is connected from Edit Tracker.
 
 ## TestFlight deployment
 
