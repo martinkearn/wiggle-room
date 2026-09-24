@@ -75,14 +75,14 @@ enum WiggleRoomFont {
         fraunces(size: size, weight: weight, opticalSize: size * 1.6, wonky: 1)
     }
 
-    /// The status word above the rings ("Under Budget", "Needs Attention")
+    /// The status word above the rings ("Below Budget", "Behind Target")
     /// — bold, wonky, a little louder than a normal headline.
     static func statusWord(_ size: CGFloat) -> Font {
         fraunces(size: size, weight: 850, opticalSize: size * 1.4, wonky: 1)
     }
 
     /// The small serif label that names a card or figure ("Current
-    /// Balance", "Current Budget") — Fraunces names things; Nunito carries
+    /// Balance", "Budget today") — Fraunces names things; Nunito carries
     /// the figures and captions beneath it.
     static var cardLabel: Font {
         fraunces(size: 13, weight: 600, opticalSize: 24, wonky: 1, soft: 70)
