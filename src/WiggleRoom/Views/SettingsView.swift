@@ -36,6 +36,11 @@ struct SettingsView: View {
                     SettingsLabel(title: "Tracker Order", symbol: "arrow.up.arrow.down", colorIndex: 1)
                 }
                 NavigationLink {
+                    TrackerTransferView()
+                } label: {
+                    SettingsLabel(title: "Export & Import", symbol: "arrow.up.arrow.down.square", colorIndex: 2)
+                }
+                NavigationLink {
                     SiriPhrasesView()
                 } label: {
                     SettingsLabel(title: "Siri Phrases", symbol: "waveform", colorIndex: 4)

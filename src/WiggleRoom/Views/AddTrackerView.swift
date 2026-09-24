@@ -43,8 +43,8 @@ struct AddTrackerView: View {
     @Environment(\.dismiss) private var dismiss
 
     /// When set, the form edits this tracker in place instead of creating a
-    /// new one. Its source can't be changed here — only the details,
-    /// period, and budget.
+    /// new one. Existing connections are fixed, while a read-only imported
+    /// tracker with no source can be connected here.
     var existingTracker: Tracker?
 
     /// Called after the user confirms deleting `existingTracker`, right
@@ -219,7 +219,7 @@ struct AddTrackerView: View {
                         .font(WiggleRoomFont.headline(15, weight: 650))
                 }
 
-                if existingTracker == nil {
+                if existingTracker == nil || existingTracker?.connectedSource == nil {
                     Section {
                         Picker("Source", selection: $sourceSelection) {
                             Text("Manual Entry").tag(SourceOption.source(store.manualEntrySource.id) as SourceOption?)
@@ -237,12 +237,12 @@ struct AddTrackerView: View {
                         }
                     }
 
-                    if !isManualEntrySelected {
+                    if selectedSourceId != nil && !isManualEntrySelected {
                         targetPickerSection
                     }
                 } else {
                     Section {
-                        LabeledContent("Source", value: existingTracker?.connectedSource?.displayName ?? "Manual Entry")
+                        LabeledContent("Source", value: existingTracker?.connectedSource?.displayName ?? "Not Connected")
                         if existingTracker?.isManualEntry == false {
                             if isResolvingAccountName {
                                 LabeledContent("Account") {
@@ -253,7 +253,7 @@ struct AddTrackerView: View {
                             }
                         }
                     } footer: {
-                        Text("Source and account are fixed once a tracker is created.")
+                        Text("A connected source and account are fixed once selected.")
                     }
                 }
 
@@ -334,7 +334,7 @@ struct AddTrackerView: View {
                     // "3,000" and would silently truncate it to "3".
                     startingValueText = existingTracker.startingValue.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
                     totalAllowanceText = existingTracker.totalAllowance.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
-                    sourceSelection = .source(existingTracker.connectedSource?.id ?? store.manualEntrySource.id)
+                    sourceSelection = existingTracker.connectedSource.map { .source($0.id) }
                     reminderCadenceMinutes = existingTracker.reminderCadenceMinutes
                     colorIndex = existingTracker.resolvedColorIndex
                     glyph = existingTracker.glyph
@@ -412,10 +412,10 @@ struct AddTrackerView: View {
         selectedTargetId = nil
         availableTargets = []
         targetLoadErrorMessage = nil
-        // Editing an existing tracker never shows `targetPickerSection` (its
-        // source can't change) — skip the network call entirely rather than
-        // spending a Starling request on nothing.
-        guard existingTracker == nil, !isManualEntrySelected,
+        // A connected existing tracker's source can't change. A read-only
+        // imported tracker has no source and deliberately uses this same
+        // picker to become connected.
+        guard existingTracker?.connectedSource == nil, !isManualEntrySelected,
               let selectedSourceId, let source = resolveSource(withId: selectedSourceId)
         else {
             return
@@ -559,7 +559,7 @@ struct AddTrackerView: View {
     /// existing manual tracker being edited, or Manual Entry currently
     /// selected while creating a new one.
     private var isManualEntrySelected: Bool {
-        if let existingTracker {
+        if let existingTracker, existingTracker.connectedSource != nil {
             return existingTracker.isManualEntry
         }
         return selectedSourceId == store.manualEntrySource.id
@@ -681,7 +681,7 @@ struct AddTrackerView: View {
             // tracker's source/account can't be changed after creation.
             // Requiring it unconditionally left Save permanently disabled
             // for every existing non-manual tracker.
-            && (existingTracker != nil || isManualEntrySelected || selectedTargetId != nil)
+            && (existingTracker?.connectedSource != nil || isManualEntrySelected || selectedTargetId != nil)
     }
 
     private func save() {
@@ -728,7 +728,21 @@ struct AddTrackerView: View {
             existingTracker.startingValue = startingValue
             existingTracker.totalAllowance = totalAllowance
             existingTracker.reminderCadenceMinutes = reminderCadenceMinutes
+            var newlyConnectedToExternalSource = false
+            if existingTracker.connectedSource == nil,
+               let selectedSourceId,
+               let source = resolveSource(withId: selectedSourceId) {
+                existingTracker.connectedSource = source
+                existingTracker.sourceTargetId = source.providerId == store.manualProvider.providerId
+                    ? existingTracker.id.uuidString
+                    : selectedTargetId
+                newlyConnectedToExternalSource = source.providerId != store.manualProvider.providerId
+            }
             store.saveChanges(reminderTracker: existingTracker)
+            if newlyConnectedToExternalSource {
+                let store = store
+                Task { _ = try? await store.refreshFromSource(existingTracker, force: true) }
+            }
             dismiss()
             return
         }
