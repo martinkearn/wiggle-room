@@ -6,8 +6,9 @@
 import SwiftUI
 
 /// "Update current value" (§5.5): the user enters a value and a timestamp
-/// for a manual tracker. This is how `actualValue` (§4.2) gets set for any
-/// manual tracker — there is no automatic refresh. Also doubles as the
+/// for a tracker. This is how `actualValue` (§4.2) gets set for a manual
+/// tracker, and it can supplement updates fetched from a connected source.
+/// Also doubles as the
 /// **edit** screen for a previously-logged reading: pass `existingReading:`
 /// and it prefills the form and mutates that reading in place on save,
 /// with a Delete action alongside it.
