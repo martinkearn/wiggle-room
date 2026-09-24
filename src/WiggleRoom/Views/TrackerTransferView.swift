@@ -17,24 +17,7 @@ struct TrackerTransferView: View {
     @State private var message: TransferMessage?
 
     var body: some View {
-        #if os(macOS)
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Export & Import")
-                .font(WiggleRoomFont.headline(22, weight: 650))
-            transferControls
-            Spacer()
-        }
-        #else
-        List {
-            Section {
-                transferControls
-            } footer: {
-                Text("Exports include every tracker setting and reading. Connected-source credentials are never included.")
-            }
-        }
-        .navigationTitle("Export & Import")
-        .inlineNavigationBarIfAvailable()
-        #endif
+        platformContent
         .fileExporter(
             isPresented: $isExporting,
             document: exportDocument,
@@ -59,6 +42,28 @@ struct TrackerTransferView: View {
                 dismissButton: .default(Text("OK"))
             )
         }
+    }
+
+    @ViewBuilder
+    private var platformContent: some View {
+        #if os(macOS)
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Export & Import")
+                .font(WiggleRoomFont.headline(22, weight: 650))
+            transferControls
+            Spacer()
+        }
+        #else
+        List {
+            Section {
+                transferControls
+            } footer: {
+                Text("Exports include every tracker setting and reading. Connected-source credentials are never included.")
+            }
+        }
+        .navigationTitle("Export & Import")
+        .inlineNavigationBarIfAvailable()
+        #endif
     }
 
     @ViewBuilder
@@ -185,7 +190,7 @@ struct TrackerTransferView: View {
 
     private func performImport(_ archive: TrackerArchive) {
         let mappings = Dictionary(
-            uniqueKeysWithValues: archive.externalSources.compactMap { archivedSource in
+            uniqueKeysWithValues: archive.externalSources.compactMap { archivedSource -> (UUID, ConnectedSource)? in
                 guard let choice = sourceChoices[archivedSource.id],
                       let sourceId = UUID(uuidString: choice),
                       let source = connectedSources.first(where: { $0.id == sourceId })
