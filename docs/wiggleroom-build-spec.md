@@ -74,7 +74,7 @@ The difference between expected and actual consumption determines whether the tr
 
 ### Manual Entry
 
-Manual trackers accept readings entered by the user. The internal Manual Entry `ConnectedSource` is plumbing rather than an external connection. Duplicate manual records are consolidated automatically without deleting trackers.
+Every tracker accepts manual readings from Balance History, including trackers connected to an external source. Any reading can be edited or deleted there regardless of how it was created. Manual trackers additionally retain their pull-to-update entry gesture. The internal Manual Entry `ConnectedSource` is plumbing rather than an external connection. Duplicate manual records are consolidated automatically without deleting trackers.
 
 ### Starling
 

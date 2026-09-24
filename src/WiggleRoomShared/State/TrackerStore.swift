@@ -220,8 +220,7 @@ final class TrackerStore {
         #endif
     }
 
-    /// Removes a single previously-logged reading (manual trackers only —
-    /// see `Tracker.isManualEntry`).
+    /// Removes a single previously logged or provider-fetched reading.
     func deleteReading(_ reading: ValueSnapshot) {
         modelContext.delete(reading)
         try? modelContext.save()
