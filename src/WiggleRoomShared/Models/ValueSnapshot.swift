@@ -17,7 +17,8 @@ final class ValueSnapshot {
     var date: Date = Date.now
     var tracker: Tracker?
 
-    init(value: Decimal, date: Date) {
+    init(id: UUID = UUID(), value: Decimal, date: Date) {
+        self.id = id
         self.value = value
         self.date = date
     }
