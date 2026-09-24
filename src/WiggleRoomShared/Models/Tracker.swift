@@ -200,10 +200,8 @@ extension Tracker {
     /// Which side of the pace line is the good side.
     var higherIsBetter: Bool { trackerType.higherIsBetter }
 
-    /// Whether this tracker is manually logged (as opposed to a real
-    /// auto-fetching connection) — the only source type that supports
-    /// hand-editing/deleting individual readings, since a real provider's
-    /// history should reflect what it actually reported.
+    /// Whether this tracker uses manual entry rather than an auto-fetching
+    /// connection. All tracker types still support manual history changes.
     var isManualEntry: Bool {
         connectedSource?.providerId == "manual"
     }

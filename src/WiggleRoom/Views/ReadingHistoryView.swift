@@ -7,16 +7,20 @@ import SwiftUI
 import SwiftData
 
 /// Lists every reading logged for a tracker (§4.6 — full history, not just
-/// the latest value), newest first. For a manual tracker, rows are
-/// tap-to-edit (via `LogReadingView`'s edit mode) and swipe/context-menu to
-/// delete; for a real auto-fetch source (Starling), the same list is
-/// read-only — a provider's history should reflect what it actually
-/// reported, not something the user hand-edits.
+/// the latest value), newest first. Every tracker supports adding manual
+/// updates and editing or deleting existing updates, including values fetched
+/// from a connected source.
 struct ReadingHistoryView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     let tracker: Tracker
 
+    /// "Balance History" / "Mileage History" / "Weight History" — the same
+    /// noun the dashboard's own figure card and the menu item that opens
+    /// this sheet use, so all three read as the one thing.
+    private var historyTitle: String { "\(tracker.terminology.currentFigure) History" }
+
+    @State private var isPresentingNewReading = false
     @State private var editingReading: ValueSnapshot?
 
     private var readingsNewestFirst: [ValueSnapshot] {
@@ -43,17 +47,15 @@ struct ReadingHistoryView: View {
                         // usual Delete-key path, so a per-row context menu is
                         // the affordance instead.
                         .contextMenu {
-                            if tracker.isManualEntry {
-                                Button(role: .destructive) {
-                                    store.deleteReading(reading)
-                                } label: {
-                                    Label("Delete Update", systemImage: "trash")
-                                }
+                            Button(role: .destructive) {
+                                store.deleteReading(reading)
+                            } label: {
+                                Label("Delete Update", systemImage: "trash")
                             }
                         }
                         #endif
                     }
-                    .onDelete(perform: deleteAction)
+                    .onDelete(perform: deleteReadings)
                 }
                 .listStyle(.plain)
                 #if os(macOS)
@@ -71,8 +73,8 @@ struct ReadingHistoryView: View {
         // with no size hint at all can size a sheet down to something that
         // renders its content invisibly small rather than visibly empty.
         .frame(minWidth: 360, minHeight: 320)
-        .navigationTitle("Balance History")
-        .leadingSheetTitle("Balance History")
+        .navigationTitle(historyTitle)
+        .leadingSheetTitle(historyTitle)
         .inlineNavigationBarIfAvailable()
         .toolbar {
             // This sheet's only other dismissal was swipe-down — not
@@ -84,31 +86,31 @@ struct ReadingHistoryView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { dismiss() }
             }
-            #if !os(macOS)
-            if tracker.isManualEntry && !readingsNewestFirst.isEmpty {
-                ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    isPresentingNewReading = true
+                } label: {
+                    Label("Add Manual Update", systemImage: "plus")
+                }
+                #if !os(macOS)
+                if !readingsNewestFirst.isEmpty {
                     EditButton()
                 }
+                #endif
             }
-            #endif
+        }
+        .sheet(isPresented: $isPresentingNewReading) {
+            LogReadingView(tracker: tracker)
         }
         .sheet(item: $editingReading) { reading in
             LogReadingView(tracker: tracker, existingReading: reading)
         }
     }
 
-    /// A manual tracker's row is tap-to-edit; a real auto-fetch source's
-    /// reading is read-only (its provider is the source of truth for what
-    /// it reported), so the row is plain text with no tap affordance.
-    @ViewBuilder
     private func row(for reading: ValueSnapshot) -> some View {
-        if tracker.isManualEntry {
-            Button {
-                editingReading = reading
-            } label: {
-                rowContent(for: reading)
-            }
-        } else {
+        Button {
+            editingReading = reading
+        } label: {
             rowContent(for: reading)
         }
     }
@@ -127,20 +129,10 @@ struct ReadingHistoryView: View {
         }
     }
 
-    /// `nil` for a real auto-fetch source — no swipe-to-delete affordance at
-    /// all. Broken out as its own explicitly-typed property (rather than an
-    /// inline ternary at the `.onDelete(perform:)` call site) since a
-    /// ternary mixing a function reference and `nil` there is a known
-    /// trigger for a Swift type-checker crash ("Failed to produce
-    /// diagnostic for expression").
-    private var deleteAction: ((IndexSet) -> Void)? {
-        guard tracker.isManualEntry else { return nil }
-        return deleteReadings
-    }
-
     private func deleteReadings(at offsets: IndexSet) {
-        for index in offsets {
-            store.deleteReading(readingsNewestFirst[index])
+        let readingsToDelete = offsets.map { readingsNewestFirst[$0] }
+        for reading in readingsToDelete {
+            store.deleteReading(reading)
         }
     }
 }

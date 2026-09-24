@@ -113,6 +113,36 @@ final class TrackerStoreTests: XCTestCase {
         XCTAssertEqual(tracker.latestReading?.value, 80)
     }
 
+    func testConnectedTracker_manualReadingCanBeAddedEditedAndDeleted() throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        let source = ConnectedSource(providerId: "starling", displayName: "Fictional Bank")
+        context.insert(source)
+        let store = TrackerStore(modelContext: context)
+        let tracker = Tracker(
+            name: "Test",
+            type: .spendingMoney,
+            connectedSource: source,
+            sourceTargetId: "synthetic-account",
+            startDate: Date(),
+            endDate: Date().addingTimeInterval(3600),
+            startingValue: 100,
+            totalAllowance: 100
+        )
+        store.addTracker(tracker)
+
+        store.logReading(value: 80, date: Date(), for: tracker)
+        let reading = try XCTUnwrap(tracker.latestReading)
+        reading.value = 75
+        store.saveChanges()
+
+        XCTAssertEqual(tracker.latestReading?.value, 75)
+
+        store.deleteReading(reading)
+
+        XCTAssertTrue(try context.fetch(FetchDescriptor<ValueSnapshot>()).isEmpty)
+    }
+
     func testManualEntrySource_usesManualProviderIdAndIsStableAcrossInstances() {
         let container = makeInMemoryModelContainer()
         let context = container.mainContext

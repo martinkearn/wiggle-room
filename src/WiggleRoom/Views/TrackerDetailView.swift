@@ -261,12 +261,10 @@ struct TrackerDetailView: View {
                     } label: {
                         Label("Edit Tracker", systemImage: "pencil")
                     }
-                    if !tracker.sortedReadings.isEmpty {
-                        Button {
-                            isPresentingReadingHistory = true
-                        } label: {
-                            Label("\(tracker.terminology.currentFigure) History", systemImage: "clock")
-                        }
+                    Button {
+                        isPresentingReadingHistory = true
+                    } label: {
+                        Label("\(tracker.terminology.currentFigure) History", systemImage: "clock")
                     }
                 } label: {
                     Label("More", systemImage: "ellipsis.circle")
