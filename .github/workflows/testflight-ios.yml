@@ -168,17 +168,8 @@ jobs:
           # github.event.head_commit, which is null for workflow_dispatch.
           NOTES_DIRECTORY="$RUNNER_TEMP/WiggleRoom-iOS.xcarchive/TestFlight"
           mkdir -p "$NOTES_DIRECTORY"
-          {
-            git log -1 --pretty=%B
-            printf 'Commit %s on %s\n' "$(git rev-parse --short HEAD)" "$GITHUB_REF_NAME"
-            printf 'Pipeline run #%s\n' "$GITHUB_RUN_NUMBER"
-            printf '%s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
-          } > "$RUNNER_TEMP/what-to-test.txt"
-          # The field caps at 4000 characters. Truncate on a character
-          # boundary — cutting bytes could split a multi-byte character and
-          # leave invalid UTF-8 in the upload.
-          python3 -c 'import pathlib, sys; source, destination = sys.argv[1:3]; pathlib.Path(destination).write_text(pathlib.Path(source).read_text()[:4000])' \
-            "$RUNNER_TEMP/what-to-test.txt" "$NOTES_DIRECTORY/WhatToTest.en-US.txt"
+          git log -1 --pretty=%B \
+            | python3 .github/scripts/write-test-notes.py "$NOTES_DIRECTORY/WhatToTest.en-US.txt"
           # Echoed so a failed pickup can be told apart from a bad file.
           echo "What to Test:"
           cat "$NOTES_DIRECTORY/WhatToTest.en-US.txt"
