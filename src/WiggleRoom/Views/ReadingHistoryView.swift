@@ -15,6 +15,11 @@ struct ReadingHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     let tracker: Tracker
 
+    /// "Balance History" / "Mileage History" / "Weight History" — the same
+    /// noun the dashboard's own figure card and the menu item that opens
+    /// this sheet use, so all three read as the one thing.
+    private var historyTitle: String { "\(tracker.terminology.currentFigure) History" }
+
     @State private var isPresentingNewReading = false
     @State private var editingReading: ValueSnapshot?
 
@@ -68,8 +73,8 @@ struct ReadingHistoryView: View {
         // with no size hint at all can size a sheet down to something that
         // renders its content invisibly small rather than visibly empty.
         .frame(minWidth: 360, minHeight: 320)
-        .navigationTitle("Balance History")
-        .leadingSheetTitle("Balance History")
+        .navigationTitle(historyTitle)
+        .leadingSheetTitle(historyTitle)
         .inlineNavigationBarIfAvailable()
         .toolbar {
             // This sheet's only other dismissal was swipe-down — not

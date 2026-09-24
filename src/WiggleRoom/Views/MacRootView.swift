@@ -29,7 +29,7 @@ struct MacRootView: View {
                     WiggleEmptyState(
                         symbol: "plus",
                         title: "No Trackers Yet",
-                        message: "Add a tracker to see how you're pacing against a budget.",
+                        message: "Add a tracker to see how you're pacing against its target.",
                         actionTitle: "Add a Tracker",
                         action: { isPresentingAddTracker = true }
                     )

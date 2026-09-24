@@ -65,6 +65,8 @@ final class StarlingProvider: SourceProvider {
     nonisolated let providerId = "starling"
     nonisolated let displayName = "Starling"
     nonisolated let requiresConnection = true
+    /// A bank balance backs a money tracker and nothing else.
+    nonisolated let supportedTrackerTypes: Set<TrackerType> = [.spendingMoney, .savingMoney]
 
     /// Shared by every `StarlingProvider` instance created with the default
     /// argument, so the daily request count is tracked app-wide rather than

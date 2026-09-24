@@ -30,8 +30,8 @@ A `Tracker` represents one allowance over a date range.
 |---|---|
 | `id` | Stable UUID |
 | `name` | User-facing name |
-| `unit` | Currency or measurement unit |
-| `direction` | Increasing or decreasing |
+| `typeRawValue` | Tracker type, stored as a plain string |
+| `unit` | Measurement unit, constrained to those the type permits |
 | `startDate`, `endDate` | Tracking period |
 | `startingValue` | Value at the beginning of the period |
 | `totalAllowance` | Planned movement over the period |
@@ -40,6 +40,39 @@ A `Tracker` represents one allowance over a date range.
 | `sortOrder` | Synced custom ordering |
 | `colorIndex`, `glyph` | Visual identity |
 | `reminderCadenceMinutes` | Optional manual-entry reminder |
+
+### Tracker types
+
+Every tracker is one of four types, chosen at creation and locked thereafter. The type sets the permitted units, the direction, the polarity, all user-facing wording, the default glyph and reminder, and which sources may back it.
+
+Direction and polarity are independent axes, and the four types are their 2×2. Direction is which way the value travels; polarity is which side of the pace line is the good side.
+
+| Type | Direction | Good side | Orientation | Units |
+|---|---|---|---|---|
+| Spending Money | Decreasing | Higher | Allowance | £, $, € |
+| Saving Money | Increasing | Higher | Goal | £, $, € |
+| Mileage | Increasing | Lower | Allowance | mi, km |
+| Weight loss | Decreasing | Lower | Goal | kg, lb |
+
+Orientation decides how the whole-period figure is entered. An allowance type is entered as a movement ("a £500 budget"); a goal type is entered as an end value ("£5,000", "85 kg"). Storage is uniform: a goal type's `totalAllowance` is the distance from `startingValue` to the stated goal, recomputed if the starting value is later edited so the goal itself cannot drift.
+
+`TrackerType` owns a terminology table covering every type-dependent phrase — the current figure, today's pace figure, the whole-period figure, the final figure, the three status labels, the remaining-amount caption, and the completion celebration. Each type needs a whole-period noun and a today noun, because the dashboard shows both figures side by side.
+
+`typeRawValue` is a plain `String` with a default rather than an enum attribute, and is read through an accessor that falls back to a known type. A newer build writing an unrecognised value must not fault an older device that syncs the record.
+
+### Units
+
+Precision and the amber floor belong to the unit, not the type: kg and lb differ within Weight loss, while the currencies are shared by both money types.
+
+| Unit | Placement | Precision | Amber floor |
+|---|---|---|---|
+| £ $ € | Prefix, no space | 2 dp | 0.02 |
+| mi | Suffix, space | 0 dp | 2 |
+| km | Suffix, space | 0 dp | 2 |
+| kg | Suffix, space | 1 dp | 1.0 |
+| lb | Suffix, space | 0 dp | 2 |
+
+A whole value drops its decimals entirely, so values read as `£684`, `£692.40`, `8,400 mi`, `85 kg`, `84.6 kg`. A zero-precision unit rounds typed input up to a whole number, with the rounding stated inline on the log screen.
 
 Each reading is a separate timestamped `ValueSnapshot`. Reading history is append-oriented so CloudKit can merge updates made on different devices.
 
@@ -66,11 +99,28 @@ For an increasing tracker:
 actualConsumption = currentValue - startingValue
 ```
 
-The difference between expected and actual consumption determines whether the tracker is on budget, slightly over, or over budget. Values are clamped where needed for presentation, but stored readings remain unchanged.
+Consumption alone cannot say whether a tracker is doing well, because consumption is the point for a goal type: saving faster than planned, or losing weight faster than planned, is the good case. Status is therefore decided by a polarity-aware figure:
+
+```text
+goodness = higherIsBetter ? (currentValue - targetValueToday)
+                          : (targetValueToday - currentValue)
+```
+
+`goodness >= 0` is on or ahead of pace. For a decreasing "higher is better" tracker this reduces algebraically to `expectedConsumption - actualConsumption`, so Spending Money behaves exactly as before. Direction is still used for ring fill, consumption, and the chart's reference line.
+
+The traffic light is green at or ahead of pace, amber within the early-warning band behind it, and red beyond that:
+
+```text
+amberBand = max(0.05 × totalAllowance, unit.amberFloor)
+```
+
+There is no grace zone before green turns amber: any shortfall means the actual figure has already slipped past the target figure printed beside it. The per-unit floor matters only for weight, where day-to-day variation of about ±1 kg from water, food in transit and sodium would otherwise push a user who is exactly on pace into red. Guidance about weighing weekly lives in the reminder default rather than in the thresholds.
+
+Values are clamped where needed for presentation, but stored readings remain unchanged.
 
 ## 4. Sources
 
-`SourceProvider` isolates provider-specific behavior from tracker calculations and UI.
+`SourceProvider` isolates provider-specific behavior from tracker calculations and UI. Each provider declares the tracker types it can back, so the relationship lives with the provider rather than being hard-coded per type: Starling supplies the two money types, Manual Entry suits all four, and a future vehicle or health source would declare its own. Add Tracker filters its source list through that declaration once a type is chosen.
 
 ### Manual Entry
 
@@ -129,9 +179,10 @@ The interface should feel calm and informative rather than punitive.
 
 - The outer ring represents elapsed time.
 - The inner ring represents consumed allowance.
-- Green indicates on-budget or better.
-- Amber indicates a small shortfall.
+- Green indicates on pace or better, whichever side of the pace line the tracker's type treats as good.
+- Amber indicates a small shortfall, never narrower than the unit's own floor.
 - Red indicates a larger shortfall.
+- Status wording comes from the tracker type's terminology table, so no surface can drift from another.
 - Tracker identity colours do not replace status colours.
 - Fraunces is used for names and headings; Nunito is the primary text face.
 - Numeric values remain the source of truth and accompany visual indicators.

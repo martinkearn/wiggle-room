@@ -8,6 +8,10 @@ import SwiftData
 
 /// Whether a tracker's value depletes from a starting value (e.g. a bank
 /// balance) or accumulates upward from a baseline (e.g. odometer mileage).
+///
+/// Derived from `TrackerType` rather than chosen independently — direction
+/// alone can't say which side of the pace line is the good side. See
+/// `TrackerType.higherIsBetter`.
 enum TrackerDirection: String, Codable, Hashable {
     case decreasing
     case increasing
@@ -24,13 +28,35 @@ enum TrackerDirection: String, Codable, Hashable {
 final class Tracker {
     var id: UUID = UUID()
     var name: String = ""
+
+    /// This tracker's unit symbol, always one of `TrackerUnit`'s raw values.
+    /// Read it through `trackerUnit`, which falls back to the type's default
+    /// rather than trusting the stored string.
     var unit: String = ""
-    var direction: TrackerDirection = TrackerDirection.decreasing
+
+    /// What this tracker tracks, stored as a plain `String` rather than a
+    /// `RawRepresentable` enum property deliberately. More types are
+    /// expected, and a newer device writing a raw value this build has never
+    /// heard of must not fault an older device that syncs the record — an
+    /// enum-typed SwiftData attribute would. Read it through `trackerType`,
+    /// which falls back gracefully.
+    ///
+    /// Chosen at creation and fixed thereafter: it sets the units, the
+    /// direction, which side of the pace line is good, all the wording, and
+    /// which sources can back the tracker, so changing it later would
+    /// reinterpret every reading already logged.
+    var typeRawValue: String = TrackerType.spendingMoney.rawValue
+
     var connectedSource: ConnectedSource?
     var sourceTargetId: String?
     var startDate: Date = Date.now
     var endDate: Date = Date.now
     var startingValue: Decimal = 0
+
+    /// The canonical whole-period movement, whichever way the type frames it
+    /// to the user: the budget/allowance itself for an allowance type, or the
+    /// distance from `startingValue` to the stated goal for a goal type. See
+    /// `TrackerType.totalAllowance(startingValue:targetValue:)`.
     var totalAllowance: Decimal = 0
 
     /// A lightweight local-notification reminder to log a new reading, on a
@@ -78,7 +104,7 @@ final class Tracker {
     var colorIndex: Int = -1
 
     /// SF Symbol name for this tracker's badge; empty means the default for
-    /// its unit (see `glyphSymbol`).
+    /// its type (see `glyphSymbol`).
     var glyph: String = ""
 
     /// Every reading ever logged for this tracker (§4.6 — timestamped
@@ -91,8 +117,8 @@ final class Tracker {
     init(
         id: UUID = UUID(),
         name: String,
-        unit: String,
-        direction: TrackerDirection,
+        type: TrackerType,
+        unit: TrackerUnit? = nil,
         connectedSource: ConnectedSource?,
         sourceTargetId: String? = nil,
         startDate: Date,
@@ -103,8 +129,8 @@ final class Tracker {
     ) {
         self.id = id
         self.name = name
-        self.unit = unit
-        self.direction = direction
+        self.typeRawValue = type.rawValue
+        self.unit = (unit ?? type.defaultUnit).symbol
         self.connectedSource = connectedSource
         self.sourceTargetId = sourceTargetId
         self.startDate = startDate
@@ -149,21 +175,30 @@ extension Tracker {
 }
 
 extension Tracker {
-    /// Units that read as currency (symbol prefixed directly onto the
-    /// number, e.g. "£1,234.56") rather than a suffix unit (e.g.
-    /// "1,234 miles"). Anything not in this list is treated as a suffix
-    /// unit.
-    private static let currencySymbols: Set<String> = [
-        "£", "$", "€", "¥", "₹", "₩", "₽", "₺", "₪", "R$", "kr", "Fr"
-    ]
-
-    var isCurrencyUnit: Bool {
-        Tracker.isCurrencyUnit(unit)
+    /// What this tracker tracks, resolved from `typeRawValue` with a
+    /// graceful fallback for a value written by a newer build.
+    var trackerType: TrackerType {
+        get { TrackerType(rawValue: typeRawValue) ?? .fallback }
+        set { typeRawValue = newValue.rawValue }
     }
 
-    static func isCurrencyUnit(_ unit: String) -> Bool {
-        currencySymbols.contains(unit)
+    /// This tracker's unit, resolved from `unit` with a fallback to the
+    /// type's default for anything unrecognised.
+    var trackerUnit: TrackerUnit {
+        get { TrackerUnit(rawValue: unit) ?? trackerType.defaultUnit }
+        set { unit = newValue.symbol }
     }
+
+    /// Every piece of type-dependent wording — see `TrackerTerminology`.
+    var terminology: TrackerTerminology { trackerType.terminology }
+
+    /// Which way the value travels over the period. Still used for ring
+    /// fill, `consumedSoFar`, and the chart's reference line; no longer a
+    /// thing the user picks.
+    var direction: TrackerDirection { trackerType.direction }
+
+    /// Which side of the pace line is the good side.
+    var higherIsBetter: Bool { trackerType.higherIsBetter }
 
     /// Whether this tracker uses manual entry rather than an auto-fetching
     /// connection. All tracker types still support manual history changes.
@@ -171,46 +206,25 @@ extension Tracker {
         connectedSource?.providerId == "manual"
     }
 
-    /// A decreasing tracker denominated in currency reads naturally as a
-    /// budget ("under/over budget"), which draws a much clearer good/bad
-    /// line for money than generic on-track language does. Every other
-    /// tracker shape (increasing, or non-currency units like mileage) keeps
-    /// the neutral wording instead.
-    var usesBudgetLanguage: Bool {
-        direction == .decreasing && isCurrencyUnit
-    }
-
-    /// "Current Balance" reads naturally for a currency tracker (it's a
-    /// bank balance, a budget remaining); plain "Current" stays for
-    /// everything else (mileage, etc.), where "balance" wouldn't make
-    /// sense. Shared by the dashboard's figure card and the ring legend so
-    /// they always say exactly the same thing about the same ring.
-    var currentValueLabel: String {
-        isCurrencyUnit ? "Current Balance" : "Current"
-    }
-
     /// Formats a value in this tracker's unit, placing a currency symbol on
-    /// the left with no space (e.g. "£1,234.56") or any other unit on the
-    /// right with a space (e.g. "1,234 miles"). `signed` prefixes a "+" for
-    /// non-negative values (negative values always show their own "-"). For
-    /// a currency unit, a whole number shows no decimal places ("£684") and
-    /// anything with a fractional part always shows exactly 2 ("£692.40",
-    /// never "£692.4"). A non-currency unit (mileage and the like) never
-    /// shows decimal places at all — a fraction of a mile isn't a
-    /// meaningful reading, so it's rounded to the nearest whole number
-    /// rather than surfacing precision nobody logged on purpose.
+    /// the left with no space ("£1,234.56") or any other unit on the right
+    /// with a space ("8,400 mi"). `signed` prefixes a "+" for non-negative
+    /// values (negative values always show their own "-"). A whole value
+    /// drops its decimals entirely ("£684", "85 kg"); anything with a
+    /// fractional part shows exactly the unit's own precision ("£692.40",
+    /// "84.6 kg") — and for a zero-precision unit that means no decimals at
+    /// all, since a fraction of a mile isn't a meaningful reading.
     func formattedValue(_ value: Decimal, signed: Bool = false) -> String {
-        Tracker.formattedValue(value, unit: unit, signed: signed)
+        Tracker.formattedValue(value, unit: trackerUnit, signed: signed)
     }
 
-    /// Unit-string version of `formattedValue(_:signed:)`, usable before a
+    /// Unit-only version of `formattedValue(_:signed:)`, usable before a
     /// `Tracker` exists yet — e.g. while a user is still filling in the "New
     /// Tracker" form.
-    static func formattedValue(_ value: Decimal, unit: String, signed: Bool = false) -> String {
+    static func formattedValue(_ value: Decimal, unit: TrackerUnit, signed: Bool = false) -> String {
         let absoluteValue = abs(value)
-        let showsDecimals = isCurrencyUnit(unit)
         let isWhole = (absoluteValue as NSDecimalNumber).doubleValue.truncatingRemainder(dividingBy: 1) == 0
-        let fractionLength = showsDecimals && !isWhole ? 2 : 0
+        let fractionLength = isWhole ? 0 : unit.precision
         let magnitude = absoluteValue.formatted(.number.precision(.fractionLength(fractionLength)))
         let sign: String
         if value < 0 {
@@ -220,33 +234,39 @@ extension Tracker {
         } else {
             sign = ""
         }
-        return isCurrencyUnit(unit) ? "\(sign)\(unit)\(magnitude)" : "\(sign)\(magnitude) \(unit)"
+        switch unit.placement {
+        case .prefix: return "\(sign)\(unit.symbol)\(magnitude)"
+        case .suffix: return "\(sign)\(magnitude) \(unit.symbol)"
+        }
     }
 }
 
 extension Tracker {
     /// How much would be left over at the end of the period given the
-    /// current starting value and total budget — only meaningful for a
-    /// decreasing (spend-down) tracker, and only worth surfacing when it's
-    /// not simply zero (i.e. starting value and budget aren't the same).
-    /// A negative result means the budget exceeds the starting value.
-    static func projectedRemainder(direction: TrackerDirection, startingValue: Decimal, totalAllowance: Decimal) -> Decimal? {
-        guard direction == .decreasing else { return nil }
+    /// current starting value and total allowance — only meaningful for a
+    /// spend-down allowance (a budget deliberately smaller than the balance
+    /// it's drawn from), and only worth surfacing when it isn't simply zero.
+    /// A negative result means the budget exceeds the starting value. A goal
+    /// type has no such leftover: its allowance is defined as the distance to
+    /// the goal, so the difference is the goal itself, not a remainder.
+    static func projectedRemainder(type: TrackerType, startingValue: Decimal, totalAllowance: Decimal) -> Decimal? {
+        guard type.orientation == .allowance, type.direction == .decreasing else { return nil }
         let remainder = startingValue - totalAllowance
         return remainder != 0 ? remainder : nil
     }
 
     var projectedRemainder: Decimal? {
-        Tracker.projectedRemainder(direction: direction, startingValue: startingValue, totalAllowance: totalAllowance)
+        Tracker.projectedRemainder(type: trackerType, startingValue: startingValue, totalAllowance: totalAllowance)
     }
 
-    /// The tracker's target balance at the very end of its period, assuming
+    /// The tracker's target value at the very end of its period, assuming
     /// the full allowance is used exactly on schedule — `startingValue`
     /// moved by `totalAllowance` in whichever direction the tracker runs.
     /// This is the same figure `pace(actualValue:asOf:)` would report as
     /// `targetValueToday` if evaluated at `endDate` itself, exposed
     /// directly since it depends only on the tracker's own configuration,
-    /// not on any particular reading or instant.
+    /// not on any particular reading or instant. For a goal type it *is* the
+    /// goal the user typed.
     var projectedFinalValue: Decimal {
         switch direction {
         case .decreasing: startingValue - totalAllowance
@@ -254,18 +274,29 @@ extension Tracker {
         }
     }
 
+    /// The whole-period figure as the user thinks of it (§6): the movement
+    /// itself for an allowance type ("a £500 budget"), the end value for a
+    /// goal type ("£5,000 in the account"). This is what Add/Edit Tracker
+    /// collects and what the dashboard prints beside
+    /// `terminology.wholePeriodFigure`.
+    var wholePeriodValue: Decimal {
+        switch trackerType.orientation {
+        case .allowance: totalAllowance
+        case .goal: projectedFinalValue
+        }
+    }
+
     /// How much would be left over at the end of the tracker's period, worded
     /// for display — `nil` exactly when `projectedRemainder` is (i.e. the
     /// "spend it all" case needs no extra explanation). Shared by the
-    /// dashboard's Current Budget card and the extra-large widget, which
-    /// mirrors that dashboard layout as closely as a widget's static
-    /// rendering allows.
+    /// dashboard's pace card and the extra-large widget, which mirrors that
+    /// dashboard layout as closely as a widget's static rendering allows.
     var remainingAtEndCaption: String? {
         guard let remainder = projectedRemainder else { return nil }
         if remainder > 0 {
             return "\(formattedValue(remainder)) left at the end"
         } else {
-            return "Budget is \(formattedValue(abs(remainder))) more than the starting value"
+            return "\(terminology.wholePeriodFigure) is \(formattedValue(abs(remainder))) more than the starting value"
         }
     }
 

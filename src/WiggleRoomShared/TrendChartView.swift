@@ -221,7 +221,7 @@ struct TrendChartView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(colors: [tracker.accentColor], label: "Budget")
+            legendItem(colors: [tracker.accentColor], label: tracker.terminology.paceNoun)
             legendItem(colors: [WiggleRoomColors.good, WiggleRoomColors.bad], label: "Actual")
             legendItem(colors: [WiggleRoomColors.brand], label: "Trend")
         }
@@ -255,8 +255,11 @@ struct TrendChartView: View {
             ).enumerated()), id: \.offset) { _, point in
                 LineMark(
                     x: .value("Date", point.date),
-                    y: .value("Budget", point.value),
-                    series: .value("Series", "Budget")
+                    // The y-value's label is what Swift Charts reads out in
+                    // its accessibility description, so it carries the type's
+                    // own noun; the series key is an internal identifier.
+                    y: .value(tracker.terminology.paceNoun, point.value),
+                    series: .value("Series", "Pace")
                 )
                 .foregroundStyle(tracker.accentColor)
                 .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))

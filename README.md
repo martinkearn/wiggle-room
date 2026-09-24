@@ -1,14 +1,14 @@
 # Wiggle Room
 
-Wiggle Room is a SwiftUI app for tracking a limited allowance against the pace needed to reach a target at the end of a fixed period. A tracker can represent a monthly budget, annual mileage allowance, or any other quantity that decreases or increases over time.
+Wiggle Room is a SwiftUI app for tracking a quantity against the pace needed to reach a target at the end of a fixed period. Every tracker is one of four types — Spending Money, Saving Money, Mileage, or Weight loss — chosen when it is created. The type sets the units, which way the number travels, which side of the pace line is the good side, and the wording used everywhere it appears.
 
 The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep a user's trackers and reading history in sync across their own devices.
 
 ## Features
 
-- Generic increasing and decreasing trackers
+- Four tracker types: Spending Money, Saving Money, Mileage, and Weight loss
 - Manual readings and optional Starling Bank balance integration
-- Pace, budget, and projected-final calculations
+- Pace, target, and projected-final calculations, with a traffic-light status that knows whether higher or lower is better
 - Reading history and trend charts
 - iOS and macOS apps, Apple Watch companion app, widgets, complications, Live Activities, Siri Shortcuts, and Spotlight integration
 - Cross-device sync through the user's private CloudKit database

@@ -265,8 +265,8 @@ struct RingsView: View {
                     .foregroundStyle(statusColor)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
-                if showsStatusLabel && (!tracker.usesBudgetLanguage || status == .warning) {
-                    Text("difference from budget")
+                if showsStatusLabel && status == .warning {
+                    Text(tracker.terminology.differenceCaption)
                         .font(.wiggleText(.caption2))
                         .foregroundStyle(.secondary)
                 }

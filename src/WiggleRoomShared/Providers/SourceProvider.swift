@@ -23,6 +23,14 @@ protocol SourceProvider: AnyObject {
     /// Starling, false for manual).
     var requiresConnection: Bool { get }
 
+    /// The tracker types this provider can actually back. Declared by the
+    /// provider rather than hard-coded per type, so adding a vehicle or
+    /// health source later is a change in one file: Starling can only
+    /// sensibly supply a money balance, a future Tesla source only mileage,
+    /// while manual entry suits every type. Add Tracker filters its source
+    /// list through this once a type is chosen.
+    var supportedTrackerTypes: Set<TrackerType> { get }
+
     /// The targets currently available within a connected instance of this
     /// provider — e.g. Starling's accounts/Spaces, or a manual source's
     /// named logs.

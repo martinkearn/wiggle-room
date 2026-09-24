@@ -21,7 +21,7 @@ import SwiftData
 /// auto-fetching connected source (Starling, Tesla), so there's exactly one
 /// gesture to learn for "bring this tracker's figures up to date" no matter
 /// where its data comes from. macOS has no pull gesture, so it keeps an
-/// explicit "Update Current Balance" button instead.
+/// explicit "Update Current <figure>" button instead.
 struct TrackerDetailView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -264,7 +264,7 @@ struct TrackerDetailView: View {
                     Button {
                         isPresentingReadingHistory = true
                     } label: {
-                        Label("Balance History", systemImage: "clock")
+                        Label("\(tracker.terminology.currentFigure) History", systemImage: "clock")
                     }
                 } label: {
                     Label("More", systemImage: "ellipsis.circle")
@@ -351,8 +351,8 @@ struct TrackerDetailView: View {
         }
     }
 
-    /// Two visually separate cards, not one shared row — Current Balance
-    /// and Current Budget are different things updated in different ways
+    /// Two visually separate cards, not one shared row — the current
+    /// figure and the pace figure are different things updated in different ways
     /// (one by logging a reading, one automatically by the clock) — but
     /// otherwise identical in shape/weight, since the update action now
     /// lives outside both of them (a pull-to-refresh gesture on iOS, an
@@ -361,12 +361,13 @@ struct TrackerDetailView: View {
     private var figuresRow: some View {
         HStack(alignment: .top, spacing: 12) {
             card(tint: pace.status.color) {
-                figureContent(title: tracker.currentValueLabel, value: pace.currentValue,
+                figureContent(title: tracker.terminology.currentFigure, value: pace.currentValue,
                               captions: [remainingInAllowanceCaption].compactMap { $0 } + sourceTimingCaptions)
             }
 
             card(tint: tracker.accentColor, variant: 1) {
-                figureContent(title: "Current Budget", value: pace.targetValueToday, captions: [totalBudgetCaption, finalBalanceCaption, estimatedFinalCaption].compactMap { $0 })
+                figureContent(title: tracker.terminology.paceFigure, value: pace.targetValueToday,
+                              captions: [wholePeriodCaption, finalFigureCaption, estimatedFinalCaption].compactMap { $0 })
             }
             // A little "just updated" flourish when a new reading lands —
             // a full turn rather than a half-flip so the card never rests
@@ -382,13 +383,13 @@ struct TrackerDetailView: View {
     }
 
     /// Final-state replacement for `figuresRow` once the tracker has
-    /// completed — "Current Budget" is a live projection that's no longer
+    /// completed — the pace figure is a live projection that's no longer
     /// meaningful, so it's replaced with the stable final figure and status
     /// instead, pinned to `endDate` (see `finalPace`).
     private var completedSummary: some View {
         card(tint: (finalPace?.status ?? .warning).color) {
             figureContent(
-                title: "Final \(tracker.currentValueLabel)",
+                title: "Final \(tracker.terminology.currentFigure)",
                 value: finalPace?.currentValue ?? tracker.startingValue,
                 captions: [finalSummaryCaption].compactMap { $0 }
             )
@@ -502,13 +503,13 @@ struct TrackerDetailView: View {
     /// A persistent affordance for the pull-to-refresh gesture — unlike a
     /// button, `.refreshable`'s own control only appears once a pull is
     /// already underway, so without this there'd be nothing on screen
-    /// hinting the gesture exists at all. Always "update current balance" —
+    /// hinting the gesture exists at all. Always "update current <figure>" —
     /// for a manual tracker it opens the log sheet, for a connected one it
     /// re-fetches the balance; either way the balance figure changes.
     /// ("Refresh" is reserved for re-evaluating the budget against the
     /// current time, which never changes the balance.)
     private var pullToUpdateHint: some View {
-        Label("Pull down to update current balance", systemImage: "arrow.down")
+        Label("Pull down to update current \(tracker.terminology.currentFigure.lowercased())", systemImage: "arrow.down")
             .font(.wiggleText(.caption2))
             .foregroundStyle(.secondary)
     }
@@ -527,7 +528,7 @@ struct TrackerDetailView: View {
             }
         } label: {
             Label(
-                "Update Current Balance",
+                "Update Current \(tracker.terminology.currentFigure)",
                 systemImage: tracker.isManualEntry ? "plus.circle.fill" : "arrow.clockwise"
             )
             .font(.wiggleText(.subheadline, weight: .semibold))
@@ -560,17 +561,22 @@ struct TrackerDetailView: View {
         pace.remainingInAllowanceCaption(for: tracker)
     }
 
-    /// The small, subtle line under Current Budget's own number — same
-    /// weight/position as Current Balance's "£X left in this budget" — but
-    /// stating the tracker's projected final target instead: where the
-    /// number above is landing right now, this is where it's designed to
-    /// land by the very end of the period.
-    private var totalBudgetCaption: String {
-        "Tracker budget \(tracker.formattedValue(tracker.totalAllowance))"
+    /// The small, subtle line under the pace card's own number — same
+    /// weight/position as the current figure's "£X left in this budget" —
+    /// stating the whole-period figure the user actually entered: the budget
+    /// or allowance for an allowance type, the goal itself for a goal type
+    /// (§6).
+    private var wholePeriodCaption: String {
+        "\(tracker.terminology.wholePeriodFigure) \(tracker.formattedValue(tracker.wholePeriodValue))"
     }
 
-    private var finalBalanceCaption: String {
-        "Final budget \(tracker.formattedValue(tracker.projectedFinalValue))"
+    /// Where the number above is designed to land by the very end of the
+    /// period. Only shown for an allowance type: for a goal type the final
+    /// figure *is* the goal, which `wholePeriodCaption` has already printed
+    /// directly above, and repeating it would just be the same line twice.
+    private var finalFigureCaption: String? {
+        guard tracker.trackerType.orientation == .allowance else { return nil }
+        return "\(tracker.terminology.finalFigure) \(tracker.formattedValue(tracker.projectedFinalValue))"
     }
 
     /// A second subtle line under Current Budget: where the trend line

@@ -21,9 +21,9 @@ struct WatchLogReadingView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 8) {
-                Text("Log \(tracker.unit)")
+                Text("Log \(tracker.trackerUnit.symbol)")
                     .font(WiggleRoomFont.headline(18, weight: 700))
-                TextField(tracker.unit, text: $valueText)
+                TextField(tracker.trackerUnit.symbol, text: $valueText)
                     .focused($isFocused)
                     .font(.wiggleNumber(size: 28, weight: .semibold))
                     .multilineTextAlignment(.center)
@@ -47,7 +47,10 @@ struct WatchLogReadingView: View {
     }
 
     private func save() {
-        guard let value = Self.parseDecimal(valueText) else { return }
+        guard let typed = Self.parseDecimal(valueText) else { return }
+        // Same rounding as the phone's log screen — a zero-precision unit
+        // stores whole numbers only. See `TrackerUnit.rounded(_:)`.
+        let value = tracker.trackerUnit.rounded(typed)
         store.logReading(value: value, date: .now, for: tracker)
         dismiss()
     }

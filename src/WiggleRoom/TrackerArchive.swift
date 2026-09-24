@@ -4,7 +4,11 @@ import UniformTypeIdentifiers
 import SwiftUI
 
 struct TrackerArchive: Codable, Identifiable {
-    static let currentVersion = 1
+    /// Bumped to 2 when tracker types replaced the free-form
+    /// `unit` + `direction` pair — a version-1 archive's `direction` can't be
+    /// mapped onto a type (decreasing alone doesn't say whether higher or
+    /// lower is the good side), so those archives are no longer importable.
+    static let currentVersion = 2
 
     let version: Int
     let exportedAt: Date
@@ -23,7 +27,10 @@ struct TrackerArchive: Codable, Identifiable {
         let id: UUID
         let name: String
         let unit: String
-        let direction: TrackerDirection
+        /// `TrackerType`'s raw value, kept as a plain string for the same
+        /// reason `Tracker.typeRawValue` is: an archive written by a newer
+        /// build must stay readable rather than failing to decode outright.
+        let type: String
         let sourceId: UUID?
         let sourceTargetId: String?
         let startDate: Date
@@ -99,7 +106,7 @@ enum TrackerArchiveService {
                     id: tracker.id,
                     name: tracker.name,
                     unit: tracker.unit,
-                    direction: tracker.direction,
+                    type: tracker.typeRawValue,
                     sourceId: tracker.connectedSource?.id,
                     sourceTargetId: tracker.sourceTargetId,
                     startDate: tracker.startDate,
@@ -206,8 +213,8 @@ enum TrackerArchiveService {
             let tracker = Tracker(
                 id: archived.id,
                 name: archived.name,
-                unit: archived.unit,
-                direction: archived.direction,
+                type: TrackerType(rawValue: archived.type) ?? .fallback,
+                unit: TrackerUnit(rawValue: archived.unit),
                 connectedSource: source,
                 sourceTargetId: archived.sourceTargetId,
                 startDate: archived.startDate,

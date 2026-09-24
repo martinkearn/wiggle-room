@@ -191,7 +191,7 @@ struct TrackerWidgetEntryView: View {
                         .foregroundStyle(p.status.color)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    Text("difference from budget")
+                    Text(tracker.terminology.differenceCaption)
                         .font(.wiggleText(.caption2))
                         .foregroundStyle(.secondary)
                 }
@@ -201,8 +201,8 @@ struct TrackerWidgetEntryView: View {
             Divider()
 
             HStack(spacing: 12) {
-                widgetFigure(title: tracker.currentValueLabel, value: tracker.formattedValue(p.currentValue), color: p.status.color)
-                widgetFigure(title: "Current Budget", value: tracker.formattedValue(p.targetValueToday), color: .primary)
+                widgetFigure(title: tracker.terminology.currentFigure, value: tracker.formattedValue(p.currentValue), color: p.status.color)
+                widgetFigure(title: tracker.terminology.paceFigure, value: tracker.formattedValue(p.targetValueToday), color: .primary)
             }
         }
         .padding()
@@ -265,7 +265,7 @@ struct TrackerWidgetEntryView: View {
 
             if isCompleted {
                 widgetFigure(
-                    title: "Final \(tracker.currentValueLabel)",
+                    title: "Final \(tracker.terminology.currentFigure)",
                     value: tracker.formattedValue(p.currentValue),
                     color: p.status.color,
                     caption: "\(p.statusLine(for: tracker)) \(p.displayDifference(for: tracker))"
@@ -273,16 +273,16 @@ struct TrackerWidgetEntryView: View {
             } else {
                 HStack(spacing: 16) {
                     widgetFigure(
-                        title: tracker.currentValueLabel,
+                        title: tracker.terminology.currentFigure,
                         value: tracker.formattedValue(p.currentValue),
                         color: p.status.color,
                         caption: p.remainingInAllowanceCaption(for: tracker)
                     )
                     widgetFigure(
-                        title: "Current Budget",
+                        title: tracker.terminology.paceFigure,
                         value: tracker.formattedValue(p.targetValueToday),
                         color: .primary,
-                        caption: "Final budget \(tracker.formattedValue(tracker.projectedFinalValue))"
+                        caption: "\(tracker.terminology.wholePeriodFigure) \(tracker.formattedValue(tracker.wholePeriodValue))"
                     )
                 }
             }

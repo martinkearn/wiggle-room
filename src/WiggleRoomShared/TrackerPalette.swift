@@ -56,6 +56,8 @@ enum TrackerPalette {
         "sterlingsign.circle.fill", "dollarsign.circle.fill", "eurosign.circle.fill", "banknote.fill", "creditcard.fill",
         // Getting around
         "car.fill", "bicycle", "bus.fill", "fuelpump.fill", "airplane",
+        // Health
+        "scalemass.fill", "figure.walk",
         // Leisure
         "figure.run", "dumbbell.fill", "gamecontroller.fill", "popcorn.fill", "beach.umbrella.fill", "cup.and.saucer.fill", "fork.knife",
         // Everyday
@@ -80,9 +82,10 @@ extension Tracker {
 
     var accentName: String { TrackerPalette.name(at: resolvedColorIndex) }
 
-    /// The SF Symbol on this tracker's badge.
+    /// The SF Symbol on this tracker's badge — the chosen one, or the
+    /// default for this tracker's type.
     var glyphSymbol: String {
         if !glyph.isEmpty { return glyph }
-        return isCurrencyUnit ? "creditcard.fill" : "gauge.with.dots.needle.33percent"
+        return trackerType.defaultGlyph
     }
 }

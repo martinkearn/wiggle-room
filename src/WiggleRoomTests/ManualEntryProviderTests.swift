@@ -24,8 +24,7 @@ final class ManualEntryProviderTests: XCTestCase {
         let tracker = Tracker(
             id: id,
             name: name,
-            unit: "£",
-            direction: .decreasing,
+            type: .spendingMoney,
             connectedSource: source,
             sourceTargetId: id.uuidString,
             startDate: Date(),

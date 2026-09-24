@@ -13,7 +13,7 @@ import Foundation
 /// just that.
 struct ViewTrackerStatusIntent: AppIntent {
     static var title: LocalizedStringResource = "Check a Tracker"
-    static var description = IntentDescription("Reports how a tracker — or all of them — is doing against its budget.")
+    static var description = IntentDescription("Reports how a tracker — or all of them — is doing against its pace.")
 
     @Parameter(title: "Tracker")
     var tracker: TrackerEntity?

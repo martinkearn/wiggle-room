@@ -260,6 +260,14 @@ final class TrackerStore {
         return try await provider.fetchCurrentValue(target: target)
     }
 
+    /// The provider behind a `ConnectedSource`, before any `Tracker` exists
+    /// to resolve one from — used by `AddTrackerView` to filter its source
+    /// list down to providers that can actually back the chosen tracker type
+    /// (§8 of the tracker-types spec).
+    func provider(for source: ConnectedSource) -> SourceProvider? {
+        resolvedProvider(for: source)
+    }
+
     private func resolvedProvider(for source: ConnectedSource) -> SourceProvider? {
         switch source.providerId {
         case manualProvider.providerId:
