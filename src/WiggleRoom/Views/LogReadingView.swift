@@ -41,7 +41,7 @@ struct LogReadingView: View {
                     valueInput
                         .listRowInsets(EdgeInsets())
                         .padding(.vertical, 12)
-                    DatePicker("Date", selection: $date)
+                    DatePicker("Date", selection: $date, in: ...Date.now)
                         .datePickerStyle(.compact)
                 } footer: {
                     Text(footerHint)
