@@ -13,6 +13,7 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 - iOS and macOS apps, Apple Watch companion app, widgets, complications, Live Activities, Siri Shortcuts, and Spotlight integration
 - Cross-device sync through the user's private CloudKit database
 - Per-tracker colours, symbols, reminders, and custom ordering
+- JSON export and import of complete trackers and reading history
 
 ## Requirements
 
@@ -32,11 +33,21 @@ The app can be used entirely with manual trackers. Starling credentials are ente
 
 CloudKit, App Groups, signing identities, and bundle identifiers are tied to the original developer account. Forks must configure their own Apple Developer identifiers and capabilities before CloudKit or device builds work.
 
+**Settings → About** identifies the running build: marketing version, the build number TestFlight shows, and the commit it was built from, including the commit subject, branch and a link to the originating workflow run. Builds made locally say so instead of offering a run link.
+
+Tracker backups and transfers are available under **Settings → Export & Import**. Exports contain tracker configuration and reading history, but never connected-source credentials. During import, external trackers can be reassigned to an existing source of the same type or imported read-only until a source is connected from Edit Tracker.
+
+## Continuous integration
+
+Pull requests targeting `main` run a build check that compiles the app for iOS and macOS in the Release configuration, unsigned. It needs no repository secrets, so it also covers pull requests raised from forks and by coding agents. Merging a branch that does not compile is what this check exists to prevent, since the distribution workflows below only run after a merge has already landed.
+
 ## TestFlight deployment
 
 Pushes to `main` start separate GitHub Actions workflows for iOS and macOS. Both workflows also support manual dispatch from the GitHub Actions interface.
 
 Every workflow attempt receives a new build number derived from the monotonic GitHub Actions workflow run number, workflow attempt, and platform. This keeps iOS and macOS archive numbers distinct, including reruns. The number is applied consistently to the app and all embedded extensions before the workflow creates a signed archive and uploads it to the existing App Store Connect record.
+
+Each archive carries the triggering commit into TestFlight's "What to Test" notes, written as `TestFlight/WhatToTest.en-US.txt` inside the archive before export, so testers can see which change the build contains. The notes hold the commit message, the short commit hash and branch, and a link to the workflow run that produced the build.
 
 The workflows require GitHub repository secrets for App Store Connect authentication and signing. For the complete list, purpose, setup, certificate export, fork configuration, rotation, and troubleshooting instructions, see the [GitHub Actions TestFlight setup guide](docs/github-actions-setup.md).
 

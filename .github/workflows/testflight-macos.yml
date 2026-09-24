@@ -191,6 +191,21 @@ jobs:
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             DEVELOPMENT_TEAM="$TEAM_ID"
 
+      - name: Write TestFlight test notes
+        run: |
+          # App Store Connect reads TestFlight/WhatToTest.<locale>.txt from
+          # inside the archive and shows it to testers as "What to Test"
+          # against this build, so a tester can see which change they are
+          # actually holding. Taken from git rather than
+          # github.event.head_commit, which is null for workflow_dispatch.
+          NOTES_DIRECTORY="$RUNNER_TEMP/WiggleRoom-macOS.xcarchive/TestFlight"
+          mkdir -p "$NOTES_DIRECTORY"
+          git log -1 --pretty=%B \
+            | python3 .github/scripts/write-test-notes.py "$NOTES_DIRECTORY/WhatToTest.en-US.txt"
+          # Echoed so a failed pickup can be told apart from a bad file.
+          echo "What to Test:"
+          cat "$NOTES_DIRECTORY/WhatToTest.en-US.txt"
+
       - name: Upload macOS archive to TestFlight
         env:
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}

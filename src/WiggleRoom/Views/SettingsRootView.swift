@@ -11,8 +11,10 @@ private enum SettingsPane: String, Hashable {
     case general
     case connectedSources
     case order
+    case transfer
     case siri
     case cloudKit
+    case about
     case dangerZone
 
     var label: String {
@@ -20,8 +22,10 @@ private enum SettingsPane: String, Hashable {
         case .general: "General"
         case .connectedSources: "Connected Sources"
         case .order: "Tracker Order"
+        case .transfer: "Export & Import"
         case .siri: "Siri Phrases"
         case .cloudKit: "CloudKit Sync"
+        case .about: "About"
         case .dangerZone: "Danger Zone"
         }
     }
@@ -31,8 +35,10 @@ private enum SettingsPane: String, Hashable {
         case .general: 2
         case .connectedSources: 3
         case .order: 1
+        case .transfer: 2
         case .siri: 4
         case .cloudKit: 5
+        case .about: 0
         case .dangerZone: 0
         }
     }
@@ -52,8 +58,10 @@ private enum SettingsPane: String, Hashable {
         case .general: "gearshape"
         case .connectedSources: "point.3.filled.connected.trianglepath.dotted"
         case .order: "arrow.up.arrow.down"
+        case .transfer: "arrow.up.arrow.down.square"
         case .siri: "waveform"
         case .cloudKit: "icloud"
+        case .about: "info.circle"
         case .dangerZone: "exclamationmark.triangle.fill"
         }
     }
@@ -76,7 +84,7 @@ struct SettingsRootView: View {
     var body: some View {
         HStack(spacing: 0) {
             List(selection: $selection) {
-                ForEach([SettingsPane.general, .connectedSources, .order, .siri, .cloudKit, .dangerZone], id: \.self) { pane in
+                ForEach([SettingsPane.general, .connectedSources, .order, .transfer, .siri, .cloudKit, .about, .dangerZone], id: \.self) { pane in
                     SettingsLabel(title: pane.label, symbol: pane.systemImage, colorIndex: pane.colorIndex, color: pane.color, size: 24)
                         .tag(pane)
                 }
@@ -105,10 +113,14 @@ struct SettingsRootView: View {
             ConnectedSourcesView()
         case .order:
             TrackerOrderView()
+        case .transfer:
+            TrackerTransferView()
         case .siri:
             SiriPhrasesView()
         case .cloudKit:
             CloudSyncDiagnosticsView()
+        case .about:
+            AboutView()
         case .dangerZone:
             DangerZoneView()
         }

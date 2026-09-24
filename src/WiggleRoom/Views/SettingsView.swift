@@ -36,6 +36,11 @@ struct SettingsView: View {
                     SettingsLabel(title: "Tracker Order", symbol: "arrow.up.arrow.down", colorIndex: 1)
                 }
                 NavigationLink {
+                    TrackerTransferView()
+                } label: {
+                    SettingsLabel(title: "Export & Import", symbol: "arrow.up.arrow.down.square", colorIndex: 2)
+                }
+                NavigationLink {
                     SiriPhrasesView()
                 } label: {
                     SettingsLabel(title: "Siri Phrases", symbol: "waveform", colorIndex: 4)
@@ -45,6 +50,11 @@ struct SettingsView: View {
                 } label: {
                     SettingsLabel(title: "CloudKit Sync", symbol: "icloud", colorIndex: 5)
                 }
+                NavigationLink {
+                    AboutView()
+                } label: {
+                    SettingsLabel(title: "About", symbol: "info.circle", colorIndex: 0)
+                }
                 // Last in the list, own red glyph — see `DangerZoneView`'s
                 // own doc comment for why it's a separate top-level menu
                 // rather than living inline here.
@@ -53,16 +63,6 @@ struct SettingsView: View {
                 } label: {
                     SettingsLabel(title: "Danger Zone", symbol: "exclamationmark.triangle.fill", color: WiggleRoomColors.bad)
                 }
-            }
-
-            Section {
-                // Confirms this device is running the exact same code
-                // as another — see `AppBuildInfo`'s own doc comment for
-                // why this is a git commit hash, not a build date/time
-                // or version number.
-                LabeledContent("Build", value: AppBuildInfo.gitCommitDescription)
-                    .font(.wiggleText(.caption))
-                    .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Settings")

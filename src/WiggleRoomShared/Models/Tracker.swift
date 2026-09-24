@@ -93,7 +93,7 @@ final class Tracker {
         name: String,
         unit: String,
         direction: TrackerDirection,
-        connectedSource: ConnectedSource,
+        connectedSource: ConnectedSource?,
         sourceTargetId: String? = nil,
         startDate: Date,
         endDate: Date,

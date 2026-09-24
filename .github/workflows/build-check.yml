@@ -1,0 +1,62 @@
+name: Build check
+
+# The gate the TestFlight workflows are not: those only run after a merge
+# reaches main, so until this existed the first sign that a pull request
+# did not compile was a failed release upload on main. Builds both
+# platforms and reports pass/fail on the pull request itself.
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to the branch makes the in-flight check irrelevant, unlike
+# the distribution workflows where a cancelled run could strand a build
+# number.
+concurrency:
+  group: build-check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_PATH: src/WiggleRoom.xcodeproj
+  SCHEME: WiggleRoom
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    strategy:
+      # Both platforms report independently: one failing should not hide
+      # whether the other also broke.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: iOS
+            destination: generic/platform=iOS
+          - platform: macOS
+            destination: platform=macOS
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build ${{ matrix.platform }}
+        run: |
+          # Release, to match what the distribution workflows archive, so
+          # this catches anything that only fails under release settings.
+          # Unsigned deliberately: no secrets are needed, which keeps the
+          # check working on pull requests from forks and from agents.
+          xcodebuild build \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination "${{ matrix.destination }}" \
+            CODE_SIGNING_ALLOWED=NO
