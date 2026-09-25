@@ -1,6 +1,20 @@
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
+
+private enum TrackerExportConfiguration {
+    static let contentType: UTType = .json
+    static let defaultFilename = "Wiggle Room Trackers"
+    static var defaultFilenameWithExtension: String {
+        guard let filenameExtension = contentType.preferredFilenameExtension else {
+            return defaultFilename
+        }
+        return "\(defaultFilename).\(filenameExtension)"
+    }
+}
 
 struct TrackerTransferView: View {
     @Environment(TrackerStore.self) private var store
@@ -9,26 +23,39 @@ struct TrackerTransferView: View {
     @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
     private var connectedSources: [ConnectedSource]
 
+    #if !os(macOS)
     @State private var exportDocument: TrackerArchiveDocument?
     @State private var isExporting = false
+    #endif
     @State private var isImporting = false
     @State private var pendingArchive: TrackerArchive?
     @State private var sourceChoices: [UUID: String] = [:]
     @State private var message: TransferMessage?
+    #if os(macOS)
+    @State private var hostingWindow: NSWindow?
+    #endif
 
     var body: some View {
         platformContent
+        #if os(macOS)
+        .background(WindowAccessor(window: $hostingWindow))
+        #endif
+        #if !os(macOS)
         .fileExporter(
             isPresented: $isExporting,
             document: exportDocument,
-            contentType: .json,
-            defaultFilename: "Wiggle Room Trackers"
+            contentType: TrackerExportConfiguration.contentType,
+            defaultFilename: TrackerExportConfiguration.defaultFilename
         ) { result in
-            if case .failure(let error) = result {
+            switch result {
+            case .success:
+                message = TransferMessage(title: "Export Complete", detail: "The tracker export was saved.")
+            case .failure(let error):
                 message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
             }
             exportDocument = nil
         }
+        #endif
         .fileImporter(isPresented: $isImporting, allowedContentTypes: [.json]) { result in
             handleImportSelection(result)
         }
@@ -69,16 +96,7 @@ struct TrackerTransferView: View {
     @ViewBuilder
     private var transferControls: some View {
         Button {
-            do {
-                exportDocument = TrackerArchiveDocument(
-                    data: try TrackerArchiveService.encode(
-                        TrackerArchiveService.makeArchive(trackers: trackers)
-                    )
-                )
-                isExporting = true
-            } catch {
-                message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
-            }
+            exportTrackers()
         } label: {
             Label("Export All Trackers", systemImage: "square.and.arrow.up")
         }
@@ -96,6 +114,65 @@ struct TrackerTransferView: View {
             .foregroundStyle(.secondary)
         #endif
     }
+
+    private func exportTrackers() {
+        do {
+            let data = try TrackerArchiveService.encode(
+                TrackerArchiveService.makeArchive(trackers: trackers)
+            )
+            #if os(macOS)
+            exportArchiveToDisk(data)
+            #else
+            exportDocument = TrackerArchiveDocument(data: data)
+            isExporting = true
+            #endif
+        } catch {
+            message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
+        }
+    }
+
+    #if os(macOS)
+    // SwiftUI's fileExporter can fail to present from the macOS Settings scene;
+    // attach AppKit's save panel to the settings window so the export stays visible.
+    private func exportArchiveToDisk(_ data: Data) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [TrackerExportConfiguration.contentType]
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = TrackerExportConfiguration.defaultFilenameWithExtension
+        let panelCompletion: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK else { return }
+            guard let url = panel.url else {
+                message = TransferMessage(title: "Export Failed", detail: "The selected save location could not be determined.")
+                return
+            }
+            Task.detached {
+                do {
+                    // Usually a save panel's Powerbox grant is enough, but
+                    // balancing this keeps security-scoped destinations safe too.
+                    let hasAccess = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if hasAccess {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    try data.write(to: url, options: .atomic)
+                    await MainActor.run {
+                        message = TransferMessage(title: "Export Complete", detail: "Saved \(url.lastPathComponent).")
+                    }
+                } catch {
+                    await MainActor.run {
+                        message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
+                    }
+                }
+            }
+        }
+        if let window = hostingWindow {
+            panel.beginSheetModal(for: window, completionHandler: panelCompletion)
+        } else {
+            panel.begin(completionHandler: panelCompletion)
+        }
+    }
+    #endif
 
     private func importReview(for archive: TrackerArchive) -> some View {
         NavigationStack {
@@ -232,6 +309,55 @@ private struct TransferMessage: Identifiable {
     let title: String
     let detail: String
 }
+
+#if os(macOS)
+private struct WindowAccessor: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    final class Coordinator {
+        var window: Binding<NSWindow?>
+        var currentWindow: NSWindow?
+
+        init(window: Binding<NSWindow?>) {
+            self.window = window
+        }
+
+        func updateWindow(_ newWindow: NSWindow?) {
+            if currentWindow !== newWindow {
+                currentWindow = newWindow
+                window.wrappedValue = newWindow
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(window: $window)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = WindowReportingView()
+        view.onWindowChange = { [weak coordinator = context.coordinator] newWindow in
+            coordinator?.updateWindow(newWindow)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            context.coordinator.updateWindow(nsView.window)
+        }
+    }
+
+    private final class WindowReportingView: NSView {
+        var onWindowChange: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            onWindowChange?(window)
+        }
+    }
+}
+#endif
 
 #Preview {
     NavigationStack { TrackerTransferView() }
