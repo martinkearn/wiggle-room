@@ -88,11 +88,19 @@ struct GeneralSettingsView: View {
     }
 
     private var themePicker: some View {
-        Picker("Appearance", selection: $appThemePreferenceRawValue) {
+        Picker("Appearance", selection: themePreference) {
             ForEach(AppThemePreference.allCases) { theme in
-                Text(theme.displayName).tag(theme.rawValue)
+                Text(theme.displayName).tag(theme)
             }
         }
+    }
+
+    private var themePreference: Binding<AppThemePreference> {
+        Binding(get: {
+            AppThemePreference.resolved(from: appThemePreferenceRawValue)
+        }, set: { newValue in
+            appThemePreferenceRawValue = newValue.rawValue
+        })
     }
 
     private var themeDescription: some View {
@@ -108,5 +116,11 @@ struct GeneralSettingsView: View {
         .modelContainer(PreviewData.container)
         .environment(PreviewData.store)
         .frame(width: 640, height: 440)
+}
+#else
+#Preview {
+    NavigationStack {
+        GeneralSettingsView()
+    }
 }
 #endif
