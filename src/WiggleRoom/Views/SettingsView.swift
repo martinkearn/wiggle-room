@@ -26,6 +26,11 @@ struct SettingsView: View {
             // rather than deliberate grouping.
             Section {
                 NavigationLink {
+                    GeneralSettingsView()
+                } label: {
+                    SettingsLabel(title: "General", symbol: "gearshape", colorIndex: 2)
+                }
+                NavigationLink {
                     ConnectedSourcesView()
                 } label: {
                     SettingsLabel(title: "Connected Sources", symbol: "point.3.filled.connected.trianglepath.dotted", colorIndex: 3)
