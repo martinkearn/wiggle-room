@@ -196,7 +196,7 @@ The app's rings, cards, and chart strokes use a deliberately irregular, hand-dra
 - Tracker list and detail navigation
 - Pull-to-refresh/update behavior
 - Add and edit trackers and connected sources
-- Settings for sources, ordering, CloudKit diagnostics, Siri phrases, and an About screen reporting the running version, build number and source commit, with a separate Danger Zone menu for reset operations
+- Settings for General app preferences, sources, ordering, CloudKit diagnostics, Siri phrases, and an About screen reporting the running version, build number and source commit, with a separate Danger Zone menu for reset operations
 - JSON export and import of tracker configuration and complete reading history
 - Spotlight, notification actions, Live Activities, and widgets
 

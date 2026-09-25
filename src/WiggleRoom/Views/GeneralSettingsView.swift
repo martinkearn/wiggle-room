@@ -3,30 +3,41 @@
 //  WiggleRoom
 //
 
-#if os(macOS)
 import SwiftUI
 import SwiftData
 
-/// Settings → General (§7.2): macOS configuration that isn't tied to a
-/// specific tracker or connected source. Currently just which tracker the
+/// Settings → General (§7): configuration that isn't tied to a specific
+/// tracker or connected source. On macOS it also owns which tracker the
 /// menu bar item pins — moved here (2026-09-18) from a "Show in Menu Bar"
-/// submenu inside the menu bar dropdown itself, so every configurable
-/// thing in the app lives in one place (Settings), the same way Connected
-/// Sources already does, rather than a glanceable status-item dropdown
-/// also doubling as a settings surface.
+/// submenu inside the menu bar dropdown itself.
 ///
 /// Plain content laid directly into `SettingsRootView`'s sidebar-detail
 /// pane — no `Form`/`NavigationStack` chrome of its own, since that scene
 /// structure moved to `SettingsRootView` when the window switched from a
 /// `TabView` to a fixed sidebar (2026-09-18).
 struct GeneralSettingsView: View {
+    @AppStorage(appThemePreferenceKey) private var appThemePreferenceRawValue = AppThemePreference.system.rawValue
+    #if os(macOS)
     @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
     @AppStorage(menuBarTrackerIDKey) private var pinnedTrackerID: String = ""
+    #endif
 
     var body: some View {
+        #if os(macOS)
         VStack(alignment: .leading, spacing: 20) {
             Text("General")
                 .font(WiggleRoomFont.headline(22, weight: 650))
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Appearance")
+                    Spacer()
+                    themePicker
+                        .labelsHidden()
+                        .frame(width: 240)
+                }
+                themeDescription
+            }
 
             if trackers.isEmpty {
                 Text("Add a tracker to choose one for the menu bar.")
@@ -59,6 +70,31 @@ struct GeneralSettingsView: View {
 
             Spacer()
         }
+        #else
+        Form {
+            Section {
+                themePicker
+            } footer: {
+                Text("Choose whether Wiggle Room follows the system appearance or always uses light or dark mode.")
+            }
+        }
+        .navigationTitle("General")
+        .inlineNavigationBarIfAvailable()
+        #endif
+    }
+
+    private var themePicker: some View {
+        Picker("Appearance", selection: $appThemePreferenceRawValue) {
+            ForEach(AppThemePreference.allCases) { theme in
+                Text(theme.displayName).tag(theme.rawValue)
+            }
+        }
+    }
+
+    private var themeDescription: some View {
+        Text("Choose whether Wiggle Room follows the system appearance or always uses light or dark mode.")
+            .font(.wiggleText(.caption))
+            .foregroundStyle(.secondary)
     }
 }
 
@@ -68,4 +104,3 @@ struct GeneralSettingsView: View {
         .environment(PreviewData.store)
         .frame(width: 640, height: 440)
 }
-#endif

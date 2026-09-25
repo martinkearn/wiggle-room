@@ -14,6 +14,7 @@ struct WiggleRoomApp: App {
     @State private var store: TrackerStore
     @State private var deepLinkRouter = DeepLinkRouter()
     @State private var appCommands = AppCommands()
+    @AppStorage(appThemePreferenceKey) private var appThemePreferenceRawValue = AppThemePreference.system.rawValue
     @Environment(\.scenePhase) private var scenePhase
     /// Guards the `.active` housekeeping below to once per app session —
     /// see its own call site for why.
@@ -84,6 +85,7 @@ struct WiggleRoomApp: App {
                 // Nunito as the app-wide default; Fraunces is applied
                 // explicitly to names and headlines.
                 .font(.wiggleText(.body))
+                .preferredColorScheme(selectedTheme.colorScheme)
                 .task {
                     TrackerSpotlightIndexer.reindex()
                     await store.performManualEntryHousekeeping(after: .seconds(10))
@@ -159,6 +161,7 @@ struct WiggleRoomApp: App {
                 }
             }
                 .font(.wiggleText(.body))
+                .preferredColorScheme(selectedTheme.colorScheme)
                 .environment(store)
                 .modelContainer(modelContainer)
         }
@@ -175,6 +178,7 @@ struct WiggleRoomApp: App {
                 }
             }
                 .font(.wiggleText(.body))
+                .preferredColorScheme(selectedTheme.colorScheme)
                 .environment(store)
                 .modelContainer(modelContainer)
         } label: {
@@ -197,5 +201,9 @@ struct WiggleRoomApp: App {
         // text and the rings render normally.
         .menuBarExtraStyle(.window)
         #endif
+    }
+
+    private var selectedTheme: AppThemePreference {
+        AppThemePreference.resolved(from: appThemePreferenceRawValue)
     }
 }

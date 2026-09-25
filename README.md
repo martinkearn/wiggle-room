@@ -29,7 +29,7 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 3. Choose an iOS simulator, a Mac, or a connected device.
 4. Build and run.
 
-The app can be used entirely with manual trackers. Starling credentials are entered at runtime under **Settings → Connected Sources**. Never hard-code or commit personal access tokens.
+The app can be used entirely with manual trackers. Starling credentials are entered at runtime under **Settings → Connected Sources**, and app appearance can be set to System, Light, or Dark under **Settings → General**. Never hard-code or commit personal access tokens.
 
 CloudKit, App Groups, signing identities, and bundle identifiers are tied to the original developer account. Forks must configure their own Apple Developer identifiers and capabilities before CloudKit or device builds work.
 
