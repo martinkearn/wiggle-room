@@ -44,6 +44,9 @@ struct TrackerArchive: Codable, Identifiable {
         let sortOrder: Int
         let colorIndex: Int
         let glyph: String
+        /// Optional so archives written before zoom existed still decode;
+        /// a missing value imports as not zoomed.
+        var isZoomed: Bool? = nil
         let readings: [Reading]
     }
 
@@ -120,6 +123,7 @@ enum TrackerArchiveService {
                     sortOrder: tracker.sortOrder,
                     colorIndex: tracker.colorIndex,
                     glyph: tracker.glyph,
+                    isZoomed: tracker.isZoomed,
                     readings: tracker.sortedReadings.map {
                         TrackerArchive.Reading(
                             id: $0.id,
@@ -229,6 +233,7 @@ enum TrackerArchiveService {
             tracker.sortOrder = archived.sortOrder
             tracker.colorIndex = archived.colorIndex
             tracker.glyph = archived.glyph
+            tracker.isZoomed = archived.isZoomed ?? false
             modelContext.insert(tracker)
             importedTrackers.append(tracker)
 

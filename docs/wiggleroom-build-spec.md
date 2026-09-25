@@ -39,6 +39,7 @@ A `Tracker` represents one allowance over a date range.
 | `sourceTargetId` | Provider-specific account or target identifier |
 | `sortOrder` | Synced custom ordering |
 | `colorIndex`, `glyph` | Visual identity |
+| `isZoomed` | Whether the rings and chart are zoomed to five days (see Zoom) |
 | `reminderCadenceMinutes` | Optional manual-entry reminder |
 
 ### Tracker types
@@ -187,6 +188,16 @@ The interface should feel calm and informative rather than punitive.
 - Fraunces is used for names and headings; Nunito is the primary text face.
 - Numeric values remain the source of truth and accompany visual indicators.
 
+### Zoom
+
+A tracker whose period is longer than five days can be zoomed. Zoom magnifies the rings and chart like a pinch-zoom on a static image. It never changes stored data, the centre figure, the status colour, or the figure cards, which all stay whole-period.
+
+- **Window.** Five local calendar days: two days before today, today, and two days after. The window slides, keeping its length, so it never extends outside the tracking period, and it moves forward at local midnight.
+- **Eligibility.** A completed tracker, or one whose period is five days or fewer, renders unzoomed. Its stored `isZoomed` flag is kept but ignored.
+- **Rings.** Each ring shows only the part of its whole-period ring that falls inside the window, stretched to fill the circle. The outer ring is the share of the window elapsed. The inner ring maps the pace line's expected consumption at the window's start and end onto empty and full, so a tracker on pace has both rings level. A value outside that slice pins the inner ring at empty or full, and a chevron marks it where the ring is wide enough.
+- **Chart.** The x-axis covers the window with daily ticks. The y-axis is fitted to the pace line, the readings and the carried-forward "now" point inside the window. Lines crossing the window's edges are interpolated to the edge before reaching Swift Charts.
+- **State.** `isZoomed` syncs with the tracker and is included in exports. Archives without it import as not zoomed.
+
 The app's rings, cards, and chart strokes use a deliberately irregular, hand-drawn style. Accessibility labels must communicate the same information without relying on colour or geometry alone.
 
 ## 7. Platform behavior
@@ -194,6 +205,7 @@ The app's rings, cards, and chart strokes use a deliberately irregular, hand-dra
 ### iOS and iPadOS
 
 - Tracker list and detail navigation
+- A toolbar zoom toggle on eligible trackers' detail screens, with the zoomed date range shown under the rings; list rows, the menu bar, and medium and larger widgets mark zoomed trackers with a small magnifier
 - Pull-to-refresh/update behavior
 - Add and edit trackers and connected sources
 - Settings for General app preferences, sources, ordering, CloudKit diagnostics, Siri phrases, and an About screen reporting the running version, build number and source commit, with a separate Danger Zone menu for reset operations
@@ -215,7 +227,7 @@ It is reached from a `@Query`-backed list, so its body observes no SwiftData at 
 
 ### watchOS
 
-- Tracker list and compact detail presentation
+- Tracker list and compact detail presentation, including the zoom toggle
 - Manual reading entry
 - WidgetKit complication
 

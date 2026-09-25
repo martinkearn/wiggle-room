@@ -89,16 +89,32 @@ struct RingsView: View {
     /// still scheduled to run after this one.
     @State private var recycleToken = UUID()
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     /// A single value combining both real fractions, so one `onChange`
     /// handles "either changed" without risking two overlapping recycle
     /// animations firing for the same underlying update.
+    /// `isZoomed` rides along so a zoom toggle can be told apart from a
+    /// data change: zooming morphs straight to the new fills, while the
+    /// drain-and-refill cycle stays reserved for new data.
     private struct FractionKey: Equatable {
         let pace: Double
         let actual: Double
+        let isZoomed: Bool
     }
 
     private var fractionKey: FractionKey {
-        FractionKey(pace: paceFraction, actual: actualFraction)
+        FractionKey(pace: paceFraction, actual: actualFraction, isZoomed: zoomWindow != nil)
+    }
+
+    /// The window the rings are magnified to, or `nil` for the whole period
+    /// (see `TrackerZoom`). The centre content always stays whole-period.
+    private var zoomWindow: DateInterval? {
+        tracker.zoomWindow(asOf: now)
+    }
+
+    private var fractions: RingFractions {
+        tracker.ringFractions(asOf: now)
     }
 
     private var pace: TrackerPace {
@@ -112,14 +128,11 @@ struct RingsView: View {
     private var statusColor: Color { status.color }
 
     private var paceFraction: Double {
-        guard pace.periodHours > 0 else { return 0 }
-        return min(max(pace.hoursElapsed / pace.periodHours, 0), 1)
+        fractions.elapsed
     }
 
     private var actualFraction: Double {
-        guard tracker.totalAllowance != 0 else { return 0 }
-        let ratio = pace.consumedSoFar / tracker.totalAllowance
-        return min(max((ratio as NSDecimalNumber).doubleValue, 0), 1)
+        fractions.consumed
     }
 
     /// How far the inner ring is inset from the outer one (applied as
@@ -162,6 +175,7 @@ struct RingsView: View {
                 ZStack {
                     ring(.outer, fraction: isAnimated ? displayedPaceFraction : paceFraction, color: WiggleRoomColors.paceRing)
                     ring(.inner, fraction: isAnimated ? displayedActualFraction : actualFraction, color: statusColor)
+                        .overlay { overflowMarker }
                         .padding(ringGap)
 
                     if showsCenterContent {
@@ -176,6 +190,7 @@ struct RingsView: View {
             }
             .aspectRatio(1, contentMode: .fit)
         }
+        .modifier(ZoomAccessibility(description: zoomAccessibilityDescription))
         .onAppear {
             guard isAnimated else { return }
             guard animatesOnAppear else {
@@ -202,9 +217,58 @@ struct RingsView: View {
                 hasAppeared = true
             }
         }
-        .onChange(of: fractionKey) { _, newValue in
+        .onChange(of: fractionKey) { oldValue, newValue in
             guard isAnimated, hasAppeared else { return }
-            recycle(paceTarget: newValue.pace, actualTarget: newValue.actual)
+            if oldValue.isZoomed != newValue.isZoomed {
+                morph(paceTarget: newValue.pace, actualTarget: newValue.actual)
+            } else {
+                recycle(paceTarget: newValue.pace, actualTarget: newValue.actual)
+            }
+        }
+    }
+
+    /// Zooming in or out slides both rings straight to their new fills —
+    /// the same data seen closer or further away, not new data, so it
+    /// deliberately doesn't drain and refill. Instant under Reduce Motion.
+    private func morph(paceTarget: Double, actualTarget: Double) {
+        recycleToken = UUID()
+        withAnimation(reduceMotion ? nil : .spring(response: 0.6, dampingFraction: 0.85)) {
+            displayedPaceFractionState = paceTarget
+            displayedActualFractionState = actualTarget
+        }
+    }
+
+    /// Spoken with the rings when zoomed, so VoiceOver users know the rings
+    /// show a magnified window rather than the whole period.
+    private var zoomAccessibilityDescription: String? {
+        guard let zoomWindow else { return nil }
+        var text = "Zoomed to \(Tracker.zoomRangeText(zoomWindow))"
+        if fractions.overflow != nil {
+            text += ", \(tracker.terminology.currentFigure.lowercased()) is beyond the zoomed range"
+        }
+        return text
+    }
+
+    /// A small chevron at the inner ring's starting point when the tracker
+    /// is so far off pace that its value lies outside the zoomed window's
+    /// slice: pointing back (anticlockwise) when the ring is pinned empty,
+    /// onward (clockwise) when pinned full. Too small to read on the
+    /// thinnest rings, so those just show the pinned ring.
+    @ViewBuilder
+    private var overflowMarker: some View {
+        if let overflow = fractions.overflow, lineWidth >= 8 {
+            GeometryReader { geometry in
+                let rect = CGRect(origin: .zero, size: geometry.size)
+                let start = IconRingShape(ring: .inner, fitsRect: true)
+                    .path(in: rect)
+                    .trimmedPath(from: 0, to: 0.0001)
+                    .boundingRect.origin
+                Image(systemName: overflow == .beyondFull ? "chevron.right" : "chevron.left")
+                    .font(.system(size: lineWidth * 0.7, weight: .black))
+                    .foregroundStyle(overflow == .beyondFull ? Color.white : statusColor)
+                    .position(start)
+            }
+            .accessibilityHidden(true)
         }
     }
 
@@ -341,4 +405,27 @@ struct RingsView: View {
     RingsView(tracker: SharedPreviewData.makeSampleTracker(), now: .now)
         .frame(width: 260, height: 260)
         .padding()
+}
+
+/// Adds a zoom description to a view's accessibility value only when there
+/// is one, leaving unzoomed views exactly as they were.
+/// `combinesChildren: false` keeps a container's own children (a chart's
+/// data points) navigable and adds the description as its label instead.
+struct ZoomAccessibility: ViewModifier {
+    let description: String?
+    var combinesChildren = true
+
+    func body(content: Content) -> some View {
+        if let description {
+            if combinesChildren {
+                content
+                    .accessibilityElement(children: .combine)
+                    .accessibilityValue(description)
+            } else {
+                content.accessibilityLabel(description)
+            }
+        } else {
+            content
+        }
+    }
 }

@@ -176,10 +176,13 @@ private struct TrackerRow: View {
             TrackerBadge(tracker: tracker, size: 42)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(tracker.name)
-                    .font(WiggleRoomFont.headline(18, weight: 650))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(tracker.name)
+                        .font(WiggleRoomFont.headline(18, weight: 650))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    ZoomIndicator(tracker: tracker, now: now, size: 12)
+                }
                 if tracker.isCompleted(asOf: now) {
                     CompletedBadge()
                 } else {

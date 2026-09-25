@@ -52,7 +52,7 @@ struct TrackerComplicationEntryView: View {
 
     private func circular(_ tracker: Tracker) -> some View {
         let p = pace(for: tracker)
-        let fraction = p.periodHours > 0 ? min(max(p.hoursElapsed / p.periodHours, 0), 1) : 0
+        let fraction = tracker.ringFractions(asOf: entry.date).elapsed
         return WobblyGauge(fraction: fraction, color: p.status.color) {
             Text(p.displayDifference(for: tracker))
                 .font(.wiggleNumber(.caption2))

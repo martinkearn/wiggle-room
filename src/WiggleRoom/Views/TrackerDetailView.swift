@@ -159,19 +159,27 @@ struct TrackerDetailView: View {
                     CompletedBadge()
                 }
 
-                RingsView(tracker: tracker, now: now, animatesOnAppear: false)
-                    .frame(width: 260, height: 260)
-                    .padding(.vertical, 18)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        WobblyCard.shape(1, scale: 1.3).fill(
-                            RadialGradient(
-                                colors: [tracker.accentColor.opacity(0.22), tracker.accentColor.opacity(0.05)],
-                                center: .center, startRadius: 30, endRadius: 240
+                VStack(spacing: 10) {
+                    RingsView(tracker: tracker, now: now, animatesOnAppear: false)
+                        .frame(width: 260, height: 260)
+                        .padding(.vertical, 18)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            WobblyCard.shape(1, scale: 1.3).fill(
+                                RadialGradient(
+                                    colors: [tracker.accentColor.opacity(0.22), tracker.accentColor.opacity(0.05)],
+                                    center: .center, startRadius: 30, endRadius: 240
+                                )
                             )
                         )
-                    )
-                    .padding(.horizontal)
+                        .padding(.horizontal)
+
+                    if let zoomWindow = tracker.zoomWindow(asOf: now) {
+                        Label("Showing \(Tracker.zoomRangeText(zoomWindow))", systemImage: "plus.magnifyingglass")
+                            .font(.wiggleText(.caption, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 if isCompleted {
                     completedSummary
@@ -254,6 +262,11 @@ struct TrackerDetailView: View {
         #endif
         .inlineNavigationBarIfAvailable()
         .toolbar {
+            if tracker.canZoom(asOf: now) {
+                ToolbarItem(placement: .primaryAction) {
+                    zoomButton
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button {
@@ -330,6 +343,22 @@ struct TrackerDetailView: View {
             // tracker under budget — worth checking here too, not just on
             // appear/refresh.
             checkForCompletionCelebration(asOf: now)
+        }
+    }
+
+    /// Magnifies the rings and chart to the five days around today, or back
+    /// out to the whole period (see `TrackerZoom`). Saved on the tracker so
+    /// the choice syncs to every device and reaches the widgets.
+    private var zoomButton: some View {
+        Button {
+            tracker.isZoomed.toggle()
+            store.saveChanges()
+        } label: {
+            if tracker.isZoomed {
+                Label("Zoom Out", systemImage: "minus.magnifyingglass")
+            } else {
+                Label("Zoom In", systemImage: "plus.magnifyingglass")
+            }
         }
     }
 

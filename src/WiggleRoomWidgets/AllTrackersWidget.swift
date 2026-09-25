@@ -32,8 +32,10 @@ struct AllTrackersProvider: TimelineProvider {
             let now = Date.now
             let trackers = Self.ordered((try? await WidgetDataStore.fetchAllTrackers()) ?? [])
             let soonestEnd = trackers.filter { !$0.isCompleted(asOf: now) }.map(\.endDate).min()
-            let next = soonestEnd.map { TrackerUpdateScheduling.nextWidgetReloadDate(after: now, until: $0) }
+            let scheduled = soonestEnd.map { TrackerUpdateScheduling.nextWidgetReloadDate(after: now, until: $0) }
                 ?? now.addingTimeInterval(TrackerUpdateScheduling.defaultWidgetFarInterval)
+            // Zoomed trackers' windows move at local midnight.
+            let next = trackers.compactMap { $0.nextZoomWindowChange(after: now) }.reduce(scheduled, min)
             completion(Timeline(entries: [AllTrackersEntry(date: now, trackers: trackers)], policy: .after(next)))
         }
     }

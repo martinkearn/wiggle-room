@@ -107,6 +107,12 @@ final class Tracker {
     /// its type (see `glyphSymbol`).
     var glyph: String = ""
 
+    /// Whether the rings and chart are zoomed to the five days around today
+    /// (see `TrackerZoom`). Synced like the rest of the record so the choice
+    /// follows the user to every device. Read through `zoomWindow(asOf:)`,
+    /// which ignores this flag while the tracker isn't eligible for zoom.
+    var isZoomed: Bool = false
+
     /// Every reading ever logged for this tracker (§4.6 — timestamped
     /// history, not a single overwritten current value). Optional array for
     /// CloudKit compatibility; use `sortedReadings`/`latestReading` rather
