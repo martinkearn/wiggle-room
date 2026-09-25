@@ -147,12 +147,6 @@ struct TrackerTransferView: View {
             }
             Task.detached {
                 do {
-                    let hasAccess = url.startAccessingSecurityScopedResource()
-                    defer {
-                        if hasAccess {
-                            url.stopAccessingSecurityScopedResource()
-                        }
-                    }
                     try data.write(to: url, options: .atomic)
                     await MainActor.run {
                         message = TransferMessage(title: "Export Complete", detail: "Saved \(url.lastPathComponent).")
@@ -312,20 +306,30 @@ private struct TransferMessage: Identifiable {
 private struct WindowAccessor: NSViewRepresentable {
     @Binding var window: NSWindow?
 
+    final class Coordinator {
+        var currentWindow: NSWindow?
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
-        DispatchQueue.main.async {
-            if window !== view.window {
-                window = view.window
-            }
-        }
+        updateWindow(from: view, context: context)
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        updateWindow(from: nsView, context: context)
+    }
+
+    private func updateWindow(from view: NSView, context: Context) {
         DispatchQueue.main.async {
-            if window !== nsView.window {
-                window = nsView.window
+            let newWindow = view.window
+            if context.coordinator.currentWindow !== newWindow {
+                context.coordinator.currentWindow = newWindow
+                window = newWindow
             }
         }
     }
