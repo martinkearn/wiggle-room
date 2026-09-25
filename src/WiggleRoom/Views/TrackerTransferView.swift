@@ -29,9 +29,15 @@ struct TrackerTransferView: View {
     @State private var pendingArchive: TrackerArchive?
     @State private var sourceChoices: [UUID: String] = [:]
     @State private var message: TransferMessage?
+    #if os(macOS)
+    @State private var hostingWindow: NSWindow?
+    #endif
 
     var body: some View {
         platformContent
+        #if os(macOS)
+        .background(WindowAccessor(window: $hostingWindow))
+        #endif
         .fileExporter(
             isPresented: $isExporting,
             document: exportDocument,
@@ -130,7 +136,7 @@ struct TrackerTransferView: View {
             guard response == .OK else { return }
             guard let url = panel.url else {
                 Task { @MainActor in
-                    Self.showExportFailure("The selected save location could not be determined.")
+                    message = TransferMessage(title: "Export Failed", detail: "The selected save location could not be determined.")
                 }
                 return
             }
@@ -139,25 +145,16 @@ struct TrackerTransferView: View {
                     try data.write(to: url, options: .atomic)
                 } catch {
                     await MainActor.run {
-                        Self.showExportFailure(error.localizedDescription)
+                        message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
                     }
                 }
             }
         }
-        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+        if let window = hostingWindow {
             panel.beginSheetModal(for: window, completionHandler: panelCompletion)
         } else {
             panel.begin(completionHandler: panelCompletion)
         }
-    }
-
-    @MainActor
-    private static func showExportFailure(_ detail: String) {
-        let alert = NSAlert()
-        alert.messageText = "Export Failed"
-        alert.informativeText = detail
-        alert.alertStyle = .warning
-        alert.runModal()
     }
     #endif
 
@@ -296,6 +293,26 @@ private struct TransferMessage: Identifiable {
     let title: String
     let detail: String
 }
+
+#if os(macOS)
+private struct WindowAccessor: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            window = view.window
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            window = nsView.window
+        }
+    }
+}
+#endif
 
 #Preview {
     NavigationStack { TrackerTransferView() }
