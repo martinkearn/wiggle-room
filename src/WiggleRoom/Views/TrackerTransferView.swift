@@ -5,6 +5,11 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
+private enum TrackerExportConfiguration {
+    static let contentType: UTType = .json
+    static let defaultFilename = "Wiggle Room Trackers"
+}
+
 struct TrackerTransferView: View {
     @Environment(TrackerStore.self) private var store
     @Environment(\.modelContext) private var modelContext
@@ -24,8 +29,8 @@ struct TrackerTransferView: View {
         .fileExporter(
             isPresented: $isExporting,
             document: exportDocument,
-            contentType: .json,
-            defaultFilename: "Wiggle Room Trackers"
+            contentType: TrackerExportConfiguration.contentType,
+            defaultFilename: TrackerExportConfiguration.defaultFilename
         ) { result in
             if case .failure(let error) = result {
                 message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
@@ -110,10 +115,10 @@ struct TrackerTransferView: View {
     #if os(macOS)
     private func exportArchiveToDisk(_ data: Data) {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
+        panel.allowedContentTypes = [TrackerExportConfiguration.contentType]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = "Wiggle Room Trackers.json"
-        let completion: (NSApplication.ModalResponse) -> Void = { response in
+        panel.nameFieldStringValue = "\(TrackerExportConfiguration.defaultFilename).json"
+        let completion: @MainActor (NSApplication.ModalResponse) -> Void = { response in
             guard response == .OK else { return }
             guard let url = panel.url else {
                 message = TransferMessage(title: "Export Failed", detail: "The selected save location could not be determined.")
@@ -125,10 +130,15 @@ struct TrackerTransferView: View {
                 message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
             }
         }
+        let panelCompletion: (NSApplication.ModalResponse) -> Void = { response in
+            MainActor.assumeIsolated {
+                completion(response)
+            }
+        }
         if let window = NSApp.keyWindow ?? NSApp.mainWindow {
-            panel.beginSheetModal(for: window, completionHandler: completion)
+            panel.beginSheetModal(for: window, completionHandler: panelCompletion)
         } else {
-            panel.begin(completionHandler: completion)
+            panel.begin(completionHandler: panelCompletion)
         }
     }
     #endif
