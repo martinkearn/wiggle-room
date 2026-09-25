@@ -6,7 +6,8 @@
 import SwiftUI
 import SwiftData
 
-private let appThemePreferenceDescription = "Choose whether Wiggle Room follows the system appearance or always uses light or dark mode."
+private let appThemePreferenceDescription: LocalizedStringKey =
+    "Choose whether Wiggle Room follows the system appearance or always uses light or dark mode."
 
 /// Settings → General (§7): configuration that isn't tied to a specific
 /// tracker or connected source. On macOS it also owns which tracker the
@@ -101,9 +102,11 @@ struct GeneralSettingsView: View {
     }
 }
 
+#if os(macOS)
 #Preview {
     GeneralSettingsView()
         .modelContainer(PreviewData.container)
         .environment(PreviewData.store)
         .frame(width: 640, height: 440)
 }
+#endif
