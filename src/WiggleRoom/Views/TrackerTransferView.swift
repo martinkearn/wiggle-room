@@ -147,6 +147,12 @@ struct TrackerTransferView: View {
             }
             Task.detached {
                 do {
+                    let hasAccess = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if hasAccess {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
                     try data.write(to: url, options: .atomic)
                     await MainActor.run {
                         message = TransferMessage(title: "Export Complete", detail: "Saved \(url.lastPathComponent).")
@@ -307,30 +313,43 @@ private struct WindowAccessor: NSViewRepresentable {
     @Binding var window: NSWindow?
 
     final class Coordinator {
+        var window: Binding<NSWindow?>
         var currentWindow: NSWindow?
+
+        init(window: Binding<NSWindow?>) {
+            self.window = window
+        }
+
+        func updateWindow(_ newWindow: NSWindow?) {
+            if currentWindow !== newWindow {
+                currentWindow = newWindow
+                window.wrappedValue = newWindow
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(window: $window)
     }
 
     func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        updateWindow(from: view, context: context)
+        let view = WindowReportingView()
+        view.onWindowChange = { [weak coordinator = context.coordinator] newWindow in
+            coordinator?.updateWindow(newWindow)
+        }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        updateWindow(from: nsView, context: context)
+        context.coordinator.updateWindow(nsView.window)
     }
 
-    private func updateWindow(from view: NSView, context: Context) {
-        DispatchQueue.main.async {
-            let newWindow = view.window
-            if context.coordinator.currentWindow !== newWindow {
-                context.coordinator.currentWindow = newWindow
-                window = newWindow
-            }
+    private final class WindowReportingView: NSView {
+        var onWindowChange: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            onWindowChange?(window)
         }
     }
 }
