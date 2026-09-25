@@ -8,6 +8,12 @@ import AppKit
 private enum TrackerExportConfiguration {
     static let contentType: UTType = .json
     static let defaultFilename = "Wiggle Room Trackers"
+    static var defaultFilenameWithExtension: String {
+        guard let filenameExtension = contentType.preferredFilenameExtension else {
+            return defaultFilename
+        }
+        return "\(defaultFilename).\(filenameExtension)"
+    }
 }
 
 struct TrackerTransferView: View {
@@ -117,22 +123,20 @@ struct TrackerTransferView: View {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [TrackerExportConfiguration.contentType]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = "\(TrackerExportConfiguration.defaultFilename).json"
-        let completion: @MainActor (NSApplication.ModalResponse) -> Void = { response in
-            guard response == .OK else { return }
-            guard let url = panel.url else {
-                message = TransferMessage(title: "Export Failed", detail: "The selected save location could not be determined.")
-                return
-            }
-            do {
-                try data.write(to: url, options: .atomic)
-            } catch {
-                message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
-            }
-        }
+        panel.nameFieldStringValue = TrackerExportConfiguration.defaultFilenameWithExtension
         let panelCompletion: (NSApplication.ModalResponse) -> Void = { response in
-            MainActor.assumeIsolated {
-                completion(response)
+            guard response == .OK else { return }
+            let selectedURL = panel.url
+            Task { @MainActor in
+                guard let url = selectedURL else {
+                    message = TransferMessage(title: "Export Failed", detail: "The selected save location could not be determined.")
+                    return
+                }
+                do {
+                    try data.write(to: url, options: .atomic)
+                } catch {
+                    message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
+                }
             }
         }
         if let window = NSApp.keyWindow ?? NSApp.mainWindow {
