@@ -14,7 +14,7 @@ enum AppThemePreference: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var displayName: String {
+    var displayName: LocalizedStringKey {
         switch self {
         case .system: "System"
         case .light: "Light"

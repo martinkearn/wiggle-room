@@ -10,7 +10,7 @@ import XCTest
 final class AppThemePreferenceTests: XCTestCase {
     func testThemeOptionsMatchSettingsOrder() {
         XCTAssertEqual(AppThemePreference.allCases, [.system, .light, .dark])
-        XCTAssertEqual(AppThemePreference.allCases.map(\.displayName), ["System", "Light", "Dark"])
+        XCTAssertEqual(AppThemePreference.allCases.map(\.rawValue), ["system", "light", "dark"])
     }
 
     func testThemeOptionsMapToColorSchemes() {

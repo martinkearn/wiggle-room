@@ -79,7 +79,7 @@ struct GeneralSettingsView: View {
             Section {
                 themePicker
             } footer: {
-                Text(appThemePreferenceDescription)
+                themeDescription
             }
         }
         .navigationTitle("General")
