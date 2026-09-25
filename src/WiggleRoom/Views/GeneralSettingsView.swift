@@ -10,9 +10,11 @@ private let appThemePreferenceDescription: LocalizedStringKey =
     "Choose whether Wiggle Room follows the system appearance or always uses light or dark mode."
 
 /// Settings → General (§7): configuration that isn't tied to a specific
-/// tracker or connected source. On macOS it also owns which tracker the
-/// menu bar item pins — moved here (2026-09-18) from a "Show in Menu Bar"
-/// submenu inside the menu bar dropdown itself.
+/// tracker or connected source. The Appearance picker writes the app-local
+/// `AppStorage` preference that controls whether Wiggle Room follows the
+/// system appearance or forces Light/Dark. On macOS it also owns which
+/// tracker the menu bar item pins — moved here (2026-09-18) from a "Show in
+/// Menu Bar" submenu inside the menu bar dropdown itself.
 ///
 /// Plain content laid directly into `SettingsRootView`'s sidebar-detail
 /// pane — no `Form`/`NavigationStack` chrome of its own, since that scene
