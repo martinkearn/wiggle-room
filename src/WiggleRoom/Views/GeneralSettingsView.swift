@@ -6,6 +6,8 @@
 import SwiftUI
 import SwiftData
 
+private let appThemePreferenceDescription = "Choose whether Wiggle Room follows the system appearance or always uses light or dark mode."
+
 /// Settings → General (§7): configuration that isn't tied to a specific
 /// tracker or connected source. On macOS it also owns which tracker the
 /// menu bar item pins — moved here (2026-09-18) from a "Show in Menu Bar"
@@ -14,7 +16,8 @@ import SwiftData
 /// Plain content laid directly into `SettingsRootView`'s sidebar-detail
 /// pane — no `Form`/`NavigationStack` chrome of its own, since that scene
 /// structure moved to `SettingsRootView` when the window switched from a
-/// `TabView` to a fixed sidebar (2026-09-18).
+/// `TabView` to a fixed sidebar (2026-09-18). On iOS this same view is
+/// pushed from `SettingsView` and renders as a standard settings `Form`.
 struct GeneralSettingsView: View {
     @AppStorage(appThemePreferenceKey) private var appThemePreferenceRawValue = AppThemePreference.system.rawValue
     #if os(macOS)
@@ -75,7 +78,7 @@ struct GeneralSettingsView: View {
             Section {
                 themePicker
             } footer: {
-                Text("Choose whether Wiggle Room follows the system appearance or always uses light or dark mode.")
+                Text(appThemePreferenceDescription)
             }
         }
         .navigationTitle("General")
@@ -92,7 +95,7 @@ struct GeneralSettingsView: View {
     }
 
     private var themeDescription: some View {
-        Text("Choose whether Wiggle Room follows the system appearance or always uses light or dark mode.")
+        Text(appThemePreferenceDescription)
             .font(.wiggleText(.caption))
             .foregroundStyle(.secondary)
     }
