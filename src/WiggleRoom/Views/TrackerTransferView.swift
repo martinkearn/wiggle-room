@@ -23,8 +23,10 @@ struct TrackerTransferView: View {
     @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
     private var connectedSources: [ConnectedSource]
 
+    #if !os(macOS)
     @State private var exportDocument: TrackerArchiveDocument?
     @State private var isExporting = false
+    #endif
     @State private var isImporting = false
     @State private var pendingArchive: TrackerArchive?
     @State private var sourceChoices: [UUID: String] = [:]
@@ -38,6 +40,7 @@ struct TrackerTransferView: View {
         #if os(macOS)
         .background(WindowAccessor(window: $hostingWindow))
         #endif
+        #if !os(macOS)
         .fileExporter(
             isPresented: $isExporting,
             document: exportDocument,
@@ -49,6 +52,7 @@ struct TrackerTransferView: View {
             }
             exportDocument = nil
         }
+        #endif
         .fileImporter(isPresented: $isImporting, allowedContentTypes: [.json]) { result in
             handleImportSelection(result)
         }
@@ -142,6 +146,12 @@ struct TrackerTransferView: View {
             }
             Task.detached {
                 do {
+                    let hasAccess = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if hasAccess {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
                     try data.write(to: url, options: .atomic)
                 } catch {
                     await MainActor.run {
