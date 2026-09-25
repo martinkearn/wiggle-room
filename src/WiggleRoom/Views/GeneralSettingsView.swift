@@ -104,10 +104,15 @@ struct GeneralSettingsView: View {
         })
     }
 
+    @ViewBuilder
     private var themeDescription: some View {
+        #if os(macOS)
         Text(appThemePreferenceDescription)
             .font(.wiggleText(.caption))
             .foregroundStyle(.secondary)
+        #else
+        Text(appThemePreferenceDescription)
+        #endif
     }
 }
 
