@@ -147,6 +147,8 @@ struct TrackerTransferView: View {
             }
             Task.detached {
                 do {
+                    // Usually a save panel's Powerbox grant is enough, but
+                    // balancing this keeps security-scoped destinations safe too.
                     let hasAccess = url.startAccessingSecurityScopedResource()
                     defer {
                         if hasAccess {
@@ -341,7 +343,9 @@ private struct WindowAccessor: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.updateWindow(nsView.window)
+        DispatchQueue.main.async {
+            context.coordinator.updateWindow(nsView.window)
+        }
     }
 
     private final class WindowReportingView: NSView {
