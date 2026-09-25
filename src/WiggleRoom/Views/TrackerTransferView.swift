@@ -119,6 +119,8 @@ struct TrackerTransferView: View {
     }
 
     #if os(macOS)
+    // SwiftUI's fileExporter can fail to present from the macOS Settings scene;
+    // attach AppKit's save panel to the settings window so the export stays visible.
     private func exportArchiveToDisk(_ data: Data) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [TrackerExportConfiguration.contentType]
@@ -126,16 +128,19 @@ struct TrackerTransferView: View {
         panel.nameFieldStringValue = TrackerExportConfiguration.defaultFilenameWithExtension
         let panelCompletion: (NSApplication.ModalResponse) -> Void = { response in
             guard response == .OK else { return }
-            let selectedURL = panel.url
-            Task { @MainActor in
-                guard let url = selectedURL else {
-                    message = TransferMessage(title: "Export Failed", detail: "The selected save location could not be determined.")
-                    return
+            guard let url = panel.url else {
+                Task { @MainActor in
+                    Self.showExportFailure("The selected save location could not be determined.")
                 }
+                return
+            }
+            Task.detached {
                 do {
                     try data.write(to: url, options: .atomic)
                 } catch {
-                    message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
+                    await MainActor.run {
+                        Self.showExportFailure(error.localizedDescription)
+                    }
                 }
             }
         }
@@ -144,6 +149,15 @@ struct TrackerTransferView: View {
         } else {
             panel.begin(completionHandler: panelCompletion)
         }
+    }
+
+    @MainActor
+    private static func showExportFailure(_ detail: String) {
+        let alert = NSAlert()
+        alert.messageText = "Export Failed"
+        alert.informativeText = detail
+        alert.alertStyle = .warning
+        alert.runModal()
     }
     #endif
 
