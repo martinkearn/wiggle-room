@@ -113,10 +113,10 @@ struct TrackerTransferView: View {
         panel.allowedContentTypes = [.json]
         panel.canCreateDirectories = true
         panel.nameFieldStringValue = "Wiggle Room Trackers.json"
-        panel.begin { response in
+        let completion: (NSApplication.ModalResponse) -> Void = { response in
             guard response == .OK else { return }
             guard let url = panel.url else {
-                message = TransferMessage(title: "Export Failed", detail: "Choose a location to save the export.")
+                message = TransferMessage(title: "Export Failed", detail: "The selected save location could not be determined.")
                 return
             }
             do {
@@ -124,6 +124,11 @@ struct TrackerTransferView: View {
             } catch {
                 message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
             }
+        }
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            panel.beginSheetModal(for: window, completionHandler: completion)
+        } else {
+            panel.begin(completionHandler: completion)
         }
     }
     #endif
