@@ -47,7 +47,10 @@ struct TrackerTransferView: View {
             contentType: TrackerExportConfiguration.contentType,
             defaultFilename: TrackerExportConfiguration.defaultFilename
         ) { result in
-            if case .failure(let error) = result {
+            switch result {
+            case .success:
+                message = TransferMessage(title: "Export Complete", detail: "The tracker export was saved.")
+            case .failure(let error):
                 message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
             }
             exportDocument = nil
@@ -146,13 +149,10 @@ struct TrackerTransferView: View {
             }
             Task.detached {
                 do {
-                    let hasAccess = url.startAccessingSecurityScopedResource()
-                    defer {
-                        if hasAccess {
-                            url.stopAccessingSecurityScopedResource()
-                        }
-                    }
                     try data.write(to: url, options: .atomic)
+                    await MainActor.run {
+                        message = TransferMessage(title: "Export Complete", detail: "Saved \(url.lastPathComponent).")
+                    }
                 } catch {
                     await MainActor.run {
                         message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
@@ -311,14 +311,18 @@ private struct WindowAccessor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
-            window = view.window
+            if window !== view.window {
+                window = view.window
+            }
         }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
-            window = nsView.window
+            if window !== nsView.window {
+                window = nsView.window
+            }
         }
     }
 }
