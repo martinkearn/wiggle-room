@@ -142,13 +142,17 @@ struct TrackerTransferView: View {
         let panelCompletion: (NSApplication.ModalResponse) -> Void = { response in
             guard response == .OK else { return }
             guard let url = panel.url else {
-                Task { @MainActor in
-                    message = TransferMessage(title: "Export Failed", detail: "The selected save location could not be determined.")
-                }
+                message = TransferMessage(title: "Export Failed", detail: "The selected save location could not be determined.")
                 return
             }
             Task.detached {
                 do {
+                    let hasAccess = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if hasAccess {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
                     try data.write(to: url, options: .atomic)
                     await MainActor.run {
                         message = TransferMessage(title: "Export Complete", detail: "Saved \(url.lastPathComponent).")
