@@ -1,6 +1,9 @@
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
 struct TrackerTransferView: View {
     @Environment(TrackerStore.self) private var store
@@ -69,16 +72,7 @@ struct TrackerTransferView: View {
     @ViewBuilder
     private var transferControls: some View {
         Button {
-            do {
-                exportDocument = TrackerArchiveDocument(
-                    data: try TrackerArchiveService.encode(
-                        TrackerArchiveService.makeArchive(trackers: trackers)
-                    )
-                )
-                isExporting = true
-            } catch {
-                message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
-            }
+            exportTrackers()
         } label: {
             Label("Export All Trackers", systemImage: "square.and.arrow.up")
         }
@@ -96,6 +90,43 @@ struct TrackerTransferView: View {
             .foregroundStyle(.secondary)
         #endif
     }
+
+    private func exportTrackers() {
+        do {
+            let data = try TrackerArchiveService.encode(
+                TrackerArchiveService.makeArchive(trackers: trackers)
+            )
+            #if os(macOS)
+            exportArchiveToDisk(data)
+            #else
+            exportDocument = TrackerArchiveDocument(data: data)
+            isExporting = true
+            #endif
+        } catch {
+            message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
+        }
+    }
+
+    #if os(macOS)
+    private func exportArchiveToDisk(_ data: Data) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = "Wiggle Room Trackers.json"
+        panel.begin { response in
+            guard response == .OK else { return }
+            guard let url = panel.url else {
+                message = TransferMessage(title: "Export Failed", detail: "Choose a location to save the export.")
+                return
+            }
+            do {
+                try data.write(to: url, options: .atomic)
+            } catch {
+                message = TransferMessage(title: "Export Failed", detail: error.localizedDescription)
+            }
+        }
+    }
+    #endif
 
     private func importReview(for archive: TrackerArchive) -> some View {
         NavigationStack {

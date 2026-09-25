@@ -212,6 +212,7 @@ It is reached from a `@Query`-backed list, so its body observes no SwiftData at 
 - Dedicated Settings window
 - Menu bar presentation for a selected tracker
 - Explicit update controls where pull-to-refresh is unavailable
+- JSON export and import of tracker configuration and complete reading history
 
 ### watchOS
 
