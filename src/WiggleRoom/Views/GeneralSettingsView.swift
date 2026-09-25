@@ -26,6 +26,7 @@ struct GeneralSettingsView: View {
     @AppStorage(menuBarTrackerIDKey) private var pinnedTrackerID: String = ""
     #endif
 
+    @ViewBuilder
     var body: some View {
         #if os(macOS)
         VStack(alignment: .leading, spacing: 20) {
