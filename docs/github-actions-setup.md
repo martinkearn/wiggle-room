@@ -346,6 +346,14 @@ Fork maintainers must use their replacement bundle identifiers instead.
 
 If a required App ID is missing, create it under **Certificates, Identifiers & Profiles → Identifiers** with the capabilities used by the corresponding target. App Groups, CloudKit, push notifications, and other entitlements in the profile must agree with the Xcode target.
 
+### Capabilities must match the entitlements file
+
+A profile is a snapshot of its App ID's capabilities at the moment it was generated, so adding a capability to a target's entitlements means enabling it on the App ID **and** regenerating every affected profile. Archiving otherwise fails with `Provisioning profile "…" doesn't include the … capability`, which is a signing failure rather than a code problem: the unsigned build check still passes.
+
+The iOS app target (`martinkearn.WiggleRoom`) needs the **HealthKit** capability, for the Apple Health source. Clinical Health Records is deliberately not enabled, and `com.apple.developer.healthkit.access` deliberately absent from the entitlements file, because the app reads body mass and nothing else. macOS has no HealthKit at all, which is why the app target's entitlements file is split per SDK — `WiggleRoom-iOS.entitlements` carries the capability and `WiggleRoom.entitlements` does not. A macOS App ID cannot carry it, so a shared file would break macOS signing.
+
+After changing a capability: regenerate the profile, re-encode it, update its secret, and re-run the failed workflow.
+
 ### Verify and encode each profile
 
 To inspect a downloaded profile before uploading it:
