@@ -24,10 +24,58 @@ struct TrendChartView: View {
     var showsLegend = true
     var showsAxes = true
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private static let liveContinuationLineStyle = StrokeStyle(lineWidth: 2, lineCap: .round, dash: [1, 4])
 
+    typealias ChartPoint = (date: Date, value: Double)
+
+    /// The five days the chart is magnified to when the tracker is zoomed
+    /// (see `TrackerZoom`), or `nil` to show the whole period.
+    private var zoomWindow: DateInterval? {
+        tracker.zoomWindow(asOf: now)
+    }
+
+    /// The span the chart's x-axis covers: the zoom window, or the whole
+    /// tracking period.
     private var window: DateInterval {
-        DateInterval(start: tracker.startDate, end: tracker.endDate)
+        zoomWindow ?? DateInterval(start: tracker.startDate, end: tracker.endDate)
+    }
+
+    /// Where the pace line sits at a given instant.
+    private func paceValue(at date: Date) -> Double {
+        double(tracker.pace(actualValue: tracker.startingValue, asOf: date).targetValueToday)
+    }
+
+    /// Cuts the line from `a` to `b` down to the part inside `window`,
+    /// interpolating a new end wherever it crosses an edge. `nil` if none of
+    /// it is inside. Unzoomed, lines are left exactly as they are.
+    private func clipped(_ a: ChartPoint, _ b: ChartPoint) -> (ChartPoint, ChartPoint)? {
+        guard let zoomWindow else { return (a, b) }
+        guard b.date >= zoomWindow.start, a.date <= zoomWindow.end else { return nil }
+        func value(at date: Date) -> Double {
+            let span = b.date.timeIntervalSince(a.date)
+            guard span > 0 else { return b.value }
+            return a.value + (b.value - a.value) * date.timeIntervalSince(a.date) / span
+        }
+        let start = a.date < zoomWindow.start ? (zoomWindow.start, value(at: zoomWindow.start)) : a
+        let end = b.date > zoomWindow.end ? (zoomWindow.end, value(at: zoomWindow.end)) : b
+        return (start, end)
+    }
+
+    /// `clipped(_:_:)` applied along a whole polyline.
+    private func clipped(_ points: [ChartPoint]) -> [ChartPoint] {
+        guard zoomWindow != nil else { return points }
+        var result: [ChartPoint] = []
+        for (a, b) in zip(points, points.dropFirst()) {
+            guard let (start, end) = clipped(a, b) else { continue }
+            if let last = result.last, last.date == start.date, last.value == start.value {
+                result.append(end)
+            } else {
+                result += [start, end]
+            }
+        }
+        return result
     }
 
     /// Bottom-axis ticks scaled to the tracker's length: hours up to a day,
@@ -70,11 +118,11 @@ struct TrendChartView: View {
         tracker.sortedReadings.last
     }
 
-    private var targetEndValue: Decimal {
-        switch tracker.direction {
-        case .decreasing: tracker.startingValue - tracker.totalAllowance
-        case .increasing: tracker.startingValue + tracker.totalAllowance
-        }
+    /// The readings drawn as points — only those inside the zoom window
+    /// when zoomed, since anything else would sit off the plot.
+    private var visibleReadings: [ValueSnapshot] {
+        guard let zoomWindow else { return tracker.sortedReadings }
+        return tracker.sortedReadings.filter { zoomWindow.contains($0.date) }
     }
 
     /// The Y range the chart should actually be scaled to — `tracker
@@ -91,9 +139,25 @@ struct TrendChartView: View {
     /// below also clamps its own values into this range directly — see that
     /// property for why leaving the raw, un-clamped values for Charts' own
     /// axis-driven clipping to handle isn't enough.
+    ///
+    /// Zoomed, the scale is fitted to what's inside the window instead —
+    /// the pace line, the readings (including where lines enter and leave
+    /// across the window's edges) and the carried-forward "now" point — so
+    /// five days of movement fill the plot rather than sitting as a flat
+    /// sliver of the whole period's scale.
     private var yDomain: ClosedRange<Double> {
-        let range = tracker.plausibleTrendRange
-        return (range.lowerBound as NSDecimalNumber).doubleValue...(range.upperBound as NSDecimalNumber).doubleValue
+        guard let zoomWindow else {
+            let range = tracker.plausibleTrendRange
+            return (range.lowerBound as NSDecimalNumber).doubleValue...(range.upperBound as NSDecimalNumber).doubleValue
+        }
+        var values = [paceValue(at: zoomWindow.start), paceValue(at: zoomWindow.end)]
+        values += segments.flatMap { [$0.start.value, $0.end.value] }
+        values += visibleReadings.map { double($0.value) }
+        values += liveContinuation.map(\.value)
+        let low = values.min() ?? 0
+        let high = values.max() ?? 0
+        let padding = high > low ? (high - low) * 0.1 : 1
+        return (low - padding)...(high + padding)
     }
 
     /// The trend line's anchor points. Rather than a single straight line
@@ -118,22 +182,23 @@ struct TrendChartView: View {
     /// outside the visible domain — avoids that entirely. The line still
     /// visibly runs to the domain's top/bottom edge, which reads as "steep"
     /// just as well as the true extrapolated value would.
-    private var trendPoints: [(date: Date, value: Decimal)]? {
+    ///
+    /// Zoomed, the line is still fitted from every reading, but only the
+    /// part inside the window is drawn.
+    private var trendPoints: [ChartPoint]? {
         let readings = tracker.sortedReadings
         guard readings.count > 1 else { return nil }
         let domain = yDomain
-        func clamped(_ raw: Double) -> Decimal {
-            Decimal(min(max(raw, domain.lowerBound), domain.upperBound))
-        }
 
-        var points: [(date: Date, value: Decimal)] = []
+        var points: [ChartPoint] = []
         for index in 1..<readings.count {
             guard let expandingFit = linearFit(through: readings[0...index]) else { continue }
-            points.append((readings[index].date, clamped(expandingFit.value(at: readings[index].date))))
+            points.append((readings[index].date, expandingFit.value(at: readings[index].date)))
         }
         guard !points.isEmpty, let fullFit = linearFit(through: readings[readings.startIndex...]) else { return nil }
-        points.append((window.end, clamped(fullFit.value(at: window.end))))
-        return points
+        points.append((tracker.endDate, fullFit.value(at: tracker.endDate)))
+        let visible = clipped(points).map { ($0.date, min(max($0.value, domain.lowerBound), domain.upperBound)) }
+        return visible.isEmpty ? nil : visible
     }
 
     /// A marker carrying the latest logged balance forward to "now" — keeps
@@ -142,7 +207,15 @@ struct TrendChartView: View {
     /// the last real reading already sits at that edge.
     private var liveNowPoint: (date: Date, value: Decimal)? {
         guard let latestReading, now < window.end else { return nil }
+        if zoomWindow != nil, now < window.start { return nil }
         return (min(now, window.end), latestReading.value)
+    }
+
+    /// The dotted line from the latest reading to `liveNowPoint`, cut to
+    /// the zoom window when zoomed. Empty when there's no live point.
+    private var liveContinuation: [ChartPoint] {
+        guard let liveNowPoint, let latestReading else { return [] }
+        return clipped([(latestReading.date, double(latestReading.value)), (liveNowPoint.date, double(liveNowPoint.value))])
     }
 
     /// The color of the most recent real segment/reading — reused for both
@@ -170,11 +243,14 @@ struct TrendChartView: View {
     /// Consecutive reading pairs, each tagged with whether the *later*
     /// point was ahead of pace — a segment is colored by where it ends up,
     /// same convention as coloring a stock chart's rising/falling days.
-    private var segments: [(id: String, start: ValueSnapshot, end: ValueSnapshot, isAhead: Bool)] {
+    /// Zoomed, each segment is cut to the window, keeping the colour of the
+    /// reading it ends at even when that reading is off the plot.
+    private var segments: [(id: String, start: ChartPoint, end: ChartPoint, isAhead: Bool)] {
         let readings = tracker.sortedReadings
         guard readings.count > 1 else { return [] }
-        return zip(readings, readings.dropFirst()).map { start, end in
-            (id: "\(start.id)-\(end.id)", start: start, end: end, isAhead: isAheadOfPace(value: end.value, at: end.date))
+        return zip(readings, readings.dropFirst()).compactMap { start, end in
+            guard let (a, b) = clipped((start.date, double(start.value)), (end.date, double(end.value))) else { return nil }
+            return (id: "\(start.id)-\(end.id)", start: a, end: b, isAhead: isAheadOfPace(value: end.value, at: end.date))
         }
     }
 
@@ -249,8 +325,8 @@ struct TrendChartView: View {
             // Target reference line — the strongest line on the chart, since
             // it's the fixed yardstick everything else is read against.
             ForEach(Array(wobbly(
-                from: (window.start, double(tracker.startingValue)),
-                to: (window.end, double(targetEndValue)),
+                from: (window.start, paceValue(at: window.start)),
+                to: (window.end, paceValue(at: window.end)),
                 seed: 0.7
             ).enumerated()), id: \.offset) { _, point in
                 LineMark(
@@ -268,8 +344,8 @@ struct TrendChartView: View {
 
             ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                 ForEach(Array(wobbly(
-                    from: (segment.start.date, double(segment.start.value)),
-                    to: (segment.end.date, double(segment.end.value)),
+                    from: segment.start,
+                    to: segment.end,
                     seed: 1.9 + Double(index) * 2.3,
                     cycles: 1
                 ).enumerated()), id: \.offset) { _, point in
@@ -284,7 +360,7 @@ struct TrendChartView: View {
                 }
             }
 
-            ForEach(tracker.sortedReadings) { reading in
+            ForEach(visibleReadings) { reading in
                 PointMark(
                     x: .value("Date", reading.date),
                     y: .value("Actual", reading.value)
@@ -292,25 +368,20 @@ struct TrendChartView: View {
                 .foregroundStyle(paceColor(for: reading.value, at: reading.date))
             }
 
-            if let liveNowPoint, let latestReading {
+            if let liveNowPoint {
                 // A dotted continuation from the last real reading up to
                 // "now" — without this, `liveNowPoint` below read as an
                 // unexplained floating dot rather than a clear "your last
                 // update, carried forward to this moment."
-                LineMark(
-                    x: .value("Date", latestReading.date),
-                    y: .value("Now", latestReading.value),
-                    series: .value("Series", "LiveContinuation")
-                )
-                .foregroundStyle(liveContinuationColor)
-                .lineStyle(Self.liveContinuationLineStyle)
-                LineMark(
-                    x: .value("Date", liveNowPoint.date),
-                    y: .value("Now", liveNowPoint.value),
-                    series: .value("Series", "LiveContinuation")
-                )
-                .foregroundStyle(liveContinuationColor)
-                .lineStyle(Self.liveContinuationLineStyle)
+                ForEach(Array(liveContinuation.enumerated()), id: \.offset) { _, point in
+                    LineMark(
+                        x: .value("Date", point.date),
+                        y: .value("Now", point.value),
+                        series: .value("Series", "LiveContinuation")
+                    )
+                    .foregroundStyle(liveContinuationColor)
+                    .lineStyle(Self.liveContinuationLineStyle)
+                }
 
                 PointMark(
                     x: .value("Date", liveNowPoint.date),
@@ -352,6 +423,11 @@ struct TrendChartView: View {
         }
         .chartYScale(domain: yDomain)
         .font(.wiggleText(.caption2))
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.4), value: zoomWindow)
+        .modifier(ZoomAccessibility(
+            description: zoomWindow.map { "Zoomed to \(Tracker.zoomRangeText($0))" },
+            combinesChildren: false
+        ))
     }
 }
 

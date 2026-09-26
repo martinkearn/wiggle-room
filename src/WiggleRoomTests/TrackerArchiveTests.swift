@@ -39,6 +39,7 @@ final class TrackerArchiveTests: XCTestCase {
         tracker.sortOrder = 3
         tracker.colorIndex = 4
         tracker.glyph = "airplane"
+        tracker.isZoomed = true
         store.addTracker(tracker)
         let reading = ValueSnapshot(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000201")!,
@@ -73,6 +74,7 @@ final class TrackerArchiveTests: XCTestCase {
         XCTAssertEqual(archived.sortOrder, 3)
         XCTAssertEqual(archived.colorIndex, 4)
         XCTAssertEqual(archived.glyph, "airplane")
+        XCTAssertEqual(archived.isZoomed, true)
         XCTAssertEqual(archived.readings.first?.id, reading.id)
         XCTAssertEqual(archived.readings.first?.value, "987.65")
         XCTAssertEqual(archived.readings.first?.date, reading.date)
@@ -162,6 +164,49 @@ final class TrackerArchiveTests: XCTestCase {
         XCTAssertNil(imported.connectedSource)
         XCTAssertFalse(imported.isManualEntry)
         XCTAssertEqual(imported.sourceTargetId, "synthetic-account")
+    }
+
+    func testImportRestoresZoomAndTreatsMissingZoomAsNotZoomed() throws {
+        let sourceContainer = makeInMemoryModelContainer()
+        let sourceStore = TrackerStore(modelContext: sourceContainer.mainContext)
+        let zoomed = makeTracker(name: "Zoomed Example", source: sourceStore.manualEntrySource)
+        zoomed.isZoomed = true
+        sourceStore.addTracker(zoomed)
+        let archive = TrackerArchiveService.makeArchive(trackers: [zoomed])
+
+        let destinationContainer = makeInMemoryModelContainer()
+        let destinationContext = destinationContainer.mainContext
+        let destinationStore = TrackerStore(modelContext: destinationContext)
+        try TrackerArchiveService.importArchive(
+            archive,
+            sourceMappings: [:],
+            store: destinationStore,
+            modelContext: destinationContext
+        )
+        let imported = try XCTUnwrap(destinationContext.fetch(FetchDescriptor<Tracker>()).first)
+        XCTAssertTrue(imported.isZoomed)
+
+        // An archive written before zoom existed has no `isZoomed` key.
+        let encoded = try TrackerArchiveService.encode(archive)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        var trackers = try XCTUnwrap(json["trackers"] as? [[String: Any]])
+        trackers[0]["isZoomed"] = nil
+        trackers[0]["name"] = "Legacy Example"
+        trackers[0]["id"] = "00000000-0000-0000-0000-000000000401"
+        json["trackers"] = trackers
+        let legacy = try TrackerArchiveService.decode(JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(legacy.trackers.first?.isZoomed)
+
+        let legacyContainer = makeInMemoryModelContainer()
+        let legacyContext = legacyContainer.mainContext
+        try TrackerArchiveService.importArchive(
+            legacy,
+            sourceMappings: [:],
+            store: TrackerStore(modelContext: legacyContext),
+            modelContext: legacyContext
+        )
+        let importedLegacy = try XCTUnwrap(legacyContext.fetch(FetchDescriptor<Tracker>()).first)
+        XCTAssertFalse(importedLegacy.isZoomed)
     }
 
     private func makeTracker(name: String, source: ConnectedSource) -> Tracker {

@@ -144,6 +144,13 @@ struct WatchTrackerDetailView: View {
                             ))
                         )
 
+                    if let zoomWindow = tracker.zoomWindow(asOf: now) {
+                        Label("Showing \(Tracker.zoomRangeText(zoomWindow))", systemImage: "plus.magnifyingglass")
+                            .font(.wiggleText(.caption2, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+
                     figureCards
 
                     Text(tracker.periodRemainingText(asOf: now))
@@ -185,6 +192,22 @@ struct WatchTrackerDetailView: View {
                 .padding(.vertical, 8)
             }
             .navigationTitle("")
+            .toolbar {
+                if tracker.canZoom(asOf: now) {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            tracker.isZoomed.toggle()
+                            store.saveChanges()
+                        } label: {
+                            if tracker.isZoomed {
+                                Label("Zoom Out", systemImage: "minus.magnifyingglass")
+                            } else {
+                                Label("Zoom In", systemImage: "plus.magnifyingglass")
+                            }
+                        }
+                    }
+                }
+            }
             .onAppear {
                 now = Date.now
                 // Always refresh once when a tracker is first opened, even

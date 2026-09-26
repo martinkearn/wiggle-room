@@ -110,6 +110,9 @@ struct TrackerChartEntryView: View {
                 .font(WiggleRoomFont.headline(nameSize, weight: 650))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+            if family != .systemSmall {
+                ZoomIndicator(tracker: tracker, now: entry.date)
+            }
             if tracker.isCompleted(asOf: entry.date) { CompletedBadge() }
             Spacer(minLength: 4)
             Text(pace(tracker).displayDifference(for: tracker))

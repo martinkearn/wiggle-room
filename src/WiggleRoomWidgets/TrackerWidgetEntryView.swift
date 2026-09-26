@@ -130,6 +130,7 @@ struct TrackerWidgetEntryView: View {
                         .font(WiggleRoomFont.headline(16, weight: 650))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                    ZoomIndicator(tracker: tracker, now: entry.date)
                     if tracker.isCompleted(asOf: entry.date) {
                         CompletedBadge()
                     }
@@ -170,6 +171,7 @@ struct TrackerWidgetEntryView: View {
                     .font(WiggleRoomFont.headline(20, weight: 650))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                ZoomIndicator(tracker: tracker, now: entry.date, size: 13)
                 if tracker.isCompleted(asOf: entry.date) {
                     CompletedBadge()
                 }
@@ -254,6 +256,7 @@ struct TrackerWidgetEntryView: View {
                     .font(WiggleRoomFont.headline(24, weight: 650))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                ZoomIndicator(tracker: tracker, now: entry.date, size: 15)
                 if isCompleted {
                     CompletedBadge()
                 }
@@ -301,8 +304,7 @@ struct TrackerWidgetEntryView: View {
 
     #if !os(macOS)
     private func circularLockScreen(_ tracker: Tracker) -> some View {
-        let p = pace(for: tracker)
-        let fraction = p.periodHours > 0 ? min(max(p.hoursElapsed / p.periodHours, 0), 1) : 0
+        let fraction = tracker.ringFractions(asOf: entry.date).elapsed
         return WobblyGauge(fraction: fraction, color: .primary) {
             Text(tracker.name.prefix(3))
                 .font(.wiggleText(size: 10))

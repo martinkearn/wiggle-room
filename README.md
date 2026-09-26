@@ -9,7 +9,7 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 - Four tracker types: Spending Money, Saving Money, Mileage, and Weight loss
 - Manual readings and optional Starling Bank balance integration
 - Pace, target, and projected-final calculations, with a traffic-light status that knows whether higher or lower is better
-- Reading history and trend charts
+- Reading history and trend charts, with a five-day zoom for long trackers
 - iOS and macOS apps, Apple Watch companion app, widgets, complications, Live Activities, Siri Shortcuts, and Spotlight integration
 - Cross-device sync through the user's private CloudKit database
 - Per-tracker colours, symbols, reminders, and custom ordering
