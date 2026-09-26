@@ -31,15 +31,30 @@ struct SettingsLabel: View {
     }
 }
 
-/// The badge for a connected source's provider (Starling → Sky, Tesla →
-/// Peach, Manual → Toffee), so a source reads as its provider at a glance.
+/// The badge for a connected source's provider (Starling → Sky, Apple Health
+/// → Bubblegum, Tesla → Peach, Manual → Toffee), so a source reads as its
+/// provider at a glance.
 struct ProviderBadge: View {
     let providerId: String
     var size: CGFloat = 36
 
+    /// The provider's own name, for the places that show it as text beside
+    /// the badge. A raw `providerId` capitalized reads as "Healthkit", which
+    /// is neither the framework's name nor the app's.
+    static func displayName(for providerId: String) -> String {
+        switch providerId {
+        case "starling": "Starling"
+        case "healthkit": "Apple Health"
+        case "tesla": "Tesla"
+        case "manual": "Manual Entry"
+        default: providerId.capitalized
+        }
+    }
+
     private var style: (symbol: String, color: Int) {
         switch providerId {
         case "starling": ("creditcard.fill", 2)
+        case "healthkit": ("heart.fill", 1)
         case "tesla": ("bolt.car.fill", 5)
         default: ("square.and.pencil", 7)
         }

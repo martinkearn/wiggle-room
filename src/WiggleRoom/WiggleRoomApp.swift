@@ -127,6 +127,12 @@ struct WiggleRoomApp: App {
                     if newPhase == .active {
                         let trackers = (try? modelContainer.mainContext.fetch(FetchDescriptor<Tracker>())) ?? []
                         TrackerLiveActivity.syncAll(trackers)
+                        // Apple Health is read from this device, once a day
+                        // in the evening. `BGAppRefreshTask` may never fire,
+                        // so activation is what makes that day's reading
+                        // actually arrive — a local read with no network,
+                        // rate limit or permission prompt behind it.
+                        Task { await store.refreshDueDailySources() }
                     }
                 }
                 #endif

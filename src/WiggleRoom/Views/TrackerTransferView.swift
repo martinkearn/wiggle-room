@@ -197,7 +197,7 @@ struct TrackerTransferView: View {
                             }
 
                             if matchingSources.isEmpty {
-                                Text("No \(archivedSource.providerId.capitalized) source is connected. Create one in Connected Sources, or choose Import Read Only and connect the tracker later from Edit Tracker.")
+                                Text("No \(ProviderBadge.displayName(for: archivedSource.providerId)) source is connected. Create one in Connected Sources, or choose Import Read Only and connect the tracker later from Edit Tracker.")
                                     .font(.wiggleText(.caption))
                                     .foregroundStyle(.secondary)
                             }

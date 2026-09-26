@@ -32,6 +32,15 @@ struct WatchTrackerDetailView: View {
         now = Date.now
     }
 
+    /// Whether an update button would have anything to do. A source bound to
+    /// another device — Apple Health, which this version doesn't read on the
+    /// watch — can't be fetched from here, so the watch shows the synced
+    /// readings and no control, rather than a button that silently does
+    /// nothing.
+    private var canUpdateOnThisDevice: Bool {
+        store.provider(for: tracker)?.isAvailableOnThisDevice ?? false
+    }
+
     private var pace: TrackerPace {
         tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: now)
     }
@@ -180,7 +189,7 @@ struct WatchTrackerDetailView: View {
                                 Label("Log", systemImage: "plus.circle.fill")
                             }
                             .buttonStyle(.borderedProminent)
-                        } else {
+                        } else if canUpdateOnThisDevice {
                             Button {
                                 Task { await refreshFromSourceIfNeeded() }
                             } label: {

@@ -276,7 +276,7 @@ struct AddTrackerView: View {
                         Text("Only sources that can supply a \(trackerType.displayName.lowercased()) reading are listed. Manual Entry suits every type.")
                     }
 
-                    if selectedSourceId != nil && !isManualEntrySelected {
+                    if showsTargetPicker {
                         targetPickerSection
                     }
                 } else {
@@ -284,15 +284,15 @@ struct AddTrackerView: View {
                         LabeledContent("Source", value: existingTracker?.connectedSource?.displayName ?? "Not Connected")
                         if existingTracker?.isManualEntry == false {
                             if isResolvingAccountName {
-                                LabeledContent("Account") {
+                                LabeledContent(boundTargetLabel) {
                                     ProgressView()
                                 }
                             } else {
-                                LabeledContent("Account", value: resolvedAccountName ?? existingTracker?.sourceTargetId ?? "Unknown")
+                                LabeledContent(boundTargetLabel, value: resolvedAccountName ?? existingTracker?.sourceTargetId ?? "Unknown")
                             }
                         }
                     } footer: {
-                        Text("A connected source and account are fixed once selected.")
+                        Text("A connected source and \(boundTargetLabel.lowercased()) are fixed once selected.")
                     }
                 }
 
@@ -423,17 +423,17 @@ struct AddTrackerView: View {
             if isLoadingTargets {
                 HStack {
                     ProgressView()
-                    Text("Loading accounts…")
+                    Text("Loading \(selectedTargetLabel.lowercased())s…")
                         .foregroundStyle(.secondary)
                 }
             } else if let targetLoadErrorMessage {
                 Text(targetLoadErrorMessage)
                     .foregroundStyle(WiggleRoomColors.error)
             } else if availableTargets.isEmpty {
-                Text("No accounts found for this source.")
+                Text("No \(selectedTargetLabel.lowercased())s found for this source.")
                     .foregroundStyle(.secondary)
             } else {
-                Picker("Account", selection: $selectedTargetId) {
+                Picker(selectedTargetLabel, selection: $selectedTargetId) {
                     Text("Choose one").tag(nil as String?)
                     ForEach(availableTargets) { target in
                         Text(target.displayName).tag(target.id as String?)
@@ -441,11 +441,38 @@ struct AddTrackerView: View {
                 }
             }
         } header: {
-            Text("Account")
+            Text(selectedTargetLabel)
                 .font(WiggleRoomFont.headline(15, weight: 650))
         } footer: {
-            Text("The account this tracker reads its balance from.")
+            Text("The \(selectedTargetLabel.lowercased()) this tracker reads from.")
         }
+    }
+
+    /// Whether there's a choice worth showing. A source offering exactly one
+    /// target — Apple Health, whose only measurement is weight — has it
+    /// selected automatically in `loadAvailableTargetsIfNeeded`, so a picker
+    /// with a single row would be asking a question with one answer. The
+    /// loading and failure states still show, since those say something.
+    private var showsTargetPicker: Bool {
+        guard selectedSourceId != nil, !isManualEntrySelected else { return false }
+        if isLoadingTargets || targetLoadErrorMessage != nil { return true }
+        return availableTargets.count != 1
+    }
+
+    /// The word this source's provider uses for one of its targets —
+    /// "Account" for a bank, "Measurement" for Apple Health. Kept with the
+    /// provider (`SourceProvider.targetLabel`) rather than hard-coded here,
+    /// so a weight tracker never reports its "Account" as "Weight".
+    private var selectedTargetLabel: String {
+        guard let selectedSourceId, let source = resolveSource(withId: selectedSourceId) else { return "Account" }
+        return store.provider(for: source)?.targetLabel ?? "Account"
+    }
+
+    /// The same word for a tracker that's already connected, where the
+    /// source is fixed and read from the tracker itself.
+    private var boundTargetLabel: String {
+        guard let existingTracker, let source = existingTracker.connectedSource else { return "Account" }
+        return store.provider(for: source)?.targetLabel ?? "Account"
     }
 
     private func loadAvailableTargetsIfNeeded() async {
@@ -464,8 +491,13 @@ struct AddTrackerView: View {
         defer { isLoadingTargets = false }
         do {
             availableTargets = try await store.listAvailableTargets(for: source)
+            // One target is no choice at all — pick it, so the section can
+            // stay off screen entirely (see `showsTargetPicker`).
+            if availableTargets.count == 1 {
+                selectedTargetId = availableTargets.first?.id
+            }
         } catch {
-            targetLoadErrorMessage = "Couldn't load accounts — try again."
+            targetLoadErrorMessage = "Couldn't load \(selectedTargetLabel.lowercased())s — try again."
         }
     }
 
@@ -509,7 +541,11 @@ struct AddTrackerView: View {
         else { return }
         isPrefillingStartingValue = true
         defer { isPrefillingStartingValue = false }
-        guard let value = try? await store.fetchCurrentValue(for: target, from: source) else { return }
+        // `unit` matters for a provider whose value can be read in more than
+        // one unit — Apple Health's body mass, in kilograms or pounds. See
+        // `SourceTarget.unit`.
+        let unitAwareTarget = SourceTarget(id: target.id, displayName: target.displayName, unit: unit.rawValue)
+        guard let value = try? await store.fetchCurrentValue(for: unitAwareTarget, from: source) else { return }
         // The user may have typed their own starting value (e.g. backdating
         // the tracker's start to reflect a balance from earlier, not right
         // now) while this fetch was in flight — never stomp on that.
