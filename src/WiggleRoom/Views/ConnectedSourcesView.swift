@@ -189,7 +189,7 @@ struct ConnectedSourcesView: View {
             } else {
                 List(addedSources) { source in
                     NavigationLink {
-                        AddSourceView(existingSource: source)
+                        editor(for: source)
                     } label: {
                         row(for: source)
                     }
@@ -243,6 +243,18 @@ struct ConnectedSourcesView: View {
             Text(removalBlockedMessage ?? "")
         }
     }
+
+    /// Each provider gets the editor its setup actually needs: a token field
+    /// for Starling, an authorisation request and a rename for Apple Health
+    /// (which has no credential at all).
+    @ViewBuilder
+    private func editor(for source: ConnectedSource) -> some View {
+        if source.providerId == "healthkit" {
+            AddHealthSourceView(existingSource: source)
+        } else {
+            AddSourceView(existingSource: source)
+        }
+    }
     #endif
 
     private func row(for source: ConnectedSource) -> some View {
@@ -251,7 +263,7 @@ struct ConnectedSourcesView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(source.displayName)
                     .font(WiggleRoomFont.headline(17, weight: 600))
-                Text(source.providerId.capitalized)
+                Text(ProviderBadge.displayName(for: source.providerId))
                     .font(.wiggleText(.subheadline))
                     .foregroundStyle(.secondary)
             }
@@ -346,6 +358,14 @@ private struct SourceEditorCard: View {
         !(source.credentialToken ?? "").isEmpty
     }
 
+    /// Apple Health has no credential to enter and can't be read on a Mac at
+    /// all, so its card is a rename, the trackers using it, and an
+    /// explanation — nothing to connect, nothing to validate, nothing to
+    /// count.
+    private var isHealthKit: Bool {
+        source.providerId == "healthkit"
+    }
+
     private var hasUnsavedChanges: Bool {
         trimmedToken != (source.credentialToken ?? "")
     }
@@ -380,12 +400,14 @@ private struct SourceEditorCard: View {
                             duplicateNameMessage = nil
                             try? modelContext.save()
                         }
-                    Text(source.providerId.capitalized)
+                    Text(ProviderBadge.displayName(for: source.providerId))
                         .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                connectionStatusBadge
+                if !isHealthKit {
+                    connectionStatusBadge
+                }
                 Button(role: .destructive) {
                     onRemove()
                 } label: {
@@ -412,6 +434,31 @@ private struct SourceEditorCard: View {
                 }
             }
 
+            if isHealthKit {
+                healthSourceNote
+            } else {
+                tokenEditor
+            }
+
+            if source.providerId == "starling" {
+                Divider()
+                starlingRateLimitSection
+            }
+        }
+        .padding(14)
+        .background(.quinary, in: WobblyCard.shape(0, scale: 0.7))
+        .task {
+            loadOtherSourceNames()
+            await refreshStarlingCooldown()
+        }
+    }
+
+    /// The Starling-shaped half of this card: the token draft and its
+    /// explicit Update action, kept separate from the name (which saves as
+    /// you type) because a token genuinely needs validating before it's
+    /// trusted.
+    private var tokenEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Personal Access Token")
                 .font(.wiggleText(.caption))
                 .foregroundStyle(.secondary)
@@ -452,18 +499,19 @@ private struct SourceEditorCard: View {
                 }
                 .disabled(trimmedToken.isEmpty || !hasUnsavedChanges || isSaving)
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-            if source.providerId == "starling" {
-                Divider()
-                starlingRateLimitSection
-            }
-        }
-        .padding(14)
-        .background(.quinary, in: WobblyCard.shape(0, scale: 0.7))
-        .task {
-            loadOtherSourceNames()
-            await refreshStarlingCooldown()
-        }
+    /// Where a Health source's figures actually come from, said plainly — a
+    /// Mac has no Health store to read, and the trackers using this source
+    /// show what an iPhone or iPad recorded.
+    private var healthSourceNote: some View {
+        Text("Apple Health readings come from your iPhone or iPad. This Mac can't read Health, so these trackers show the last weight those devices recorded.")
+            .font(.wiggleText(.caption))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Admin/diagnostic info about this connection's shared Starling

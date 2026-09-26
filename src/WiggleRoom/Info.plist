@@ -6,6 +6,8 @@
 	<array>
 		<string>martinkearn.WiggleRoom.starlingRefresh</string>
 	</array>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Wiggle Room reads the latest weight recorded in Health so a weight tracker stays up to date. It only ever reads weight, and never writes anything to Health.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

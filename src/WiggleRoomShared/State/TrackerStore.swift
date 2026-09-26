@@ -274,6 +274,8 @@ final class TrackerStore {
             return manualProvider
         case "starling":
             return StarlingProvider(connection: source)
+        case "healthkit":
+            return HealthKitProvider()
         default:
             return nil
         }
@@ -286,13 +288,15 @@ final class TrackerStore {
     /// for a manual-entry tracker (nothing to fetch) or one with no
     /// resolvable provider/target.
     ///
-    /// Only logs a new reading when the fetched value actually differs from
-    /// the latest one already on record — the 30s foreground poll (§5.3)
-    /// would otherwise write a near-duplicate, same-value reading on every
-    /// single tick regardless of whether anything changed, flooding the
-    /// trend chart with so many overlapping same-value points that
-    /// individual readings become visually indistinguishable from the line
-    /// connecting them, and needlessly bloating the synced reading history.
+    /// Only logs a reading that is genuinely new — newer than the latest one
+    /// on record, and a different value at the unit's own precision (see
+    /// `SourceReadingPolicy`, which owns the rule and its edge cases). A
+    /// foreground poll would otherwise write a near-duplicate, same-value
+    /// reading on every single tick regardless of whether anything changed,
+    /// flooding the trend chart with so many overlapping same-value points
+    /// that individual readings become visually indistinguishable from the
+    /// line connecting them, and needlessly bloating the synced reading
+    /// history.
     /// A poll that finds nothing changed still counts as a successful
     /// refresh (clears any stale error state) — it just doesn't need its
     /// own row. Returns whether the value actually changed (a new reading
@@ -304,17 +308,74 @@ final class TrackerStore {
     func refreshFromSource(_ tracker: Tracker, force: Bool = false) async throws -> Bool {
         guard !tracker.isManualEntry,
               let sourceTargetId = tracker.sourceTargetId,
-              let provider = provider(for: tracker)
+              let provider = provider(for: tracker),
+              // A device-bound source that can't be read here isn't a
+              // failure to report — it's a tracker this device only
+              // displays. Nothing is attempted and `lastCheckedDate` is left
+              // alone, so the figure on screen stays the truthful one
+              // another device fetched.
+              provider.isAvailableOnThisDevice
         else { return false }
-        let target = SourceTarget(id: sourceTargetId, displayName: tracker.name)
-        let value = try await provider.fetchCurrentValue(target: target)
+        // `unit` is carried along for a provider whose value can be read in
+        // more than one unit (Apple Health's body mass) — see
+        // `SourceTarget.unit`.
+        let target = SourceTarget(id: sourceTargetId, displayName: tracker.name, unit: tracker.unit)
+        let reading = try await provider.fetchCurrentReading(target: target)
         tracker.lastCheckedDate = .now
-        guard force || value != tracker.latestReading?.value else {
+        // Rounded at the unit's own precision before anything compares or
+        // stores it, so a provider handing back more decimal places than the
+        // app ever displays can't register as a change on every poll.
+        let value = tracker.trackerUnit.rounded(reading.value)
+        let latest = tracker.latestReading
+        guard SourceReadingPolicy.shouldLog(
+            reading: reading,
+            roundedValue: value,
+            latestValue: latest?.value,
+            latestDate: latest?.date,
+            trackerStartDate: tracker.startDate,
+            force: force
+        ) else {
+            // Still a successful check — `lastCheckedDate` above already
+            // records it. There's just nothing new to write down.
             try? modelContext.save()
             return false
         }
-        logReading(value: value, date: .now, for: tracker)
+        logReading(value: value, date: reading.date, for: tracker)
         return true
+    }
+
+    /// Reads any tracker whose source is polled once a day from this device
+    /// itself — Apple Health today — when its daily slot has passed and
+    /// nothing has claimed it yet.
+    ///
+    /// Called when the app becomes active, because `BGAppRefreshTask` is
+    /// opportunistic and may not fire at all: without this, the evening read
+    /// simply wouldn't happen on a day iOS never woke the app. It is the same
+    /// cheap local read either way — no network, no rate limit, no
+    /// permission prompt (a query made without authorisation just returns
+    /// nothing).
+    ///
+    /// Records `lastAutoFetchAttempt` like the background path does, so the
+    /// two never double up on one day's slot. The tracker-open and
+    /// pull-to-refresh paths deliberately don't, matching Starling.
+    func refreshDueDailySources(asOf now: Date = .now) async {
+        guard let trackers = try? modelContext.fetch(FetchDescriptor<Tracker>()) else { return }
+        for tracker in trackers where !tracker.isManualEntry && !tracker.isCompleted(asOf: now) {
+            let policy = TrackerUpdateScheduling.pollPolicy(forProviderId: tracker.connectedSource?.providerId)
+            guard case .dailyEvening = policy,
+                  let provider = provider(for: tracker),
+                  provider.isAvailableOnThisDevice,
+                  TrackerUpdateScheduling.timeUntilDue(
+                      policy: policy,
+                      lastAttempt: tracker.lastAutoFetchAttempt,
+                      readings: tracker.sortedReadings,
+                      asOf: now
+                  ) <= 0
+            else { continue }
+            tracker.lastAutoFetchAttempt = now
+            _ = try? await refreshFromSource(tracker)
+        }
+        try? modelContext.save()
     }
 
     /// Every mutation flows through this store (the app, and Shortcuts/Siri

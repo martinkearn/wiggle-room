@@ -10,9 +10,9 @@ import Foundation
 /// widget/complication timeline reload policy alike, so both are governed by
 /// the same rule rather than each picking its own interval. Deliberately a
 /// pure function with no dependency on `Timer`/`WidgetKit`/SwiftUI: this is
-/// also the scheduling shape a future background fetch (for a real connected
-/// source like Starling or Tesla — "when should we next poll?") can reuse
-/// directly.
+/// also the scheduling shape a background fetch for a real connected source
+/// reuses directly — "when should we next poll?" — per provider, via
+/// `SourcePollPolicy`.
 enum TrackerUpdateScheduling {
     static let defaultWidgetFarInterval: TimeInterval = 300
 
@@ -42,12 +42,87 @@ enum TrackerUpdateScheduling {
 
     /// Fixed clock windows, not anything adaptive/personalized — a blunt
     /// but predictable default.
-    static func refreshBand(at date: Date = .now) -> RefreshBand {
-        switch Calendar.current.component(.hour, from: date) {
+    static func refreshBand(at date: Date = .now, calendar: Calendar = .current) -> RefreshBand {
+        switch calendar.component(.hour, from: date) {
         case 8..<17: .peak
         case 0..<6: .offPeak
         default: .standard
         }
+    }
+
+    /// How often a tracker's source should be polled in the background,
+    /// chosen from the provider behind it rather than assumed. "As often as
+    /// the bands allow" is right for a bank balance and wrong for a bathroom
+    /// scale.
+    enum SourcePollPolicy: Equatable {
+        /// Starling, and any other source whose value can move at any
+        /// moment: the time-of-day bands above, plus burst detection.
+        case transactional
+        /// Apple Health: once per local day, at or after `hour`. Most people
+        /// weigh themselves in the morning, so one evening read catches the
+        /// day's weight without polling around the clock in the hope of
+        /// finding it.
+        case dailyEvening(hour: Int)
+    }
+
+    /// The evening hour Apple Health is read at — late enough to have caught
+    /// a morning weigh-in, early enough not to be tomorrow's reading.
+    static let healthKitPollHour = 20
+
+    static func pollPolicy(forProviderId providerId: String?) -> SourcePollPolicy {
+        switch providerId {
+        case "healthkit": .dailyEvening(hour: healthKitPollHour)
+        default: .transactional
+        }
+    }
+
+    /// Seconds until a tracker is next due for a background poll under
+    /// `policy`, 0 when it's due right now. Never attempted before
+    /// (`lastAttempt` is `nil`) counts as maximally overdue either way.
+    static func timeUntilDue(
+        policy: SourcePollPolicy,
+        lastAttempt: Date?,
+        readings: [ValueSnapshot],
+        asOf now: Date = .now,
+        calendar: Calendar = .current
+    ) -> TimeInterval {
+        switch policy {
+        case .transactional:
+            // This tracker's own effective band right now — `peak`'s cadence
+            // while it's individually bursting, regardless of the actual time
+            // of day, otherwise whatever the clock says.
+            let band = isBursting(readings: readings, asOf: now) ? RefreshBand.peak : refreshBand(at: now, calendar: calendar)
+            return max(0, band.interval - now.timeIntervalSince(lastAttempt ?? .distantPast))
+        case .dailyEvening(let hour):
+            // Due when the most recent daily slot at or before now hasn't
+            // been claimed yet, which also handles catching up: a device
+            // that was off for three days is due immediately rather than
+            // waiting for the next evening to come round. Burst detection
+            // deliberately plays no part — two weigh-ins half an hour apart
+            // are no reason to start polling every five minutes.
+            let slot = mostRecentDailySlot(hour: hour, asOf: now, calendar: calendar)
+            guard (lastAttempt ?? .distantPast) >= slot else { return 0 }
+            let nextSlot = calendar.date(byAdding: .day, value: 1, to: slot) ?? slot.addingTimeInterval(24 * 60 * 60)
+            return max(0, nextSlot.timeIntervalSince(now))
+        }
+    }
+
+    /// Today's `hour`:00 local once it has passed, otherwise yesterday's.
+    ///
+    /// Built from date components and `Calendar` arithmetic rather than
+    /// 24-hour maths, so a daylight-saving change shifts the slot with the
+    /// clock instead of sliding it an hour off. Deliberately not
+    /// `date(bySettingHour:of:)`, which searches *forward* by default and so
+    /// hands back tomorrow's slot when today's has already passed — the exact
+    /// case this function exists to answer.
+    static func mostRecentDailySlot(hour: Int, asOf now: Date = .now, calendar: Calendar = .current) -> Date {
+        var components = calendar.dateComponents([.year, .month, .day], from: now)
+        components.hour = hour
+        components.minute = 0
+        components.second = 0
+        guard let today = calendar.date(from: components) else { return now }
+        guard today > now else { return today }
+        return calendar.date(byAdding: .day, value: -1, to: today) ?? today.addingTimeInterval(-24 * 60 * 60)
     }
 
     /// More than one reading logged within the trailing `window` counts as

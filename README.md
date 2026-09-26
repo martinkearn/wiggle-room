@@ -7,7 +7,7 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 ## Features
 
 - Seven tracker types: Spending Money, Spending Credit, Saving Money, Mileage, Weight loss, and plain Rising and Falling Numbers
-- Manual readings and optional Starling Bank balance integration
+- Manual readings, optional Starling Bank balance integration, and Apple Health weight readings on iPhone and iPad
 - Pace, target, and projected-final calculations, with a traffic-light status that knows whether higher or lower is better
 - Reading history and trend charts, with a five-day zoom for long trackers
 - iOS and macOS apps, Apple Watch companion app, widgets, complications, Live Activities, Siri Shortcuts, and Spotlight integration
@@ -21,6 +21,7 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 - An Apple ID configured in Xcode
 - Apple Developer Program membership for CloudKit on physical devices and TestFlight distribution
 - An optional Starling personal access token to use the Starling provider
+- The HealthKit capability on the App ID for iOS builds that use Apple Health
 
 ## Getting started
 
@@ -30,6 +31,8 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 4. Build and run.
 
 The app can be used entirely with manual trackers. Starling credentials are entered at runtime under **Settings → Connected Sources**, and app appearance can be set to System, Light, or Dark under **Settings → General**. Never hard-code or commit personal access tokens.
+
+Apple Health is added under the same **Settings → Connected Sources**, on iPhone and iPad only — HealthKit does not exist on macOS. It supplies the latest weight recorded in Health to a Weight loss tracker, read-only: nothing is ever written back to Health, and a weight added by hand in the app stays in the app. A Mac or Apple Watch shows a Health-backed tracker as a read-only view of the readings an iPhone or iPad fetched, with manual entry and editing working as normal. Readings are polled once a day in the evening, and whenever the tracker is opened.
 
 CloudKit, App Groups, signing identities, and bundle identifiers are tied to the original developer account. Forks must configure their own Apple Developer identifiers and capabilities before CloudKit or device builds work.
 
@@ -77,6 +80,7 @@ The concise product and architecture specification is in [`docs/wiggleroom-build
 
 - User data is stored locally with SwiftData and synced through the user's private CloudKit database.
 - Starling requests go directly from the app to Starling over HTTPS.
+- Apple Health is read-only and limited to body mass. Health data is never sent anywhere, and Health readings are stored alongside every other reading in the user's own private CloudKit database.
 - The project contains no API credentials. Test credentials are synthetic.
 - Do not include real balances, account identifiers, tokens, screenshots, or other personal data in issues, tests, documentation, or commits.
 

@@ -151,8 +151,13 @@ struct TrackerDetailView: View {
                 // hint on iOS, above the rings alongside everything else
                 // that's static context for this screen.
                 #if !os(macOS)
-                pullToUpdateHint
-                    .padding(.top, 4)
+                if let deviceBoundSourceNote {
+                    deviceBoundSourceNoteText(deviceBoundSourceNote)
+                        .padding(.top, 4)
+                } else {
+                    pullToUpdateHint
+                        .padding(.top, 4)
+                }
                 #endif
 
                 if isCompleted {
@@ -186,7 +191,11 @@ struct TrackerDetailView: View {
                 } else {
                     figuresRow
                     #if os(macOS)
-                    updateBalanceButton
+                    if let deviceBoundSourceNote {
+                        deviceBoundSourceNoteText(deviceBoundSourceNote)
+                    } else {
+                        updateBalanceButton
+                    }
                     #endif
                 }
 
@@ -201,7 +210,7 @@ struct TrackerDetailView: View {
                 periodDetails
 
                 if tracker.latestReading == nil {
-                    Text("No readings yet — log one to see your pace.")
+                    Text(emptyReadingsMessage)
                         .font(.wiggleText(.footnote))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -556,6 +565,40 @@ struct TrackerDetailView: View {
         default:
             return "Couldn't update the balance — will try again soon."
         }
+    }
+
+    /// What to say when a tracker has no readings at all. A manual tracker is
+    /// asked for one; a connected tracker is waiting on its source, and for a
+    /// device-bound source that may well be another device, so telling the
+    /// user to log one here would be the wrong instruction. Never an error —
+    /// nothing has gone wrong, there is simply nothing recorded yet.
+    private var emptyReadingsMessage: String {
+        guard !tracker.isManualEntry, let provider = store.provider(for: tracker) else {
+            return "No readings yet — log one to see your pace."
+        }
+        return "Nothing from \(provider.displayName) yet — a reading will appear when it has one, or add one by hand from \(tracker.terminology.currentFigure) History."
+    }
+
+    /// Why there's nothing to press: this tracker's source is read from a
+    /// device that isn't this one. Apple Health doesn't exist on macOS at
+    /// all, and this version doesn't read it on the watch either, so the
+    /// figures here are the ones an iPhone or iPad recorded — a read-only
+    /// view rather than a tracker that quietly fails to update. `nil` for a
+    /// manual tracker and for any source this device can read itself.
+    private var deviceBoundSourceNote: String? {
+        guard !tracker.isManualEntry, !isCompleted,
+              let provider = store.provider(for: tracker),
+              !provider.isAvailableOnThisDevice
+        else { return nil }
+        return "\(provider.displayName) readings come from your iPhone or iPad."
+    }
+
+    private func deviceBoundSourceNoteText(_ note: String) -> some View {
+        Text(note)
+            .font(.wiggleText(.caption))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
     }
 
     #if !os(macOS)

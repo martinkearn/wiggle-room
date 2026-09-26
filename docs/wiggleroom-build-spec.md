@@ -19,6 +19,7 @@ The product is designed for one person's use across their own Apple devices. It 
 - SwiftUI user interface
 - SwiftData persistence with CloudKit private-database sync
 - App Groups for same-device access by apps and extensions
+- HealthKit on iOS and iPadOS only, via a per-SDK entitlements file (a macOS App ID cannot carry the HealthKit capability)
 
 visionOS and Mac Catalyst are not currently supported.
 
@@ -85,6 +86,8 @@ A whole value drops its decimals entirely, so values read as `£684`, `£692.40`
 
 Each reading is a separate timestamped `ValueSnapshot`. Reading history is append-oriented so CloudKit can merge updates made on different devices.
 
+A reading fetched from a source is recorded only when it is genuinely new: newer than the latest reading already held, and a different value at the unit's own precision. A source that reports historic readings carries its own timestamp into the record — an Apple Health weigh-in appears on the chart at the time it was taken, not the time it was collected — and a reading dated before the tracker's start is not recorded at all.
+
 A tracker's `name` must be unique (case-insensitive) among the user's other trackers; Add/Edit Tracker blocks Save on a collision.
 
 ### Pace calculation
@@ -129,7 +132,7 @@ Values are clamped where needed for presentation, but stored readings remain unc
 
 ## 4. Sources
 
-`SourceProvider` isolates provider-specific behavior from tracker calculations and UI. Each provider declares the tracker types it can back, so the relationship lives with the provider rather than being hard-coded per type: Starling supplies the two account-balance money types, Manual Entry suits them all, and a future vehicle or health source would declare its own. Spending Credit is deliberately outside Starling's set: Starling reports an amount held rather than an amount owed, so a synced balance would travel the wrong way against a credit limit. Add Tracker filters its source list through that declaration once a type is chosen.
+`SourceProvider` isolates provider-specific behavior from tracker calculations and UI. Each provider declares the tracker types it can back, so the relationship lives with the provider rather than being hard-coded per type: Starling supplies the two account-balance money types, Apple Health supplies Weight loss, Manual Entry suits them all, and a future vehicle source would declare its own. Spending Credit is deliberately outside Starling's set: Starling reports an amount held rather than an amount owed, so a synced balance would travel the wrong way against a credit limit. Add Tracker filters its source list through that declaration once a type is chosen.
 
 ### Manual Entry
 
@@ -147,7 +150,17 @@ The Starling provider uses a user-supplied personal access token and supports:
 
 Requests go directly to `https://api.starlingbank.com` over HTTPS. The app does not operate an intermediary server and does not initiate payments.
 
-Additional providers should conform to `SourceProvider` and remain isolated from the core tracker model.
+### Apple Health
+
+The Apple Health provider reads one figure — the latest body-mass sample — and backs Weight loss trackers only. It is read-only in the strongest sense: the app requests no write access, so a weight typed by hand in Balance History stays in Wiggle Room and is never pushed into Health. HealthKit only ever exposes the Health store of the person signed in on the device; there is no API for anyone else's health data and none is sought.
+
+There is no credential. A Health source's `credentialToken` stays empty and is never read, because authorisation lives in the system's own Health permissions, per device, and cannot be synced or inspected by the app. HealthKit never reports read permission back either, so a refusal is indistinguishable from an empty Health store: both look like no samples, no error, and no reading logged, and no screen claims to know which happened. Exactly one Health source exists, since it is the one Health store the device owner already has; Add Source stops offering it once one exists.
+
+HealthKit is unavailable on macOS. It exists on iOS, iPadOS, watchOS, Mac Catalyst and visionOS, and this project builds neither Catalyst nor visionOS, so Health is an iPhone and iPad feature here. Elsewhere a Health-backed tracker is a read-only view of readings those devices fetched (see Platform behavior).
+
+A tracker's unit is editable after creation, so the unit can't be encoded into `sourceTargetId` the way Starling encodes an account and Space — it travels with each request on `SourceTarget.unit` instead, and the provider reads body mass in kilograms or pounds accordingly. Values are rounded at the unit's own precision before anything compares or stores them, since Health holds a weight as a double and an unrounded 84.6 kg would otherwise register as a change on every poll.
+
+Additional providers should conform to `SourceProvider` and remain isolated from the core tracker model. `SourceProvider` also declares the word a provider uses for one of its targets ("Account" for a bank, "Measurement" for Health), and whether it can be read on the device running right now.
 
 ### Safeguards
 
@@ -255,6 +268,12 @@ Tracker exports contain every field needed to preserve appearance, pace, complet
 
 It is reached from a `@Query`-backed list, so its body observes no SwiftData at all (see Persistence and sync). Every store-derived value on it is a one-time read taken as the screen opens — connection state, tracker names, and request count alike — held as plain values rather than model references, and none of them updates while the screen stays open. That is intentional rather than a limitation: nothing can change them underneath the user in practice, since saving dismisses the screen. macOS keeps the richer inline editor, which is not reached that way and does show them live.
 
+### Device-bound sources
+
+A source that is read from the device itself rather than over the network — Apple Health today — can only be read where that data exists. Every surface asks the provider (`isAvailableOnThisDevice`) rather than checking the platform, so one rule covers macOS, watchOS and any future device-bound source.
+
+Where the answer is no, the tracker is a read-only view: it displays exactly as it does anywhere else, computed from synced readings, and the update control gives way to a line saying the readings come from the user's iPhone or iPad. Nothing is fetched, no check is recorded, and no error is shown, because nothing failed. Everything that isn't a fetch still works — Balance History adds, edits and deletes readings by hand, and Edit Tracker behaves as it does for any connected tracker. A Mac can create a Health-backed tracker (the source is a synced record and its measurement resolves without touching HealthKit; the starting weight is typed in), but it cannot add the source itself, since authorisation only exists on the device that grants it.
+
 ### macOS
 
 - Sidebar-based tracker interface, with a `+` in the sidebar's toolbar alongside the existing new-tracker menu command
@@ -279,6 +298,8 @@ It is reached from a `@Query`-backed list, so its body observes no SwiftData at 
 ## 8. Background work
 
 - Background refresh is opportunistic and must never be the only way data is updated.
+- Polling cadence follows the provider behind each tracker. A bank balance can move at any moment, so Starling keeps its time-of-day bands and burst detection. A weight moves once a day, so Apple Health is read once per local day at 20:00 — late enough to have caught a morning weigh-in — with burst detection deliberately not applied.
+- A daily source is also read when the app becomes active and its slot has passed, because a background wake-up may never come. That read is local, costs nothing, and cannot raise a permission prompt.
 - Provider calls respect request budgets and server cooldowns.
 - Multiple trackers targeting the same provider value reuse short-lived cached results where possible.
 - Widget timelines reload after relevant local or CloudKit changes.
@@ -291,6 +312,9 @@ It is reached from a `@Query`-backed list, so its body observes no SwiftData at 
 - Credentials must never be logged or included in diagnostics.
 - Credentials must never be included in tracker exports.
 - Starling traffic is sent only to Starling's HTTPS API.
+- Apple Health is read-only and body mass only: no write access is requested, no other quantity type is read, and nothing is ever written back to Health. Health data is never sent anywhere — Starling remains the app's only outbound traffic.
+- Weight values never appear in diagnostics or logs, exactly as no other tracker figure does.
+- Health-derived readings are stored in the app's own CloudKit private database like every other reading, because cross-device history is the point of the feature. App Store Review Guideline 5.1.3 says apps using HealthKit must not store health information in iCloud, so a public App Store submission would need that decision revisited; for personal and TestFlight use it is the owner's own data in their own private database.
 - The macOS app requires the outbound network client sandbox entitlement.
 - Reset operations require explicit user confirmation.
 - Diagnostic screens may show identifiers and counts, but not credentials or financial values unrelated to normal tracker UI.
@@ -312,8 +336,9 @@ Before distribution:
 3. Verify an iOS archive and a macOS archive.
 4. Confirm embedded extensions use the parent's build number.
 5. Test manual entry and Starling failure states without real credentials in source or fixtures.
-6. Test CloudKit sync using fictional tracker names and values.
-7. Confirm widgets and watch surfaces handle an empty or delayed local store.
+6. Test Apple Health with synthetic weight samples: a first connection, refused access (which must stay quiet rather than erroring), and a Mac or watch showing the read-only view.
+7. Test CloudKit sync using fictional tracker names and values.
+8. Confirm widgets and watch surfaces handle an empty or delayed local store.
 
 ## 12. Out of scope
 

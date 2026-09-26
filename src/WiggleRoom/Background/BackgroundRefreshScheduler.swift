@@ -13,12 +13,16 @@ import SwiftData
 /// entirely up to the system, and can be much less frequent in practice
 /// (low battery, Low Power Mode, app rarely opened, …).
 ///
-/// Cadence is per-tracker, not a single flat interval (§5.3): each
-/// tracker is due again once `TrackerUpdateScheduling.RefreshBand`'s
-/// interval has passed since its own `lastAutoFetchAttempt` — peak
-/// (08:00–17:00) every 5 minutes, standard every 15, off-peak
-/// (00:00–06:00) every 60 — or, independent of the clock, every 5 minutes
-/// while that specific tracker is in an active burst (`isBursting`). A
+/// Cadence is per-tracker, not a single flat interval (§5.3), and follows
+/// the provider behind each tracker
+/// (`TrackerUpdateScheduling.pollPolicy`). A Starling tracker is due again
+/// once `TrackerUpdateScheduling.RefreshBand`'s interval has passed since
+/// its own `lastAutoFetchAttempt` — peak (08:00–17:00) every 5 minutes,
+/// standard every 15, off-peak (00:00–06:00) every 60 — or, independent of
+/// the clock, every 5 minutes while that specific tracker is in an active
+/// burst (`isBursting`). An Apple Health tracker is due once a day, in the
+/// evening, which never pulls a wake-up earlier for anything else since the
+/// next request is timed to whichever tracker is due soonest. A
 /// wake-up still refreshes the whole process at once (`BGAppRefreshTask`
 /// has no per-tracker scheduling of its own — only one earliest-begin-date
 /// can be requested for the whole app), but which trackers actually get a
@@ -101,24 +105,20 @@ enum BackgroundRefreshScheduler {
         return dueTrackers.map { timeUntilDue($0, asOf: now) }.min() ?? TrackerUpdateScheduling.RefreshBand.standard.interval
     }
 
-    /// This tracker's own effective band right now — `peak`'s cadence
-    /// while it's individually bursting, regardless of the actual time of
-    /// day, otherwise whatever the clock says.
-    @MainActor
-    private static func effectiveBand(for tracker: Tracker, asOf now: Date) -> TrackerUpdateScheduling.RefreshBand {
-        TrackerUpdateScheduling.isBursting(readings: tracker.sortedReadings, asOf: now)
-            ? .peak
-            : TrackerUpdateScheduling.refreshBand(at: now)
-    }
-
     /// Seconds until `tracker` is next due for a background check, 0 if
-    /// it's already overdue. Never attempted before (`lastAutoFetchAttempt`
-    /// is `nil`) counts as maximally overdue.
+    /// it's already overdue — under whichever policy its own provider calls
+    /// for (`TrackerUpdateScheduling.pollPolicy`): the time-of-day bands plus
+    /// burst detection for Starling, a single evening slot per day for Apple
+    /// Health. Never attempted before (`lastAutoFetchAttempt` is `nil`)
+    /// counts as maximally overdue either way.
     @MainActor
     private static func timeUntilDue(_ tracker: Tracker, asOf now: Date) -> TimeInterval {
-        let interval = effectiveBand(for: tracker, asOf: now).interval
-        let sinceLastAttempt = now.timeIntervalSince(tracker.lastAutoFetchAttempt ?? .distantPast)
-        return max(0, interval - sinceLastAttempt)
+        TrackerUpdateScheduling.timeUntilDue(
+            policy: TrackerUpdateScheduling.pollPolicy(forProviderId: tracker.connectedSource?.providerId),
+            lastAttempt: tracker.lastAutoFetchAttempt,
+            readings: tracker.sortedReadings,
+            asOf: now
+        )
     }
 
     @MainActor
