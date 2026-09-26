@@ -327,6 +327,8 @@ Automated builds may use a monotonically increasing CI run number for `CURRENT_P
 
 Signing, provisioning, CloudKit containers, App Groups, and bundle identifiers must be configured for the developer account performing the build.
 
+A provisioning profile carries the capabilities its App ID had when the profile was generated, so a new entitlement means enabling the capability and regenerating the affected profiles. The iOS app's App ID needs HealthKit; macOS must not have it, since a macOS App ID cannot carry it. An unsigned build check cannot catch a mismatch here — only an archive can.
+
 ## 11. Verification
 
 Before distribution:
