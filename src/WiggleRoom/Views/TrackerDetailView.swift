@@ -160,14 +160,6 @@ struct TrackerDetailView: View {
                 }
 
                 VStack(spacing: 10) {
-                    #if !os(macOS)
-                    // The same badge the tracker wears in the list, so the
-                    // screen it opens onto is recognisably the row that was
-                    // tapped. macOS puts it beside the name in the header
-                    // above instead, where there is room for it on one line.
-                    TrackerBadge(tracker: tracker, size: 44)
-                    #endif
-
                     RingsView(tracker: tracker, now: now, animatesOnAppear: false)
                         .frame(width: 260, height: 260)
                         .padding(.vertical, 18)
@@ -249,6 +241,33 @@ struct TrackerDetailView: View {
         .toolbar(removing: .title)
         #endif
         .inlineNavigationBarIfAvailable()
+        #if !os(macOS)
+        // The same badge the tracker wears in the list, drawn beside the
+        // name in the bar itself so the screen is recognisably the row that
+        // was tapped — it used to float on its own above the rings, which
+        // read as a stray element rather than part of the heading. A
+        // principal item replaces the bar's own title, so the name is
+        // redrawn here in the same Fraunces the `UINavigationBarAppearance`
+        // uses for inline titles (`installNavigationBarAppearance()`);
+        // `.navigationTitle` above still stands for back buttons and the
+        // navigation history. macOS keeps its badge in the in-content
+        // header, since the window title can't take Fraunces at all.
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 7) {
+                    TrackerBadge(tracker: tracker, size: 24)
+                    Text(tracker.name)
+                        .font(WiggleRoomFont.fraunces(size: 17, weight: 700, opticalSize: 20))
+                        // Explicit, since toolbar content otherwise picks up
+                        // the bar's brand tint meant for its buttons.
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+            }
+        }
+        #endif
         .toolbar {
             if tracker.canZoom(asOf: now) {
                 ToolbarItem(placement: .primaryAction) {
