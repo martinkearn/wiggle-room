@@ -346,6 +346,70 @@ Fork maintainers must use their replacement bundle identifiers instead.
 
 If a required App ID is missing, create it under **Certificates, Identifiers & Profiles → Identifiers** with the capabilities used by the corresponding target. App Groups, CloudKit, push notifications, and other entitlements in the profile must agree with the Xcode target.
 
+### Capabilities must match the entitlements file
+
+A provisioning profile is a snapshot of its App ID's capabilities at the moment the profile was generated. Adding a capability to a target's entitlements therefore means enabling it on the App ID **and** regenerating every affected profile, or the archive fails on the entitlement the profile predates.
+
+This is a signing failure rather than a code problem, and the two look nothing alike: the unsigned build check still passes, the macOS workflow may still succeed, and there is nothing in Swift to fix.
+
+The iOS app target (`martinkearn.WiggleRoom`) needs the **HealthKit** capability, for the Apple Health source. Clinical Health Records is deliberately not enabled, and `com.apple.developer.healthkit.access` deliberately absent from the entitlements file, because the app reads body mass and nothing else. macOS has no HealthKit at all, which is why the app target's entitlements file is split per SDK — `WiggleRoom-iOS.entitlements` carries the capability and `WiggleRoom.entitlements` does not. A macOS App ID cannot carry it, so a shared file would break macOS signing.
+
+#### Xcode or the Apple Developer portal?
+
+The portal, for everything CI depends on.
+
+Ticking a capability in Xcode's **Signing & Capabilities** tab edits the target's entitlements file and, under automatic signing, can also enable that capability on the App ID and refresh Xcode's own *development* profile. That is enough to run on a device from Xcode, and it is why a local device build can succeed while the workflow fails.
+
+It does nothing for distribution. These workflows sign manually (`CODE_SIGN_STYLE=Manual`) against the App Store profiles installed from repository secrets, and Xcode neither regenerates those profiles nor updates the secrets. A capability change is finished only once the App ID, the App Store profile, and the secret all agree.
+
+The entitlements files themselves are committed to the repository, so the steps below are about the App ID and the profile, not the Xcode project.
+
+#### Worked example: adding HealthKit to the iOS app
+
+1. **Enable the capability on the App ID.** Open [Identifiers](https://developer.apple.com/account/resources/identifiers/list) and select the identifier whose bundle identifier matches the target — `martinkearn.WiggleRoom` for the iOS app. Tick **HealthKit**, leave **Clinical Health Records** unticked, and save, confirming the warning that modifying capabilities affects existing profiles.
+
+   Only the iOS identifier. A macOS App ID cannot carry HealthKit, and the macOS app is a separate identifier record even though it shares the bundle identifier.
+
+2. **Regenerate the App Store profile.** Open [Profiles](https://developer.apple.com/account/resources/profiles/list), select the iOS App Store profile for that App ID, and edit it. The newly enabled capability is included on regeneration. Confirm the selected certificate is still the same Apple Distribution certificate CI imports, then generate and download.
+
+   Editing and regenerating the existing profile is enough; creating a replacement works equally well. The profile's name matters only for readability, since the workflow installs profiles by UUID.
+
+3. **Confirm the capability reached the file** before uploading anything:
+
+   ```sh
+   security cms -D -i WiggleRoom_App_Store.mobileprovision | plutil -p - | grep -i healthkit
+   ```
+
+   Expect a line like `"com.apple.developer.healthkit" => 1`. No output means the profile still predates the capability — regenerate it rather than encoding it.
+
+4. **Update the secret.** Encode the verified profile as in [Verify and encode each profile](#verify-and-encode-each-profile):
+
+   ```sh
+   base64 -i WiggleRoom_App_Store.mobileprovision | tr -d '\n' | pbcopy
+   ```
+
+   Then **Settings → Secrets and variables → Actions → `IOS_APP_STORE_PROFILE_BASE64` → Update secret**, and paste the single-line value. Updating a secret replaces it in place; no other secret changes.
+
+5. **Re-run the distribution workflow.** In **Actions**, open the failed *Distribute iOS to TestFlight* run and choose **Re-run failed jobs**, or from a terminal:
+
+   ```sh
+   gh run rerun <run-id> --failed
+   ```
+
+   Every attempt performs a real TestFlight upload and takes its own build number from the workflow run number, so a rerun cannot collide with the failed attempt.
+
+#### Which profiles need regenerating
+
+Only those whose target's entitlements changed. HealthKit belongs to the app target alone, so the widget, watch app, complication and both macOS profiles are untouched by it. A capability shared across targets — App Groups or CloudKit, say — means regenerating each of their profiles and updating each secret.
+
+#### Reading the failure
+
+| Archive error | What it means | What to do |
+|---|---|---|
+| `doesn't include the <name> capability` | The App ID lacks the capability, or the profile was generated before it was enabled | Steps 1–5 above |
+| `doesn't include the com.apple.developer.<key> entitlement` | The entitlements file declares a key the profile doesn't carry | Enable the matching capability, or remove the key if the app doesn't use it |
+| Build check green, archive red | Signing, not code — an unsigned build never validates entitlements against a profile | Look at the App ID, profile and secret, not the source |
+
 ### Verify and encode each profile
 
 To inspect a downloaded profile before uploading it:
