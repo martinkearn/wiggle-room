@@ -220,7 +220,7 @@ The app's rings, cards, and chart strokes use a deliberately irregular, hand-dra
 
 ### Tracker screen layout
 
-A tracker's own screen is headed by its name and nothing else. It carries the same badge — glyph and colour — that the tracker wears in the list, so the screen is recognisably the row that opened it: above the rings on iOS, beside the name on macOS, where a single line has room for both.
+A tracker's own screen is headed by its name and nothing else. It carries the same badge — glyph and colour — that the tracker wears in the list, so the screen is recognisably the row that opened it, and the badge sits immediately beside the name in the heading on every platform: in the navigation bar itself on iOS and iPadOS, and in the in-content header on macOS, where the window title cannot take the app's own typeface.
 
 The period's date range and, for a connected tracker, its connection and account sit with the days-remaining line below the figures, not under the heading. They were previously drawn beneath the title, which never closed the gap above them: the iOS system navigation subtitle shows only one line and reserves space whether or not it is used, so a two-line strip had to be drawn separately and always left a gap. Keeping all three lines together, away from the heading, removes the constraint rather than working around it.
 
