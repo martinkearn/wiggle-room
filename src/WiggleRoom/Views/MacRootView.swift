@@ -34,21 +34,10 @@ struct MacRootView: View {
                         action: { isPresentingAddTracker = true }
                     )
                 } else {
-                    // Explicit `List(selection:) { ... }` content rather
-                    // than `List(trackers, selection:)` — needed to prepend
-                    // the "Add Tracker" row below, which isn't a `Tracker`
-                    // and (deliberately) carries no `.tag`, so it never
-                    // participates in `selection` at all.
+                    // Explicit `List(selection:) { ... }` content rather than
+                    // `List(trackers, selection:)`, so each row can carry its
+                    // own `.tag` and context menu.
                     List(selection: $selection) {
-                        // Top of the sidebar, not the toolbar — always
-                        // visible without scrolling, and newly created
-                        // trackers sort to the top anyway (`\Tracker
-                        // .startDate, order: .reverse`), so this is exactly
-                        // where a just-added tracker will actually appear.
-                        AddTrackerRow {
-                            isPresentingAddTracker = true
-                        }
-
                         ForEach(trackers) { tracker in
                             MacTrackerRow(tracker: tracker)
                                 .tag(tracker.id)
@@ -84,6 +73,18 @@ struct MacRootView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 4)
                     .padding(.bottom, 6)
+            }
+            // Adding a tracker belongs in the sidebar's toolbar, alongside
+            // the existing ⌘N command, rather than in the list of trackers
+            // itself — the same move as iOS's top-right "+" (§7.1).
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        isPresentingAddTracker = true
+                    } label: {
+                        Label("Add Tracker", systemImage: "plus")
+                    }
+                }
             }
         } detail: {
             if let selectedTracker = trackers.first(where: { $0.id == selection }) {
@@ -133,37 +134,6 @@ struct MacRootView: View {
         NSApplication.shared.dockTile.badgeLabel = anyBehindPace ? "!" : nil
     }
     #endif
-}
-
-/// The "Add Tracker" entry point, styled to echo `MacTrackerRow`'s shape
-/// (same ring size/spacing) rather than a plain row — replaces the old
-/// toolbar "+" button entirely. A dashed ring with a "+" in place of a
-/// real pace ring, and brand-tinted text, distinguish it from an actual
-/// tracker row at a glance. Deliberately not selectable — no `.tag`, so it
-/// never becomes a `NavigationSplitView` selection.
-private struct AddTrackerRow: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                ZStack {
-                    IconRingShape(ring: .outer, fitsRect: true)
-                        .stroke(WiggleRoomColors.brand.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [3, 2.5]))
-                        .padding(2/2)
-                        .frame(width: 28, height: 28)
-                    Image(systemName: "plus")
-                        .font(.wiggleText(size: 11, weight: .semibold))
-                        .foregroundStyle(WiggleRoomColors.brand)
-                }
-                Text("Add Tracker")
-                    .foregroundStyle(WiggleRoomColors.brand)
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 2)
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 private struct MacTrackerRow: View {

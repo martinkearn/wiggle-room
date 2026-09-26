@@ -135,13 +135,13 @@ struct TrackerDetailView: View {
             VStack(spacing: 28) {
                 #if os(macOS)
                 // The window title can't take Fraunces, so the header is
-                // drawn in the content instead (name, range, connection).
-                VStack(alignment: .leading, spacing: 3) {
+                // drawn in the content instead — just the badge and the name
+                // now, with the range and connection moved down into
+                // `periodDetails` (§7.1).
+                HStack(spacing: 10) {
+                    TrackerBadge(tracker: tracker, size: 34)
                     Text(tracker.name)
                         .font(WiggleRoomFont.headline(30, weight: 700))
-                    Text(sourceCaption.map { "\(periodRangeText)\n\($0)" } ?? periodRangeText)
-                        .font(.wiggleText(.caption))
-                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -160,6 +160,14 @@ struct TrackerDetailView: View {
                 }
 
                 VStack(spacing: 10) {
+                    #if !os(macOS)
+                    // The same badge the tracker wears in the list, so the
+                    // screen it opens onto is recognisably the row that was
+                    // tapped. macOS puts it beside the name in the header
+                    // above instead, where there is room for it on one line.
+                    TrackerBadge(tracker: tracker, size: 44)
+                    #endif
+
                     RingsView(tracker: tracker, now: now, animatesOnAppear: false)
                         .frame(width: 260, height: 260)
                         .padding(.vertical, 18)
@@ -198,9 +206,7 @@ struct TrackerDetailView: View {
                         .padding(.horizontal)
                 }
 
-                Text(periodRemainingText)
-                    .font(.wiggleText(.caption))
-                    .foregroundStyle(.secondary)
+                periodDetails
 
                 if tracker.latestReading == nil {
                     Text("No readings yet — log one to see your pace.")
@@ -218,10 +224,10 @@ struct TrackerDetailView: View {
             }
             .padding(.bottom, 32)
             #if os(macOS)
-            // The three-line header (name / range / source) is taller than
-            // the toolbar's own safe-area allowance, so without this the
-            // rings' top edge slid underneath it.
-            .padding(.top, 32)
+            // Clears the toolbar, which reserves less height than the
+            // in-content header needs. Smaller than it was, now that the
+            // header is one line rather than three.
+            .padding(.top, 18)
             #endif
         }
         #if !os(macOS)
@@ -229,36 +235,18 @@ struct TrackerDetailView: View {
             await handleUpdateGesture()
         }
         #endif
+        // The header is the tracker's name and nothing else. The date range
+        // and the "connection · account" line used to live under it — as a
+        // navigation subtitle on macOS and a pinned strip below the bar on
+        // iOS — and neither ever sat flush against the title: the iOS system
+        // subtitle shows only one line and reserves space of its own whether
+        // or not it is used, so a two-line strip had to be drawn separately
+        // and always left a gap above it. Rather than keep chasing that gap,
+        // both lines now sit in `periodDetails`, down with the days-remaining
+        // line they belong with.
         .navigationTitle(tracker.name)
         #if os(macOS)
         .toolbar(removing: .title)
-        #endif
-        // Header: title and date range in the navigation bar. On iOS the
-        // system subtitle only shows one line and leaves reserved space of
-        // its own, so the date range and (connected sources only) the
-        // "connection · account" line are drawn together as a pinned strip
-        // directly beneath the bar instead — a top safe-area inset, so it
-        // stays put while the content scrolls and the content starts below
-        // it rather than under it, with no gap between the two lines.
-        #if os(macOS)
-        .navigationSubtitle(sourceCaption.map { "\(periodRangeText)\n\($0)" } ?? periodRangeText)
-        #else
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 2) {
-                Text(periodRangeText)
-                    .font(.wiggleText(.caption))
-                    .foregroundStyle(.secondary)
-                if let sourceCaption {
-                    Text(sourceCaption)
-                        .font(.wiggleText(.caption))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-            .background(.bar)
-        }
         #endif
         .inlineNavigationBarIfAvailable()
         .toolbar {
@@ -346,6 +334,26 @@ struct TrackerDetailView: View {
         }
     }
 
+    /// Everything about *when* this tracker runs and *where* its figures come
+    /// from, in one block below the figures: how much of the period is left,
+    /// the period itself, and — for a connected tracker — the connection and
+    /// account behind it. All three used to be split between the header and
+    /// here; see `body`'s note on why they were brought together.
+    private var periodDetails: some View {
+        VStack(spacing: 3) {
+            Text(periodRemainingText)
+            Text(periodRangeText)
+            if let sourceCaption {
+                Text(sourceCaption)
+                    .lineLimit(2)
+            }
+        }
+        .font(.wiggleText(.caption))
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal)
+    }
+
     /// Magnifies the rings and chart to the five days around today, or back
     /// out to the whole period (see `TrackerZoom`). Saved on the tracker so
     /// the choice syncs to every device and reaches the widgets.
@@ -394,7 +402,11 @@ struct TrackerDetailView: View {
                               captions: [remainingInAllowanceCaption].compactMap { $0 } + sourceTimingCaptions)
             }
 
-            card(tint: tracker.accentColor, variant: 1) {
+            // The tracker's reference colour, not its identity colour: this
+            // card sits immediately beside a status-tinted one, and a red or
+            // green tracker tinted both of them the same (see
+            // `TrackerPalette`).
+            card(tint: tracker.referenceColor, variant: 1) {
                 figureContent(title: tracker.terminology.paceFigure, value: pace.targetValueToday,
                               captions: [wholePeriodCaption, finalFigureCaption, estimatedFinalCaption].compactMap { $0 })
             }

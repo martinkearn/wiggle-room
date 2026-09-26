@@ -385,8 +385,12 @@ struct RingsView: View {
         return ZStack {
             shape
                 // The empty part of each ring wears the tracker's own colour;
-                // the filled arc keeps its clock/status colour.
-                .stroke(tracker.accentColor.opacity(0.24), style: style)
+                // the filled arc keeps its clock/status colour. `reference`
+                // rather than `accentColor`, since the track sits directly
+                // beneath the status-coloured arc — a red tracker's track
+                // under a red arc read as one washed-out ring rather than as
+                // a track and its fill (see `TrackerPalette`).
+                .stroke(tracker.referenceColor.opacity(0.24), style: style)
             shape
                 .trim(from: 0, to: fraction)
                 .stroke(color, style: style)
