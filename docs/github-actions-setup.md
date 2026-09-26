@@ -409,6 +409,7 @@ Only those whose target's entitlements changed. HealthKit belongs to the app tar
 | `doesn't include the <name> capability` | The App ID lacks the capability, or the profile was generated before it was enabled | Steps 1–5 above |
 | `doesn't include the com.apple.developer.<key> entitlement` | The entitlements file declares a key the profile doesn't carry | Enable the matching capability, or remove the key if the app doesn't use it |
 | Build check green, archive red | Signing, not code — an unsigned build never validates entitlements against a profile | Look at the App ID, profile and secret, not the source |
+| `exportArchive Missing purpose string in Info.plist … NS<name>UsageDescription` | Upload validation, after a successful archive: an entitlement implies API access that needs a purpose string, even when the app never calls it | Add the named key to `WiggleRoom/Info.plist`. HealthKit needs both `NSHealthShareUsageDescription` and `NSHealthUpdateUsageDescription`, read-only or not |
 
 ### Verify and encode each profile
 

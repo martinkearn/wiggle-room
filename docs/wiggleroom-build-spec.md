@@ -312,7 +312,7 @@ Where the answer is no, the tracker is a read-only view: it displays exactly as 
 - Credentials must never be logged or included in diagnostics.
 - Credentials must never be included in tracker exports.
 - Starling traffic is sent only to Starling's HTTPS API.
-- Apple Health is read-only and body mass only: no write access is requested, no other quantity type is read, and nothing is ever written back to Health. Health data is never sent anywhere — Starling remains the app's only outbound traffic.
+- Apple Health is read-only and body mass only: no write access is requested, no other quantity type is read, and nothing is ever written back to Health. The Info.plist still carries both Health purpose strings, because App Store upload validation rejects a build holding the HealthKit entitlement without them; the write string states plainly that the app doesn't write, and can never be shown since no write authorisation is ever requested. Health data is never sent anywhere — Starling remains the app's only outbound traffic.
 - Weight values never appear in diagnostics or logs, exactly as no other tracker figure does.
 - Health-derived readings are stored in the app's own CloudKit private database like every other reading, because cross-device history is the point of the feature. App Store Review Guideline 5.1.3 says apps using HealthKit must not store health information in iCloud, so a public App Store submission would need that decision revisited; for personal and TestFlight use it is the owner's own data in their own private database.
 - The macOS app requires the outbound network client sandbox entitlement.

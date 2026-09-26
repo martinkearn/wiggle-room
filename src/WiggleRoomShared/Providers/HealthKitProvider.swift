@@ -73,9 +73,14 @@ final class HealthKitBodyMassSource: BodyMassSource {
 
     nonisolated var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
-    /// `toShare` is deliberately empty: the app asks for read access only,
-    /// and there is no `NSHealthUpdateUsageDescription` in the Info.plist to
-    /// support writing even if some future call tried to.
+    /// `toShare` is deliberately empty: the app asks for read access only.
+    ///
+    /// The Info.plist carries `NSHealthUpdateUsageDescription` all the same,
+    /// because App Store upload validation rejects a build that holds the
+    /// HealthKit entitlement without both purpose strings, whether or not it
+    /// writes. Since no write authorisation is ever requested, that string
+    /// can never actually be shown to anyone — it says the app doesn't write,
+    /// which is the truthful thing for it to say.
     func requestReadAuthorization() async throws {
         guard isAvailable else { throw HealthKitProviderError.notAvailable }
         try await store.requestAuthorization(toShare: [], read: [bodyMass])

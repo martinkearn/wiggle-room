@@ -8,6 +8,8 @@
 	</array>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Wiggle Room reads the latest weight recorded in Health so a weight tracker stays up to date. It only ever reads weight, and never writes anything to Health.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Wiggle Room never adds to or changes anything in Health. It reads your latest weight only, so a weight tracker stays up to date.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
