@@ -136,10 +136,18 @@ struct TrackerListView: View {
     }
 }
 
-/// A single row: name plus a small ring-based pace indicator and the
-/// difference from target — the key at-a-glance number (§3.2, §7.1). Styled
-/// as its own soft card, tinted a whisper of the tracker's status color, so
-/// the list reads as a stack of little dashboards rather than a plain table.
+/// A single row, laid out as the tracker's own dashboard in miniature
+/// (§3.2, §7.1): an identity band carrying the badge, the full name and how
+/// much of the period is left, above a data band carrying the rings, the
+/// status line and the two figures the dashboard itself leads with. Styled
+/// as its own soft card, tinted a whisper of the tracker's colour, so the
+/// list reads as a stack of little dashboards rather than a plain table.
+///
+/// The row is deliberately tall enough for two lines of name and two lines
+/// of figures. It used to be a single 70pt line, which forced the name to
+/// truncate — the one thing on the row the user chose themselves — and left
+/// room for only the ahead/behind figure, so the two numbers that figure is
+/// the *difference between* were invisible until the tracker was opened.
 private struct TrackerRow: View {
     let tracker: Tracker
     let now: Date
@@ -152,16 +160,18 @@ private struct TrackerRow: View {
         pace.status
     }
 
-    /// The trailing status/figure column is a **fixed** width rather than a
-    /// minimum one, so that every row's ring sits the same distance from the
-    /// right edge and the rings line up down the list. They previously did
-    /// not: the column sized itself to its own contents, so a row reading
-    /// "JUST OVER BUDGET" was visibly wider than one reading "ON TRACK", and
-    /// a row with no readings at all — a plain "No data yet" — was narrower
-    /// again, each pushing its ring left by a different amount. Both the
-    /// figure and the status word scale down inside this width rather than
-    /// widening it.
-    private static let statusColumnWidth: CGFloat = 88
+    /// The leading gutter shared by both bands: the badge sits in it at the
+    /// top, the rings at the bottom, and every line of text starts to the
+    /// right of it. One width for both keeps the two circles concentric
+    /// down the card and gives the text a single left edge, and because the
+    /// rings are now anchored to the *leading* edge rather than floating
+    /// after a variable-width text column, they line up down the whole list
+    /// without a fixed-width status column to hold them in place.
+    private static let gutterWidth: CGFloat = 44
+
+    /// The height held for a row whose tracker has gone — close enough to a
+    /// real row that the list doesn't visibly jump while `@Query` catches up.
+    private static let placeholderHeight: CGFloat = 124
 
     var body: some View {
         // Same guard as `TrackerDetailView`'s own top-level check, for the
@@ -174,61 +184,16 @@ private struct TrackerRow: View {
         // `RingsView` (which carries its own identical guard).
         if tracker.modelContext == nil {
             Color.clear
-                .frame(height: 70)
+                .frame(height: Self.placeholderHeight)
         } else {
             rowBody
         }
     }
 
     private var rowBody: some View {
-        HStack(spacing: 12) {
-            TrackerBadge(tracker: tracker, size: 42)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 5) {
-                    Text(tracker.name)
-                        .font(WiggleRoomFont.headline(18, weight: 650))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    ZoomIndicator(tracker: tracker, now: now, size: 12)
-                }
-                if tracker.isCompleted(asOf: now) {
-                    CompletedBadge()
-                } else {
-                    Text(tracker.periodRemainingText(asOf: now))
-                        .font(.wiggleText(.caption))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer(minLength: 0)
-
-            RingsView(tracker: tracker, now: now, lineWidth: 6, showsCenterContent: false)
-                .frame(width: 42, height: 42)
-
-            if tracker.latestReading != nil {
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(pace.statusLine(for: tracker))
-                        .font(.wiggleText(.caption2))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Text(pace.displayDifference(for: tracker))
-                        .font(.wiggleNumber(.subheadline, weight: .bold))
-                        .foregroundStyle(status.color)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
-                .frame(width: Self.statusColumnWidth, alignment: .trailing)
-            } else {
-                Text("No data yet")
-                    .font(.wiggleText(.caption))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: Self.statusColumnWidth, alignment: .trailing)
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            identityBand
+            dataBand
         }
         .padding(14)
         .trackerCard(tracker)
@@ -236,6 +201,163 @@ private struct TrackerRow: View {
             WobblyCard.shape()
                 .strokeBorder(tracker.accentColor.opacity(0.18), lineWidth: 1)
         )
+        // One spoken sentence rather than eight separate fragments — the
+        // row now carries enough text that VoiceOver reading each piece as
+        // its own element would be slower than opening the tracker. Says
+        // everything colour and ring geometry say (§3.4).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    /// Badge, name and period — who this tracker is, across the full width
+    /// of the card, so a long name wraps to a second line instead of being
+    /// truncated to make room for figures.
+    private var identityBand: some View {
+        HStack(alignment: .top, spacing: 12) {
+            TrackerBadge(tracker: tracker, size: 40)
+                .frame(width: Self.gutterWidth)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(tracker.name)
+                        .font(WiggleRoomFont.headline(18, weight: 650))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ZoomIndicator(tracker: tracker, now: now, size: 12)
+                }
+                periodLine
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// How long is left and when it ends — the second half answers "left
+    /// until when?", which a countdown on its own never does.
+    @ViewBuilder
+    private var periodLine: some View {
+        if tracker.isCompleted(asOf: now) {
+            HStack(spacing: 6) {
+                CompletedBadge()
+                Text(endDateText)
+                    .font(.wiggleText(.caption))
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Text("\(tracker.periodRemainingText(asOf: now)) \u{00B7} \(endDateText)")
+                .font(.wiggleText(.caption))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
+    /// Rings, status and figures — how this tracker is doing.
+    private var dataBand: some View {
+        HStack(alignment: .center, spacing: 12) {
+            RingsView(tracker: tracker, now: now, lineWidth: 6, showsCenterContent: false)
+                .frame(width: Self.gutterWidth, height: Self.gutterWidth)
+
+            VStack(alignment: .leading, spacing: 5) {
+                statusLine
+                figuresLine
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// The headline: the type's own status wording and the ahead/behind
+    /// figure, in the status colour. Same wording as the dashboard's ring
+    /// centre, from `TrackerPace`, so the two never drift apart.
+    @ViewBuilder
+    private var statusLine: some View {
+        if tracker.latestReading != nil {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(pace.statusLine(for: tracker))
+                    .font(WiggleRoomFont.cardLabel)
+                    .foregroundStyle(.secondary)
+                Text(pace.displayDifference(for: tracker))
+                    .font(.wiggleNumber(.title3, weight: .bold))
+                    .foregroundStyle(status.color)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+        } else {
+            Text("No readings yet")
+                .font(.wiggleText(.subheadline))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    /// The two figures the status figure is the difference *between*: what
+    /// the tracker reads now, and what it would read to be exactly on pace
+    /// today. Both are named with the type's own nouns ("Balance",
+    /// "Budget today"; "Weight", "Target today").
+    private var figuresLine: some View {
+        HStack(spacing: 8) {
+            figure(label: tracker.terminology.currentFigure, value: currentValueText)
+            Text("\u{00B7}")
+                .font(.wiggleText(.caption2))
+                .foregroundStyle(.tertiary)
+            figure(label: tracker.terminology.paceFigure, value: tracker.formattedValue(pace.targetValueToday))
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+    }
+
+    private func figure(label: String, value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.wiggleText(.caption2))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.wiggleNumber(.caption, weight: .semibold))
+                .foregroundStyle(.primary)
+        }
+    }
+
+    /// An em dash rather than the starting value when nothing has been
+    /// logged yet: the pace figure beside it is real, and printing a figure
+    /// the user never entered next to it would read as a reading.
+    private var currentValueText: String {
+        guard tracker.latestReading != nil else { return "\u{2014}" }
+        return tracker.formattedValue(pace.currentValue)
+    }
+
+    /// "ends 12 Oct", or "ends 12 Oct 2027" when the period ends in another
+    /// year, where a bare day and month would be ambiguous. Capitalised
+    /// once completed, where it follows the Completed pill rather than the
+    /// days-remaining phrase.
+    private var endDateText: String {
+        let calendar = Calendar.current
+        let endsThisYear = calendar.component(.year, from: tracker.endDate) == calendar.component(.year, from: now)
+        let style: Date.FormatStyle = endsThisYear
+            ? .dateTime.day().month(.abbreviated)
+            : .dateTime.day().month(.abbreviated).year()
+        let formatted = tracker.endDate.formatted(style)
+        return tracker.isCompleted(asOf: now) ? "Ended \(formatted)" : "ends \(formatted)"
+    }
+
+    private var accessibilityDescription: String {
+        var parts = [tracker.name]
+        if tracker.isCompleted(asOf: now) {
+            parts.append("Completed")
+        }
+        parts.append(tracker.periodRemainingText(asOf: now))
+        if tracker.latestReading != nil {
+            parts.append("\(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))")
+            parts.append("\(tracker.terminology.currentFigure) \(tracker.formattedValue(pace.currentValue))")
+        } else {
+            parts.append("No readings yet")
+        }
+        parts.append("\(tracker.terminology.paceFigure) \(tracker.formattedValue(pace.targetValueToday))")
+        if let window = tracker.zoomWindow(asOf: now) {
+            parts.append("Zoomed to \(Tracker.zoomRangeText(window))")
+        }
+        return parts.joined(separator: ", ")
     }
 }
 

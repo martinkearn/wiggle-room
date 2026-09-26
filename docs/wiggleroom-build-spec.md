@@ -224,7 +224,18 @@ A tracker's own screen is headed by its name and nothing else. It carries the sa
 
 The period's date range and, for a connected tracker, its connection and account sit with the days-remaining line below the figures, not under the heading. They were previously drawn beneath the title, which never closed the gap above them: the iOS system navigation subtitle shows only one line and reserves space whether or not it is used, so a two-line strip had to be drawn separately and always left a gap. Keeping all three lines together, away from the heading, removes the constraint rather than working around it.
 
-In the tracker list, each row's trailing status and figure column is a fixed width, so every row's ring sits the same distance from the edge and the rings line up down the list. Both the figure and the status word scale down within that width rather than widening it.
+### Tracker list row
+
+On iOS and iPadOS a list row is the tracker's own dashboard in miniature, in two bands sharing one leading gutter:
+
+- **Identity.** The badge, the tracker's name across the full width of the card, the zoom marker, and one caption line giving how much of the period is left and the date it ends on. The name wraps to a second line rather than truncating: it is the one thing on the row the user chose themselves.
+- **Data.** The rings, then the status wording with the ahead/behind figure in the status colour, then the current figure and today's pace figure side by side, each named with the type's own noun.
+
+The row shows both of the figures the ahead/behind figure is the difference between, because a difference alone cannot say whether a tracker is nearly finished or barely started. Wording and figures come from the same `TrackerPace` and terminology table the dashboard uses, so the row and the screen it opens can never disagree.
+
+The badge and the rings share the gutter's width and so sit concentric down the card, which also lines every row's rings up down the list. That alignment used to need a fixed-width trailing column holding the rings clear of a variable-width status column; anchoring them to the leading edge gets it for free, and the status text is free to use the width it needs.
+
+macOS keeps its own compact sidebar row, which is a navigation list rather than a dashboard.
 
 ## 7. Platform behavior
 
