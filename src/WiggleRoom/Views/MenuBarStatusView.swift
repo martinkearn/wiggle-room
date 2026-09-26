@@ -132,17 +132,67 @@ struct MenuBarStatusView: View {
 
 /// The menu bar's own label — separate from the dropdown content above,
 /// since `MenuBarExtra`'s label is evaluated outside the menu itself.
+///
+/// The tracker's badge — its glyph in its own colour — and no figure. A
+/// number sitting permanently in the menu bar is both the least glanceable
+/// place to read one (no label, no context, and it changes width as it
+/// changes) and the most conspicuous: every other app's status item is a
+/// small icon. The figures are all still one click away in the dropdown,
+/// which is where they have room to be labelled. This also drops the label's
+/// dependency on `PaceClock`, so the status item no longer redraws on the
+/// clock's tick — only when the tracker itself changes.
 struct MenuBarStatusLabel: View {
     @Query(sort: \Tracker.startDate, order: .reverse) private var trackers: [Tracker]
     @AppStorage(menuBarTrackerIDKey) private var pinnedTrackerID: String = ""
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// About the height AppKit allows a status item's image.
+    private static let side: CGFloat = 18
 
     var body: some View {
-        if let tracker = resolveMenuBarTracker(pinnedID: pinnedTrackerID, in: trackers) {
-            let pace = tracker.pace(actualValue: tracker.latestReading?.value ?? tracker.startingValue, asOf: PaceClock.shared.now)
-            Text(pace.displayDifference(for: tracker))
+        // The same `modelContext` guard the rest of the app carries: this
+        // view is driven by a `@Query`, which republishes asynchronously
+        // relative to a delete, so the resolved tracker can already be
+        // detached — and reading a property of one is a hard SwiftData
+        // crash rather than a catchable error.
+        if let tracker = resolveMenuBarTracker(pinnedID: pinnedTrackerID, in: trackers),
+           tracker.modelContext != nil,
+           let badge = badgeImage(for: tracker) {
+            Image(nsImage: badge)
+                .accessibilityLabel("\(tracker.name), Wiggle Room")
         } else {
+            // No trackers yet, or the badge could not be rendered — an empty
+            // status item would look broken, so name the app instead.
             Text("Wiggle Room")
         }
+    }
+
+    /// Renders the tracker's badge to a bitmap rather than handing
+    /// `MenuBarExtra` the SwiftUI view directly. A `MenuBarExtra` label is
+    /// hosted by AppKit as a status item image, which is treated as a
+    /// template — filled flat with the menu bar's own foreground colour —
+    /// so the badge's colour, the whole point of showing it, would be lost.
+    /// An `NSImage` with `isTemplate = false` keeps it.
+    ///
+    /// Deliberately not cached: the only inputs are the tracker's colour,
+    /// glyph and the current appearance, this view redraws rarely now that
+    /// it no longer follows the clock, and rendering an 18-point image is
+    /// far cheaper than the invalidation a cache would need to get right.
+    private func badgeImage(for tracker: Tracker) -> NSImage? {
+        let renderer = ImageRenderer(
+            content: TrackerBadge(tracker: tracker, size: Self.side)
+                // `Color.dynamic` resolves against the appearance in force
+                // while the image is being rendered, which is not the menu
+                // bar's. Passing the scheme through explicitly — and reading
+                // it from the environment above, so a change to it redraws
+                // this view — keeps the badge matched to the menu bar it is
+                // drawn in.
+                .environment(\.colorScheme, colorScheme)
+        )
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        guard let image = renderer.nsImage else { return nil }
+        image.isTemplate = false
+        return image
     }
 }
 #endif

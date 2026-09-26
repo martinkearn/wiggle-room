@@ -99,7 +99,9 @@ struct WatchTrackerDetailView: View {
             card(tint: pace.status.color, title: tracker.terminology.currentFigure,
                  value: pace.currentValue,
                  captions: [pace.remainingInAllowanceCaption(for: tracker)].compactMap { $0 } + sourceTimingCaptions)
-            card(tint: tracker.accentColor, title: tracker.terminology.paceFigure,
+            // Reference colour, not identity: this card sits directly under
+            // the status-tinted one above (see `TrackerPalette`).
+            card(tint: tracker.referenceColor, title: tracker.terminology.paceFigure,
                  value: pace.targetValueToday,
                  captions: ["\(tracker.terminology.wholePeriodFigure) \(tracker.formattedValue(tracker.wholePeriodValue))",
                            tracker.trackerType.orientation == .allowance

@@ -196,6 +196,16 @@ The interface should feel calm and informative rather than punitive.
 - Fraunces is used for names and headings; Nunito is the primary text face.
 - Numeric values remain the source of truth and accompany visual indicators.
 
+### Tracker colours and status colours
+
+Each tracker carries an identity colour from a fixed palette, used for its badge, row and card washes, header glow and widget background.
+
+A few surfaces draw that identity colour immediately against a status colour: the chart's pace line beside the green/red actual line, the rings' unfilled track beneath the green/amber/red arc, and the pace figure card beside the status-tinted current figure card. On those, a palette colour that is itself a status hue cannot be read — a green tracker's pace line looks like "ahead of pace", a red one's like "behind".
+
+Every palette entry therefore has a second value, its **reference colour**, and those surfaces use it. It is the identity colour itself for entries already clear of the status hues, and a stand-in for those that are not. A stand-in keeps its entry's lightness and weight, so the tracker still reads as itself, and clears green, amber and red by a wide margin in both appearances. Peach, Toffee, Forest, Sunshine and Cherry currently need one; the remaining seven do not. Everything else keeps the identity colour, so a tracker still looks like the colour that was chosen for it.
+
+The palette is audited against the status colours whenever either changes. Only green, amber and red take part: the stale/error colour is text-only and never drawn on a ring or a chart.
+
 ### Zoom
 
 A tracker whose period is longer than five days can be zoomed. Zoom magnifies the rings and chart like a pinch-zoom on a static image. It never changes stored data, the centre figure, the status colour, or the figure cards, which all stay whole-period.
@@ -208,6 +218,14 @@ A tracker whose period is longer than five days can be zoomed. Zoom magnifies th
 
 The app's rings, cards, and chart strokes use a deliberately irregular, hand-drawn style. Accessibility labels must communicate the same information without relying on colour or geometry alone.
 
+### Tracker screen layout
+
+A tracker's own screen is headed by its name and nothing else. It carries the same badge — glyph and colour — that the tracker wears in the list, so the screen is recognisably the row that opened it: above the rings on iOS, beside the name on macOS, where a single line has room for both.
+
+The period's date range and, for a connected tracker, its connection and account sit with the days-remaining line below the figures, not under the heading. They were previously drawn beneath the title, which never closed the gap above them: the iOS system navigation subtitle shows only one line and reserves space whether or not it is used, so a two-line strip had to be drawn separately and always left a gap. Keeping all three lines together, away from the heading, removes the constraint rather than working around it.
+
+In the tracker list, each row's trailing status and figure column is a fixed width, so every row's ring sits the same distance from the edge and the rings line up down the list. Both the figure and the status word scale down within that width rather than widening it.
+
 ## 7. Platform behavior
 
 ### iOS and iPadOS
@@ -215,7 +233,7 @@ The app's rings, cards, and chart strokes use a deliberately irregular, hand-dra
 - Tracker list and detail navigation
 - A toolbar zoom toggle on eligible trackers' detail screens, with the zoomed date range shown under the rings; list rows, the menu bar, and medium and larger widgets mark zoomed trackers with a small magnifier
 - Pull-to-refresh/update behavior
-- Add and edit trackers and connected sources
+- Add and edit trackers and connected sources, reached from a `+` in the tracker list's top-right toolbar; the empty state keeps its own prominent button, since there is no list for a `+` to sit above yet
 - Settings for General app preferences, sources, ordering, CloudKit diagnostics, Siri phrases, and an About screen reporting the running version, build number and source commit, with a separate Danger Zone menu for reset operations
 - JSON export and import of tracker configuration and complete reading history
 - Spotlight, notification actions, Live Activities, and widgets
@@ -228,9 +246,9 @@ It is reached from a `@Query`-backed list, so its body observes no SwiftData at 
 
 ### macOS
 
-- Sidebar-based tracker interface
+- Sidebar-based tracker interface, with a `+` in the sidebar's toolbar alongside the existing new-tracker menu command
 - Dedicated Settings window
-- Menu bar presentation for a selected tracker
+- Menu bar presentation for a selected tracker. The status item itself shows only that tracker's badge — its glyph in its own colour — and no figure; the figures live in the dropdown, where they have room to be labelled. The badge is rendered to a non-template image, since a status item's image is otherwise filled flat with the menu bar's own foreground colour and the colour would be lost
 - Explicit update controls where pull-to-refresh is unavailable
 - JSON export and import of tracker configuration and complete reading history
 

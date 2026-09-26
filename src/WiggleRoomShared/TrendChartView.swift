@@ -297,7 +297,7 @@ struct TrendChartView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(colors: [tracker.accentColor], label: tracker.terminology.paceNoun)
+            legendItem(colors: [tracker.referenceColor], label: tracker.terminology.paceNoun)
             legendItem(colors: [WiggleRoomColors.good, WiggleRoomColors.bad], label: "Actual")
             legendItem(colors: [WiggleRoomColors.brand], label: "Trend")
         }
@@ -323,7 +323,11 @@ struct TrendChartView: View {
     private var chart: some View {
         Chart {
             // Target reference line — the strongest line on the chart, since
-            // it's the fixed yardstick everything else is read against.
+            // it's the fixed yardstick everything else is read against. Drawn
+            // in the tracker's reference colour rather than its identity
+            // colour, so a green or red tracker's yardstick can never be
+            // mistaken for the green/red actual line beside it (see
+            // `TrackerPalette`).
             ForEach(Array(wobbly(
                 from: (window.start, paceValue(at: window.start)),
                 to: (window.end, paceValue(at: window.end)),
@@ -337,7 +341,7 @@ struct TrendChartView: View {
                     y: .value(tracker.terminology.paceNoun, point.value),
                     series: .value("Series", "Pace")
                 )
-                .foregroundStyle(tracker.accentColor)
+                .foregroundStyle(tracker.referenceColor)
                 .lineStyle(StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
                 .interpolationMethod(.catmullRom)
             }

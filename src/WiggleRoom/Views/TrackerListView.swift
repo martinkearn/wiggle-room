@@ -42,21 +42,6 @@ struct TrackerListView: View {
                     EmptyTrackersView(isPresentingAddTracker: $isPresentingAddTracker)
                 } else {
                     List {
-                        // Top of the list, not bottom — always visible
-                        // without scrolling, and newly created trackers
-                        // sort to the top anyway (`\Tracker.startDate,
-                        // order: .reverse`), so this is exactly where a
-                        // just-added tracker will actually appear. Replaces
-                        // the old toolbar "+" button entirely, styled to
-                        // match a real tracker row rather than as a plain
-                        // list button.
-                        AddTrackerRow {
-                            isPresentingAddTracker = true
-                        }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-
                         ForEach(trackers) { tracker in
                             NavigationLink {
                                 TrackerDetailView(tracker: tracker)
@@ -85,6 +70,19 @@ struct TrackerListView: View {
                         isPresentingSettings = true
                     } label: {
                         Label("Settings", systemImage: "gearshape")
+                    }
+                }
+                // Adding a tracker is the conventional top-right "+", not a
+                // card at the top of the list: the list is for trackers, and
+                // a row that wasn't one had to be styled to look like one and
+                // then styled again to look unlike one. The empty state keeps
+                // its own prominent button, since there is no list to put a
+                // "+" above yet.
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        isPresentingAddTracker = true
+                    } label: {
+                        Label("Add Tracker", systemImage: "plus")
                     }
                 }
             }
@@ -154,6 +152,17 @@ private struct TrackerRow: View {
         pace.status
     }
 
+    /// The trailing status/figure column is a **fixed** width rather than a
+    /// minimum one, so that every row's ring sits the same distance from the
+    /// right edge and the rings line up down the list. They previously did
+    /// not: the column sized itself to its own contents, so a row reading
+    /// "JUST OVER BUDGET" was visibly wider than one reading "ON TRACK", and
+    /// a row with no readings at all — a plain "No data yet" — was narrower
+    /// again, each pushing its ring left by a different amount. Both the
+    /// figure and the status word scale down inside this width rather than
+    /// widening it.
+    private static let statusColumnWidth: CGFloat = 88
+
     var body: some View {
         // Same guard as `TrackerDetailView`'s own top-level check, for the
         // same reason: this `@Query`-sourced row can still be mid-render
@@ -204,18 +213,21 @@ private struct TrackerRow: View {
                         .font(.wiggleText(.caption2))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .minimumScaleFactor(0.6)
                     Text(pace.displayDifference(for: tracker))
                         .font(.wiggleNumber(.subheadline, weight: .bold))
                         .foregroundStyle(status.color)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .minimumScaleFactor(0.6)
                 }
-                .frame(minWidth: 76, alignment: .trailing)
+                .frame(width: Self.statusColumnWidth, alignment: .trailing)
             } else {
                 Text("No data yet")
                     .font(.wiggleText(.caption))
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: Self.statusColumnWidth, alignment: .trailing)
             }
         }
         .padding(14)
@@ -224,47 +236,6 @@ private struct TrackerRow: View {
             WobblyCard.shape()
                 .strokeBorder(tracker.accentColor.opacity(0.18), lineWidth: 1)
         )
-    }
-}
-
-/// The "Add Tracker" entry point, styled as its own card matching
-/// `TrackerRow`'s exact shape/sizing (same padding, corner radius, ring
-/// size) rather than a plain list button — reads as "one more thing you
-/// could add to this stack," not chrome bolted onto the list. Dashed
-/// rather than solid stroke, and a "+" in place of a ring, distinguish it
-/// from a real tracker at a glance. Lives at the top of the list (see
-/// `TrackerListView.body`) rather than the bottom or the toolbar.
-private struct AddTrackerRow: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                ZStack {
-                    IconRingShape(ring: .outer, fitsRect: true)
-                        .stroke(WiggleRoomColors.brand.opacity(0.4), style: StrokeStyle(lineWidth: 2.5, dash: [5, 4]))
-                        .padding(2.5/2)
-                        .frame(width: 46, height: 46)
-                    Image(systemName: "plus")
-                        .font(.wiggleText(size: 17, weight: .semibold))
-                        .foregroundStyle(WiggleRoomColors.brand)
-                }
-
-                Text("Add Tracker")
-                    .font(WiggleRoomFont.headline(18, weight: 650))
-                    .foregroundStyle(WiggleRoomColors.brand)
-
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .background(WiggleRoomColors.brand.opacity(0.06), in: WobblyCard.shape(1))
-            .overlay(
-                WobblyCard.shape(1)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
-                    .foregroundStyle(WiggleRoomColors.brand.opacity(0.3))
-            )
-        }
-        .buttonStyle(.plain)
     }
 }
 
