@@ -62,6 +62,9 @@ enum TrackerPalette {
         "figure.run", "dumbbell.fill", "gamecontroller.fill", "popcorn.fill", "beach.umbrella.fill", "cup.and.saucer.fill", "fork.knife",
         // Everyday
         "cart.fill", "drop.fill", "bag.fill", "house.fill", "star.fill", "heart.fill", "bolt.fill",
+        // Plain numbers — the defaults for the two unitless types, so a
+        // tracker's own default is always somewhere in this grid.
+        "chart.line.uptrend.xyaxis", "chart.line.downtrend.xyaxis", "number.circle.fill",
     ]
 }
 

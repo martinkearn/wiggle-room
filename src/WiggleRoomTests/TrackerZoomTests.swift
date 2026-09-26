@@ -164,9 +164,12 @@ final class TrackerZoomTests: XCTestCase {
     func testZoomedRingsAreLevelWhenOnPaceForEveryType() {
         let cases: [(TrackerType, Decimal, Decimal)] = [
             (.spendingMoney, 600, 600),
+            (.spendingCredit, 0, 600),
             (.savingMoney, 1_000, 3_000),
             (.mileage, 10_000, 3_000),
             (.weightLoss, 90, 6),
+            (.numberRising, 0, 120),
+            (.numberFalling, 120, 120),
         ]
         for (type, startingValue, totalAllowance) in cases {
             let tracker = makeTracker(type: type, startingValue: startingValue, totalAllowance: totalAllowance)

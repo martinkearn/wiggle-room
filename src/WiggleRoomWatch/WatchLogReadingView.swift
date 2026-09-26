@@ -21,9 +21,9 @@ struct WatchLogReadingView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 8) {
-                Text("Log \(tracker.trackerUnit.symbol)")
+                Text("Log \(tracker.unitPrompt)")
                     .font(WiggleRoomFont.headline(18, weight: 700))
-                TextField(tracker.trackerUnit.symbol, text: $valueText)
+                TextField(tracker.unitPrompt, text: $valueText)
                     .focused($isFocused)
                     .font(.wiggleNumber(size: 28, weight: .semibold))
                     .multilineTextAlignment(.center)

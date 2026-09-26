@@ -65,6 +65,18 @@ final class TrackerPaceTests: XCTestCase {
         )
     }
 
+    /// A card that starts each period empty and fills up toward its limit.
+    private func creditTracker(startingValue: Decimal = 0, limit: Decimal = 600) -> Tracker {
+        makeTracker(name: "Groceries card", type: .spendingCredit, startingValue: startingValue, totalAllowance: limit)
+    }
+
+    private func plainTracker(_ type: TrackerType, startingValue: Decimal, target: Decimal) -> Tracker {
+        makeTracker(
+            name: "Fictional count", type: type, startingValue: startingValue,
+            totalAllowance: type.totalAllowance(startingValue: startingValue, targetValue: target)
+        )
+    }
+
     // MARK: - Spending (decreasing, higher is better)
 
     func testSpending_aheadOfPace() {
@@ -172,6 +184,62 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.status, .bad)
         XCTAssertEqual(pace.statusLine(for: tracker), "Behind Target by")
         XCTAssertEqual(pace.displayDifference(for: tracker), "2 kg")
+    }
+
+    // MARK: - Spending credit (increasing, lower is better)
+
+    /// The worked example from the issue: £600 of groceries a month on a card
+    /// that starts each period at zero. Halfway through, £250 on the card is
+    /// £50 less than the £300 pace — the good case, even though the balance is
+    /// rising.
+    func testSpendingCredit_belowLimitPace_readsGreen() {
+        let tracker = creditTracker(startingValue: 0, limit: 600)
+        let pace = tracker.pace(actualValue: 250, asOf: halfway)
+
+        XCTAssertEqual(pace.consumedSoFar, 250)
+        XCTAssertEqual(pace.expectedConsumedByNow, 300)
+        XCTAssertEqual(pace.targetValueToday, 300)
+        XCTAssertEqual(pace.goodness, 50)
+        XCTAssertTrue(pace.isAheadOfPace)
+        XCTAssertEqual(pace.status, .good)
+        XCTAssertEqual(pace.statusLine(for: tracker), "Below Limit by")
+        XCTAssertEqual(pace.displayDifference(for: tracker), "£50")
+    }
+
+    func testSpendingCredit_overLimitPace_readsRed() {
+        let tracker = creditTracker(startingValue: 0, limit: 600)
+        let pace = tracker.pace(actualValue: 400, asOf: halfway) // pace is 300
+
+        XCTAssertEqual(pace.goodness, -100)
+        XCTAssertFalse(pace.isAheadOfPace)
+        XCTAssertEqual(pace.status, .bad, "100 over a 600 limit is past the 30 amber band")
+        XCTAssertEqual(pace.statusLine(for: tracker), "Over Limit by")
+    }
+
+    // MARK: - Plain numbers (no unit, both directions)
+
+    func testNumberRising_aheadOfTarget_readsGreenWithNoUnit() {
+        let tracker = plainTracker(.numberRising, startingValue: 0, target: 120)
+        let pace = tracker.pace(actualValue: 70, asOf: halfway) // pace is 60
+
+        XCTAssertEqual(tracker.totalAllowance, 120)
+        XCTAssertEqual(pace.targetValueToday, 60)
+        XCTAssertEqual(pace.goodness, 10)
+        XCTAssertEqual(pace.status, .good)
+        XCTAssertEqual(pace.statusLine(for: tracker), "Ahead of Target by")
+        XCTAssertEqual(pace.displayDifference(for: tracker), "10", "a plain number carries no symbol")
+    }
+
+    func testNumberFalling_aboveTarget_readsBehind() {
+        let tracker = plainTracker(.numberFalling, startingValue: 120, target: 0)
+        let pace = tracker.pace(actualValue: 80, asOf: halfway) // pace is 60
+
+        XCTAssertEqual(tracker.totalAllowance, 120)
+        XCTAssertEqual(pace.targetValueToday, 60)
+        XCTAssertEqual(pace.goodness, -20)
+        XCTAssertEqual(pace.status, .bad)
+        XCTAssertEqual(pace.statusLine(for: tracker), "Behind Target by")
+        XCTAssertEqual(pace.displayDifference(for: tracker), "20")
     }
 
     // MARK: - Amber band, including the per-unit floor (§7)
