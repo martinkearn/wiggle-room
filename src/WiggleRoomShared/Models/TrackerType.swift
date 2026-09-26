@@ -20,25 +20,38 @@ enum TrackerUnit: String, CaseIterable, Hashable, Codable, Identifiable {
     case kilometres = "km"
     case kilograms = "kg"
     case pounds = "lb"
+    /// The unit of the plain-number types, which have no unit at all. Its raw
+    /// value is a word rather than a symbol precisely because it has no
+    /// symbol to use — see `symbol` and `Tracker.unit`.
+    case number = "number"
 
     /// Where the symbol sits relative to the number: a currency symbol is
-    /// prefixed with no space ("£684"), everything else is suffixed with one
-    /// ("8,400 mi").
+    /// prefixed with no space ("£684"), most others are suffixed with one
+    /// ("8,400 mi"), and a unit with no symbol shows the bare figure
+    /// ("8,400").
     enum Placement {
         case prefix
         case suffix
+        case bare
     }
 
     var id: String { rawValue }
 
-    /// The symbol itself — also this unit's stored representation on
-    /// `Tracker.unit`.
-    var symbol: String { rawValue }
+    /// The symbol shown alongside a figure in this unit — empty for a unit
+    /// that has none. This is *display* only; `Tracker.unit` stores
+    /// `rawValue`.
+    var symbol: String {
+        switch self {
+        case .sterling, .dollar, .euro, .miles, .kilometres, .kilograms, .pounds: rawValue
+        case .number: ""
+        }
+    }
 
     var placement: Placement {
         switch self {
         case .sterling, .dollar, .euro: .prefix
         case .miles, .kilometres, .kilograms, .pounds: .suffix
+        case .number: .bare
         }
     }
 
@@ -49,7 +62,7 @@ enum TrackerUnit: String, CaseIterable, Hashable, Codable, Identifiable {
         switch self {
         case .sterling, .dollar, .euro: 2
         case .kilograms: 1
-        case .miles, .kilometres, .pounds: 0
+        case .miles, .kilometres, .pounds, .number: 0
         }
     }
 
@@ -59,7 +72,7 @@ enum TrackerUnit: String, CaseIterable, Hashable, Codable, Identifiable {
     var amberFloor: Decimal {
         switch self {
         case .sterling, .dollar, .euro: Decimal(string: "0.02") ?? 0
-        case .miles, .kilometres, .pounds: 2
+        case .miles, .kilometres, .pounds, .number: 2
         case .kilograms: 1
         }
     }
@@ -76,15 +89,19 @@ enum TrackerUnit: String, CaseIterable, Hashable, Codable, Identifiable {
         case .miles: "Round up to the nearest whole mile."
         case .kilometres: "Round up to the nearest whole km."
         case .pounds: "Round up to the nearest whole pound."
+        case .number: "Round up to the nearest whole number."
         case .sterling, .dollar, .euro, .kilograms: nil
         }
     }
 
     /// Rounds a typed value to what this unit can actually hold. A
     /// zero-precision unit rounds *up* (away from zero), matching the hint
-    /// the log screen shows and staying on the conservative side for both
-    /// units where it applies — an extra mile against an allowance, an extra
-    /// pound still to lose.
+    /// the log screen shows and staying on the conservative side for the
+    /// distance-and-weight units — an extra mile against an allowance, an
+    /// extra pound still to lose. A plain number shares that rule for
+    /// consistency: rounding is a property of the unit, and the two
+    /// plain-number types run in opposite directions, so no single rounding
+    /// rule can be the conservative one for both.
     func rounded(_ value: Decimal) -> Decimal {
         var input = value
         var result = Decimal()
@@ -98,7 +115,13 @@ enum TrackerUnit: String, CaseIterable, Hashable, Codable, Identifiable {
 /// allowance is a movement ("a £500 budget"), a goal is an end value ("£5,000
 /// in the account", "85 kg"). Storage is uniform either way — see
 /// `Tracker.totalAllowance`.
-enum TrackerOrientation {
+///
+/// `nonisolated` because the target defaults to main-actor isolation, which
+/// would otherwise isolate this enum's implicit `Equatable` conformance too —
+/// and `Tracker.projectedRemainder` compares orientations from a nonisolated
+/// context. The sibling enums escape it only by accident of having a raw
+/// value, whose derived conformances are nonisolated already.
+nonisolated enum TrackerOrientation {
     case allowance
     case goal
 }
@@ -143,15 +166,21 @@ struct TrackerTerminology {
 /// sets everything else — units, direction, polarity, wording, which sources
 /// can back it — and cannot be changed afterwards.
 ///
-/// The four types are the 2×2 of two genuinely independent axes:
+/// Every type is a combination of two genuinely independent axes:
 /// **direction** (which way the number travels) and **polarity** (which side
 /// of the pace line is the good side). Collapsing those into one axis is what
 /// made a Saving tracker that's £400 ahead report as red "Over Budget".
+/// Because those axes carry all the behaviour, a new type is a matter of
+/// wording and units rather than new maths: Spending Credit runs like
+/// Mileage, and the two plain-number types like Saving Money and Weight loss.
 enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
     case spendingMoney
+    case spendingCredit
     case savingMoney
     case mileage
     case weightLoss
+    case numberRising
+    case numberFalling
 
     var id: String { rawValue }
 
@@ -164,9 +193,12 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
     var displayName: String {
         switch self {
         case .spendingMoney: "Spending Money"
+        case .spendingCredit: "Spending Credit"
         case .savingMoney: "Saving Money"
         case .mileage: "Mileage"
         case .weightLoss: "Weight loss"
+        case .numberRising: "Rising Number"
+        case .numberFalling: "Falling Number"
         }
     }
 
@@ -175,59 +207,70 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
     var summary: String {
         switch self {
         case .spendingMoney: "A balance falling against a spending budget."
+        case .spendingCredit: "A credit balance rising against a spending limit."
         case .savingMoney: "A balance rising toward a savings goal."
         case .mileage: "An odometer reading against a mileage allowance."
         case .weightLoss: "Weight falling toward a target weight."
+        case .numberRising: "A plain number rising toward a target."
+        case .numberFalling: "A plain number falling toward a target."
         }
     }
 
     /// Which way the tracked value travels over the period.
     var direction: TrackerDirection {
         switch self {
-        case .spendingMoney, .weightLoss: .decreasing
-        case .savingMoney, .mileage: .increasing
+        case .spendingMoney, .weightLoss, .numberFalling: .decreasing
+        case .spendingCredit, .savingMoney, .mileage, .numberRising: .increasing
         }
     }
 
     /// Which side of the pace line is the *good* side. This is the axis the
-    /// old direction-only model had no room for: Spending and Saving are
-    /// both "higher is better" despite running in opposite directions.
+    /// old direction-only model had no room for: Spending Money and Saving
+    /// Money are both "higher is better" despite running in opposite
+    /// directions, and Spending Credit is the mirror of that — the same
+    /// money, spent the same way, but counted upward on a card, so a *lower*
+    /// balance is the good news.
     var higherIsBetter: Bool {
         switch self {
-        case .spendingMoney, .savingMoney: true
-        case .mileage, .weightLoss: false
+        case .spendingMoney, .savingMoney, .numberRising: true
+        case .spendingCredit, .mileage, .weightLoss, .numberFalling: false
         }
     }
 
     var orientation: TrackerOrientation {
         switch self {
-        case .spendingMoney, .mileage: .allowance
-        case .savingMoney, .weightLoss: .goal
+        case .spendingMoney, .spendingCredit, .mileage: .allowance
+        case .savingMoney, .weightLoss, .numberRising, .numberFalling: .goal
         }
     }
 
     var permittedUnits: [TrackerUnit] {
         switch self {
-        case .spendingMoney, .savingMoney: [.sterling, .dollar, .euro]
+        case .spendingMoney, .spendingCredit, .savingMoney: [.sterling, .dollar, .euro]
         case .mileage: [.miles, .kilometres]
         case .weightLoss: [.kilograms, .pounds]
+        case .numberRising, .numberFalling: [.number]
         }
     }
 
     var defaultUnit: TrackerUnit {
         switch self {
-        case .spendingMoney, .savingMoney: .sterling
+        case .spendingMoney, .spendingCredit, .savingMoney: .sterling
         case .mileage: .miles
         case .weightLoss: .kilograms
+        case .numberRising, .numberFalling: .number
         }
     }
 
     var defaultGlyph: String {
         switch self {
         case .spendingMoney: "creditcard.fill"
+        case .spendingCredit: "cart.fill"
         case .savingMoney: "banknote.fill"
         case .mileage: "car.fill"
         case .weightLoss: "scalemass.fill"
+        case .numberRising: "chart.line.uptrend.xyaxis"
+        case .numberFalling: "chart.line.downtrend.xyaxis"
         }
     }
 
@@ -238,7 +281,7 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
     var defaultReminderCadenceMinutes: Int? {
         switch self {
         case .weightLoss: 10_080
-        case .spendingMoney, .savingMoney, .mileage: nil
+        case .spendingMoney, .spendingCredit, .savingMoney, .mileage, .numberRising, .numberFalling: nil
         }
     }
 
@@ -254,16 +297,18 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
         let monthly = (label: "Monthly", minutes: 43_200)
         switch self {
         case .weightLoss: return [daily, everyFewDays, weekly, fortnightly]
-        case .spendingMoney, .savingMoney, .mileage: return [daily, everyFewDays, weekly, fortnightly, monthly]
+        case .spendingMoney, .spendingCredit, .savingMoney, .mileage, .numberRising, .numberFalling:
+            return [daily, everyFewDays, weekly, fortnightly, monthly]
         }
     }
 
     /// The label on the form's first value field.
     var startingValueLabel: String {
         switch self {
-        case .spendingMoney, .savingMoney: "Starting balance"
+        case .spendingMoney, .spendingCredit, .savingMoney: "Starting balance"
         case .mileage: "Starting mileage"
         case .weightLoss: "Starting weight"
+        case .numberRising, .numberFalling: "Starting value"
         }
     }
 
@@ -272,27 +317,33 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
     var targetValueLabel: String {
         switch self {
         case .spendingMoney: "Budget"
+        case .spendingCredit: "Limit"
         case .savingMoney: "Goal"
         case .mileage: "Allowance"
         case .weightLoss: "Goal weight"
+        case .numberRising, .numberFalling: "Target"
         }
     }
 
     var startingValueHint: String {
         switch self {
         case .spendingMoney: "The balance this budget starts from."
+        case .spendingCredit: "What's already on the card today — usually zero at the start of a period."
         case .savingMoney: "What's in the account today."
         case .mileage: "Today's odometer reading."
         case .weightLoss: "What you weigh today."
+        case .numberRising, .numberFalling: "The number you're starting from."
         }
     }
 
     var targetValueHint: String {
         switch self {
         case .spendingMoney: "How much you can spend across the whole period."
+        case .spendingCredit: "How much you can put on the card across the whole period."
         case .savingMoney: "The balance you want to reach by the end."
         case .mileage: "How far you can travel across the whole period."
         case .weightLoss: "The weight you want to reach by the end."
+        case .numberRising, .numberFalling: "The number you want to reach by the end."
         }
     }
 
@@ -303,17 +354,22 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
     var logHint: String {
         switch self {
         case .spendingMoney, .savingMoney: "Enter the balance now — what's actually in the account."
+        case .spendingCredit: "Enter the balance now — what's actually on the card."
         case .mileage: "Enter the current odometer reading."
         case .weightLoss: "Enter what you weigh now."
+        case .numberRising, .numberFalling: "Enter the number as it stands now."
         }
     }
 
     var validationMessage: String {
         switch self {
         case .spendingMoney: "The budget must be more than zero."
+        case .spendingCredit: "The limit must be more than zero."
         case .savingMoney: "The goal must be higher than the starting balance."
         case .mileage: "The allowance must be more than zero."
         case .weightLoss: "The goal weight must be lower than the starting weight."
+        case .numberRising: "The target must be higher than the starting value."
+        case .numberFalling: "The target must be lower than the starting value."
         }
     }
 
@@ -321,7 +377,7 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
     var formFooter: String? {
         switch self {
         case .weightLoss: "Weekly weigh-ins give a truer picture than daily ones, which swing with water and food."
-        case .spendingMoney, .savingMoney, .mileage: nil
+        case .spendingMoney, .spendingCredit, .savingMoney, .mileage, .numberRising, .numberFalling: nil
         }
     }
 
@@ -339,6 +395,19 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 remainingCaption: "left in this budget",
                 paceNoun: "Budget",
                 celebration: "Closed Below Budget!"
+            )
+        case .spendingCredit:
+            TrackerTerminology(
+                currentFigure: "Balance",
+                paceFigure: "Limit today",
+                wholePeriodFigure: "Limit",
+                finalFigure: "Final limit",
+                goodLabel: "Below Limit",
+                amberLabel: "Just Over Limit",
+                badLabel: "Over Limit",
+                remainingCaption: "left in this limit",
+                paceNoun: "Limit",
+                celebration: "Closed Below Limit!"
             )
         case .savingMoney:
             TrackerTerminology(
@@ -379,6 +448,23 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 paceNoun: "Target",
                 celebration: "Target Weight Reached!"
             )
+        case .numberRising, .numberFalling:
+            // A plain number has no domain noun to borrow, so both plain
+            // types share one neutral set. They still read correctly in
+            // opposite directions because the status labels describe the
+            // pace line, not the direction of travel.
+            TrackerTerminology(
+                currentFigure: "Value",
+                paceFigure: "Target today",
+                wholePeriodFigure: "Target",
+                finalFigure: "Target",
+                goodLabel: "Ahead of Target",
+                amberLabel: "Slightly Behind Target",
+                badLabel: "Behind Target",
+                remainingCaption: "still to go",
+                paceNoun: "Target",
+                celebration: "Target Reached!"
+            )
         }
     }
 
@@ -388,11 +474,11 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
     /// the correct side of the starting value.
     func isValidPair(startingValue: Decimal, targetValue: Decimal) -> Bool {
         switch self {
-        case .spendingMoney, .mileage:
+        case .spendingMoney, .spendingCredit, .mileage:
             return targetValue > 0
-        case .savingMoney:
+        case .savingMoney, .numberRising:
             return targetValue > startingValue
-        case .weightLoss:
+        case .weightLoss, .numberFalling:
             return targetValue < startingValue
         }
     }

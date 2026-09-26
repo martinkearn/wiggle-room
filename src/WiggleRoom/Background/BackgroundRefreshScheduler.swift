@@ -62,6 +62,13 @@ enum BackgroundRefreshScheduler {
         request.earliestBeginDate = Date(timeIntervalSinceNow: nextInterval())
         // Submission can fail harmlessly in the Simulator or when Background
         // App Refresh is unavailable, so scheduling remains best-effort.
+        //
+        // iOS 27 deprecates this in favour of `submitTaskRequest(_:)`, which
+        // reports every failure rather than only some. That symbol doesn't
+        // exist in the iOS 26 SDK the build check runs on, and a symbol
+        // missing from the SDK can't be gated behind an availability check,
+        // so the deprecated call stays until CI's toolchain catches up. The
+        // deprecation warning is the reminder.
         try? BGTaskScheduler.shared.submit(request)
     }
 

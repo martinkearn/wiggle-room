@@ -17,6 +17,15 @@ final class StarlingProviderTests: XCTestCase {
         XCTAssertTrue(provider.requiresConnection)
     }
 
+    /// Starling reports an amount held, not an amount owed, so it must not be
+    /// offered as a source for a Spending Credit tracker — a synced balance
+    /// would travel the wrong way against the limit.
+    func testSupportedTypes_areTheTwoAccountBalanceTypesOnly() {
+        let provider = StarlingProvider()
+
+        XCTAssertEqual(provider.supportedTrackerTypes, [.spendingMoney, .savingMoney])
+    }
+
     func testFetchCurrentValue_withNoBoundConnection_throwsNotConnected() async {
         let provider = StarlingProvider(connection: nil)
         let target = SourceTarget(id: "abc-123", displayName: "Personal")

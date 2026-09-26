@@ -44,16 +44,21 @@ A `Tracker` represents one allowance over a date range.
 
 ### Tracker types
 
-Every tracker is one of four types, chosen at creation and locked thereafter. The type sets the permitted units, the direction, the polarity, all user-facing wording, the default glyph and reminder, and which sources may back it.
+Every tracker is one of seven types, chosen at creation and locked thereafter. The type sets the permitted units, the direction, the polarity, all user-facing wording, the default glyph and reminder, and which sources may back it.
 
-Direction and polarity are independent axes, and the four types are their 2×2. Direction is which way the value travels; polarity is which side of the pace line is the good side.
+Direction and polarity are independent axes. Direction is which way the value travels; polarity is which side of the pace line is the good side. Those two axes carry all the behavior, so a new type is a matter of wording and units rather than new pace maths.
 
 | Type | Direction | Good side | Orientation | Units |
 |---|---|---|---|---|
 | Spending Money | Decreasing | Higher | Allowance | £, $, € |
+| Spending Credit | Increasing | Lower | Allowance | £, $, € |
 | Saving Money | Increasing | Higher | Goal | £, $, € |
 | Mileage | Increasing | Lower | Allowance | mi, km |
 | Weight loss | Decreasing | Lower | Goal | kg, lb |
+| Rising Number | Increasing | Higher | Goal | none |
+| Falling Number | Decreasing | Lower | Goal | none |
+
+Spending Credit is the mirror of Spending Money: the same spending, counted upward on a card toward a limit rather than downward out of a balance, so a lower figure is the good news. The two plain-number types are the catch-all for anything the named types don't cover, and share one neutral set of wording (Value, Target) because a plain number has no domain noun to borrow.
 
 Orientation decides how the whole-period figure is entered. An allowance type is entered as a movement ("a £500 budget"); a goal type is entered as an end value ("£5,000", "85 kg"). Storage is uniform: a goal type's `totalAllowance` is the distance from `startingValue` to the stated goal, recomputed if the starting value is later edited so the goal itself cannot drift.
 
@@ -63,7 +68,7 @@ Orientation decides how the whole-period figure is entered. An allowance type is
 
 ### Units
 
-Precision and the amber floor belong to the unit, not the type: kg and lb differ within Weight loss, while the currencies are shared by both money types.
+Precision and the amber floor belong to the unit, not the type: kg and lb differ within Weight loss, while the currencies are shared by all three money types.
 
 | Unit | Placement | Precision | Amber floor |
 |---|---|---|---|
@@ -72,8 +77,11 @@ Precision and the amber floor belong to the unit, not the type: kg and lb differ
 | km | Suffix, space | 0 dp | 2 |
 | kg | Suffix, space | 1 dp | 1.0 |
 | lb | Suffix, space | 0 dp | 2 |
+| none | No symbol | 0 dp | 2 |
 
-A whole value drops its decimals entirely, so values read as `£684`, `£692.40`, `8,400 mi`, `85 kg`, `84.6 kg`. A zero-precision unit rounds typed input up to a whole number, with the rounding stated inline on the log screen.
+The plain-number types use a unit with no symbol at all, so their figures render bare (`8,400`). It is still a real unit rather than a special case, so precision, rounding and the amber floor keep working the same way everywhere. Because a unit's raw value is its symbol for every unit that has one, `Tracker.unit` stores the raw value — the unitless one stores the word `number`.
+
+A whole value drops its decimals entirely, so values read as `£684`, `£692.40`, `8,400 mi`, `85 kg`, `84.6 kg`, `8,400`. A zero-precision unit rounds typed input up to a whole number, with the rounding stated inline on the log screen. Rounding is a property of the unit, so both plain-number types round the same way even though they run in opposite directions.
 
 Each reading is a separate timestamped `ValueSnapshot`. Reading history is append-oriented so CloudKit can merge updates made on different devices.
 
@@ -121,7 +129,7 @@ Values are clamped where needed for presentation, but stored readings remain unc
 
 ## 4. Sources
 
-`SourceProvider` isolates provider-specific behavior from tracker calculations and UI. Each provider declares the tracker types it can back, so the relationship lives with the provider rather than being hard-coded per type: Starling supplies the two money types, Manual Entry suits all four, and a future vehicle or health source would declare its own. Add Tracker filters its source list through that declaration once a type is chosen.
+`SourceProvider` isolates provider-specific behavior from tracker calculations and UI. Each provider declares the tracker types it can back, so the relationship lives with the provider rather than being hard-coded per type: Starling supplies the two account-balance money types, Manual Entry suits them all, and a future vehicle or health source would declare its own. Spending Credit is deliberately outside Starling's set: Starling reports an amount held rather than an amount owed, so a synced balance would travel the wrong way against a credit limit. Add Tracker filters its source list through that declaration once a type is chosen.
 
 ### Manual Entry
 

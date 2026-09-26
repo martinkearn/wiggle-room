@@ -29,9 +29,11 @@ final class Tracker {
     var id: UUID = UUID()
     var name: String = ""
 
-    /// This tracker's unit symbol, always one of `TrackerUnit`'s raw values.
-    /// Read it through `trackerUnit`, which falls back to the type's default
-    /// rather than trusting the stored string.
+    /// This tracker's unit, always one of `TrackerUnit`'s raw values — which
+    /// is the symbol itself for every unit that has one, and the word
+    /// "number" for the unitless plain-number types. Read it through
+    /// `trackerUnit`, which falls back to the type's default rather than
+    /// trusting the stored string.
     var unit: String = ""
 
     /// What this tracker tracks, stored as a plain `String` rather than a
@@ -136,7 +138,7 @@ final class Tracker {
         self.id = id
         self.name = name
         self.typeRawValue = type.rawValue
-        self.unit = (unit ?? type.defaultUnit).symbol
+        self.unit = (unit ?? type.defaultUnit).rawValue
         self.connectedSource = connectedSource
         self.sourceTargetId = sourceTargetId
         self.startDate = startDate
@@ -192,7 +194,15 @@ extension Tracker {
     /// type's default for anything unrecognised.
     var trackerUnit: TrackerUnit {
         get { TrackerUnit(rawValue: unit) ?? trackerType.defaultUnit }
-        set { unit = newValue.symbol }
+        set { unit = newValue.rawValue }
+    }
+
+    /// The word to show where a unit symbol would go on a control that needs
+    /// *something* there — the watch's log field, whose title would otherwise
+    /// read "Log " for a unitless tracker. A unit with a symbol shows it;
+    /// anything else borrows the type's own noun for the current reading.
+    var unitPrompt: String {
+        trackerUnit.symbol.isEmpty ? terminology.currentFigure : trackerUnit.symbol
     }
 
     /// Every piece of type-dependent wording — see `TrackerTerminology`.
@@ -213,8 +223,9 @@ extension Tracker {
     }
 
     /// Formats a value in this tracker's unit, placing a currency symbol on
-    /// the left with no space ("£1,234.56") or any other unit on the right
-    /// with a space ("8,400 mi"). `signed` prefixes a "+" for non-negative
+    /// the left with no space ("£1,234.56"), any other symbol on the right
+    /// with a space ("8,400 mi"), and nothing at all for a unitless
+    /// plain-number tracker ("8,400"). `signed` prefixes a "+" for non-negative
     /// values (negative values always show their own "-"). A whole value
     /// drops its decimals entirely ("£684", "85 kg"); anything with a
     /// fractional part shows exactly the unit's own precision ("£692.40",
@@ -243,6 +254,7 @@ extension Tracker {
         switch unit.placement {
         case .prefix: return "\(sign)\(unit.symbol)\(magnitude)"
         case .suffix: return "\(sign)\(magnitude) \(unit.symbol)"
+        case .bare: return "\(sign)\(magnitude)"
         }
     }
 }

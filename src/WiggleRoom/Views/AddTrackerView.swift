@@ -160,6 +160,9 @@ struct AddTrackerView: View {
                     Text("Details")
                         .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
+                    // Without an explicit full-width frame the stack takes its
+                    // children's ideal width, which wraps the type summary
+                    // halfway across the screen instead of at the margin.
                     VStack(alignment: .leading, spacing: 4) {
                         Text(trackerType.summary)
                         if let formFooter = trackerType.formFooter {
@@ -169,6 +172,8 @@ struct AddTrackerView: View {
                             Text("A tracker's type is fixed once it's created.")
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
                 TrackerAppearancePicker(
@@ -677,7 +682,7 @@ struct AddTrackerView: View {
         let periodHours = endDate.timeIntervalSince(startDate) / 3600
         guard periodHours > 0 else { return nil }
         let hourlyRate = totalAllowance / Decimal(periodHours)
-        return "≈ \(hourlyRate.formatted(.number.precision(.fractionLength(0...2)))) \(unit.symbol) / hour"
+        return "≈ \(Self.paceRate(hourlyRate, unit: unit)) / hour"
     }
 
     /// Only worth showing alongside the hourly rate once a tracker runs
@@ -688,7 +693,17 @@ struct AddTrackerView: View {
         let periodHours = endDate.timeIntervalSince(startDate) / 3600
         guard periodHours > 24 else { return nil }
         let dailyRate = totalAllowance / Decimal(periodHours / 24)
-        return "≈ \(dailyRate.formatted(.number.precision(.fractionLength(0...2)))) \(unit.symbol) / day"
+        return "≈ \(Self.paceRate(dailyRate, unit: unit)) / day"
+    }
+
+    /// A pace rate for the two "per hour"/"per day" lines. Always shows up to
+    /// two decimal places whatever the unit's own precision — a rate of a
+    /// third of a mile a day is worth seeing even though a reading isn't —
+    /// and omits the unit entirely when it has no symbol, so a plain-number
+    /// tracker reads "≈ 12 / day" rather than carrying a stray space.
+    private static func paceRate(_ rate: Decimal, unit: TrackerUnit) -> String {
+        let magnitude = rate.formatted(.number.precision(.fractionLength(0...2)))
+        return unit.symbol.isEmpty ? magnitude : "\(magnitude) \(unit.symbol)"
     }
 
     /// See `Tracker.projectedRemainder` — how much would be left over at the

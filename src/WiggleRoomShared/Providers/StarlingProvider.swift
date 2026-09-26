@@ -65,7 +65,10 @@ final class StarlingProvider: SourceProvider {
     nonisolated let providerId = "starling"
     nonisolated let displayName = "Starling"
     nonisolated let requiresConnection = true
-    /// A bank balance backs a money tracker and nothing else.
+    /// A bank balance backs a money tracker and nothing else. Spending Credit
+    /// is deliberately excluded: Starling reports an amount held, not an
+    /// amount owed, so a synced balance would travel the wrong way against a
+    /// credit limit. Those trackers are logged by hand.
     nonisolated let supportedTrackerTypes: Set<TrackerType> = [.spendingMoney, .savingMoney]
 
     /// Shared by every `StarlingProvider` instance created with the default
