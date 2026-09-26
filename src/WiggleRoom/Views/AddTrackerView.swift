@@ -160,6 +160,9 @@ struct AddTrackerView: View {
                     Text("Details")
                         .font(WiggleRoomFont.headline(15, weight: 650))
                 } footer: {
+                    // Without an explicit full-width frame the stack takes its
+                    // children's ideal width, which wraps the type summary
+                    // halfway across the screen instead of at the margin.
                     VStack(alignment: .leading, spacing: 4) {
                         Text(trackerType.summary)
                         if let formFooter = trackerType.formFooter {
@@ -169,6 +172,8 @@ struct AddTrackerView: View {
                             Text("A tracker's type is fixed once it's created.")
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
                 TrackerAppearancePicker(

@@ -58,11 +58,21 @@ enum BackgroundRefreshScheduler {
     /// (see `WiggleRoomApp`'s `scenePhase` observer).
     @MainActor
     static func scheduleNext() {
-        let request = BGAppRefreshTaskRequest(identifier: taskIdentifier)
-        request.earliestBeginDate = Date(timeIntervalSinceNow: nextInterval())
-        // Submission can fail harmlessly in the Simulator or when Background
-        // App Refresh is unavailable, so scheduling remains best-effort.
-        try? BGTaskScheduler.shared.submit(request)
+        // `submit(_:)` is deprecated from iOS 27 in favour of an async call
+        // that reports every failure rather than only some. BackgroundTasks
+        // asks that it not be made from the main thread, so it runs detached,
+        // and the request itself is built inside that task: `BGTaskRequest`
+        // isn't `Sendable`, while the identifier and date it's built from are.
+        let identifier = taskIdentifier
+        let earliestBeginDate = Date(timeIntervalSinceNow: nextInterval())
+        Task.detached(priority: .utility) {
+            let request = BGAppRefreshTaskRequest(identifier: identifier)
+            request.earliestBeginDate = earliestBeginDate
+            // Submission can fail harmlessly in the Simulator or when
+            // Background App Refresh is unavailable, so scheduling remains
+            // best-effort.
+            try? await BGTaskScheduler.shared.submitTaskRequest(request)
+        }
     }
 
     private static func handle(_ task: BGAppRefreshTask, container: ModelContainer) {

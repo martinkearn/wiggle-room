@@ -115,7 +115,13 @@ enum TrackerUnit: String, CaseIterable, Hashable, Codable, Identifiable {
 /// allowance is a movement ("a £500 budget"), a goal is an end value ("£5,000
 /// in the account", "85 kg"). Storage is uniform either way — see
 /// `Tracker.totalAllowance`.
-enum TrackerOrientation {
+///
+/// `nonisolated` because the target defaults to main-actor isolation, which
+/// would otherwise isolate this enum's implicit `Equatable` conformance too —
+/// and `Tracker.projectedRemainder` compares orientations from a nonisolated
+/// context. The sibling enums escape it only by accident of having a raw
+/// value, whose derived conformances are nonisolated already.
+nonisolated enum TrackerOrientation {
     case allowance
     case goal
 }

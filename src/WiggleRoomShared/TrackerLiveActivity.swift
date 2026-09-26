@@ -12,8 +12,13 @@ import Foundation
 /// rather than its whole life. Live Activities are built for short, bounded
 /// events (§9), which a tracker running for weeks or months isn't; the last
 /// tenth of one is.
-struct TrackerActivityAttributes: ActivityAttributes {
-    struct ContentState: Codable, Hashable {
+///
+/// `nonisolated` because the target defaults to main-actor isolation, and
+/// ActivityKit reads these values from concurrent contexts of its own — an
+/// isolated conformance to `ActivityAttributes` is an error under the Swift 6
+/// language mode.
+nonisolated struct TrackerActivityAttributes: ActivityAttributes {
+    nonisolated struct ContentState: Codable, Hashable {
         var statusLine: String
         var difference: String
         var isOnPace: Bool

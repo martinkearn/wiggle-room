@@ -141,7 +141,7 @@ enum WiggleRoomFont {
         ])
         let barButtonAttributes: [NSAttributedString.Key: Any] = [.font: UIFont(descriptor: barButtonDescriptor, size: 17)]
         appearance.buttonAppearance.normal.titleTextAttributes = barButtonAttributes
-        appearance.doneButtonAppearance.normal.titleTextAttributes = barButtonAttributes
+        appearance.prominentButtonAppearance.normal.titleTextAttributes = barButtonAttributes
         appearance.backButtonAppearance.normal.titleTextAttributes = barButtonAttributes
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
