@@ -58,21 +58,18 @@ enum BackgroundRefreshScheduler {
     /// (see `WiggleRoomApp`'s `scenePhase` observer).
     @MainActor
     static func scheduleNext() {
-        // `submit(_:)` is deprecated from iOS 27 in favour of an async call
-        // that reports every failure rather than only some. BackgroundTasks
-        // asks that it not be made from the main thread, so it runs detached,
-        // and the request itself is built inside that task: `BGTaskRequest`
-        // isn't `Sendable`, while the identifier and date it's built from are.
-        let identifier = taskIdentifier
-        let earliestBeginDate = Date(timeIntervalSinceNow: nextInterval())
-        Task.detached(priority: .utility) {
-            let request = BGAppRefreshTaskRequest(identifier: identifier)
-            request.earliestBeginDate = earliestBeginDate
-            // Submission can fail harmlessly in the Simulator or when
-            // Background App Refresh is unavailable, so scheduling remains
-            // best-effort.
-            try? await BGTaskScheduler.shared.submitTaskRequest(request)
-        }
+        let request = BGAppRefreshTaskRequest(identifier: taskIdentifier)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: nextInterval())
+        // Submission can fail harmlessly in the Simulator or when Background
+        // App Refresh is unavailable, so scheduling remains best-effort.
+        //
+        // iOS 27 deprecates this in favour of `submitTaskRequest(_:)`, which
+        // reports every failure rather than only some. That symbol doesn't
+        // exist in the iOS 26 SDK the build check runs on, and a symbol
+        // missing from the SDK can't be gated behind an availability check,
+        // so the deprecated call stays until CI's toolchain catches up. The
+        // deprecation warning is the reminder.
+        try? BGTaskScheduler.shared.submit(request)
     }
 
     private static func handle(_ task: BGAppRefreshTask, container: ModelContainer) {
