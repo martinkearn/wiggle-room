@@ -276,6 +276,8 @@ The row shows both of the figures the ahead/behind figure is the difference betw
 
 The badge and the rings share the gutter's width and so sit concentric down the card, which also lines every row's rings up down the list. That alignment used to need a fixed-width trailing column holding the rings clear of a variable-width status column; anchoring them to the leading edge gets it for free, and the status text is free to use the width it needs.
 
+A newly created tracker's row arrives with character. The tracker is saved while the add sheet still covers the list, so the list holds its row back until the sheet has gone. It then inserts the row, the other rows move aside, and the new row springs from 92% size with a slight tilt as its rings play their own arrival. The row's spring is quicker and calmer than it would be alone, so the rings' overshoot stays the main event. Only the new row animates. Under Reduce Motion it simply appears. Deleting a row keeps the system animation, and reordering keeps the platform's own editing behaviour.
+
 macOS keeps its own compact sidebar row, which is a navigation list rather than a dashboard.
 
 ## 7. Platform behavior
