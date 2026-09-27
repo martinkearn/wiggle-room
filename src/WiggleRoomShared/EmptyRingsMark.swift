@@ -18,19 +18,32 @@ struct IconRingShape: Shape {
     /// exactly, the way a `Circle` would — for the live rings, where the
     /// caller insets the inner ring itself.
     var fitsRect = false
-    /// A more exaggerated wobble, for small, faint uses (the empty and
-    /// loading marks) where the icon's own subtle outline reads as plain
-    /// circles at ~50pt.
-    var pronounced = false
+    /// How hand-drawn the outline looks: 0 is the icon's own subtle
+    /// outline, 1 the more exaggerated one the empty and loading marks use
+    /// (at ~50pt the icon's own outline reads as plain circles). Continuous
+    /// and animatable so the live rings can pulse it briefly when their
+    /// target drifts (`RingsView`); every resting use sits at 0 or 1.
+    var wobble: Double = 0
+
+    var animatableData: Double {
+        get { wobble }
+        set { wobble = newValue }
+    }
+
+    /// The two outlines `wobble` blends between, as bezier control points.
+    private static func outline(_ ring: Ring, pronounced: Bool) -> [CGFloat] {
+        switch (ring, pronounced) {
+        case (.outer, false): [100, 32, 144, 26, 172, 60, 168, 102, 166, 148, 130, 176, 96, 170, 54, 168, 26, 138, 32, 96, 34, 56, 60, 30, 100, 32]
+        case (.inner, false): [100, 56, 128, 52, 148, 76, 144, 102, 142, 130, 120, 150, 96, 146, 70, 144, 54, 126, 56, 98, 58, 72, 76, 54, 100, 56]
+        case (.outer, true): [100, 30, 150, 20, 176, 58, 170, 104, 168, 154, 128, 182, 92, 172, 46, 170, 22, 140, 30, 92, 34, 48, 58, 34, 100, 30]
+        case (.inner, true): [100, 54, 132, 46, 152, 74, 146, 104, 144, 134, 118, 154, 92, 148, 64, 146, 50, 126, 54, 94, 58, 66, 74, 56, 100, 54]
+        }
+    }
 
     func path(in rect: CGRect) -> Path {
-        let s: [CGFloat]
-        switch (ring, pronounced) {
-        case (.outer, false): s = [100, 32, 144, 26, 172, 60, 168, 102, 166, 148, 130, 176, 96, 170, 54, 168, 26, 138, 32, 96, 34, 56, 60, 30, 100, 32]
-        case (.inner, false): s = [100, 56, 128, 52, 148, 76, 144, 102, 142, 130, 120, 150, 96, 146, 70, 144, 54, 126, 56, 98, 58, 72, 76, 54, 100, 56]
-        case (.outer, true): s = [100, 30, 150, 20, 176, 58, 170, 104, 168, 154, 128, 182, 92, 172, 46, 170, 22, 140, 30, 92, 34, 48, 58, 34, 100, 30]
-        case (.inner, true): s = [100, 54, 132, 46, 152, 74, 146, 104, 144, 134, 118, 154, 92, 148, 64, 146, 50, 126, 54, 94, 58, 66, 74, 56, 100, 54]
-        }
+        let t = CGFloat(wobble)
+        let s = zip(Self.outline(ring, pronounced: false), Self.outline(ring, pronounced: true))
+            .map { subtle, pronounced in subtle + (pronounced - subtle) * t }
         // Both rings share the outer ring's bounds so the pair stays in
         // the same relationship as in the icon.
         let (minX, minY, span): (CGFloat, CGFloat, CGFloat) = (26, 26, 146)
@@ -66,10 +79,10 @@ struct EmptyRingsMark: View {
         let line = size * 0.09
         let style = StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round)
         ZStack {
-            IconRingShape(ring: .outer, fitsRect: true, pronounced: true)
+            IconRingShape(ring: .outer, fitsRect: true, wobble: 1)
                 .trim(from: 0, to: 0.75)
                 .stroke(WiggleRoomColors.brand.opacity(0.5), style: style)
-            IconRingShape(ring: .inner, fitsRect: true, pronounced: true)
+            IconRingShape(ring: .inner, fitsRect: true, wobble: 1)
                 .trim(from: 0, to: 0.68)
                 .stroke(WiggleRoomColors.good.opacity(0.7), style: style)
                 .padding(size * 0.17)
