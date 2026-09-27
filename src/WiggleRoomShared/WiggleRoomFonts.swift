@@ -82,7 +82,7 @@ enum WiggleRoomFont {
     }
 
     /// The small serif label that names a card or figure ("Current
-    /// Balance", "Budget today") — Fraunces names things; Nunito carries
+    /// Balance", "Budget now") — Fraunces names things; Nunito carries
     /// the figures and captions beneath it.
     static var cardLabel: Font {
         fraunces(size: 13, weight: 600, opticalSize: 24, wonky: 1, soft: 70)

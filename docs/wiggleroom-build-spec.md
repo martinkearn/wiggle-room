@@ -63,7 +63,7 @@ Spending Credit is the mirror of Spending Money: the same spending, counted upwa
 
 Orientation decides how the whole-period figure is entered. An allowance type is entered as a movement ("a £500 budget"); a goal type is entered as an end value ("£5,000", "85 kg"). Storage is uniform: a goal type's `totalAllowance` is the distance from `startingValue` to the stated goal, recomputed if the starting value is later edited so the goal itself cannot drift.
 
-`TrackerType` owns a terminology table covering every type-dependent phrase — the current figure, today's pace figure, the whole-period figure, the final figure, the three status labels, the remaining-amount caption, and the completion celebration. Each type needs a whole-period noun and a today noun, because the dashboard shows both figures side by side.
+`TrackerType` owns a terminology table covering every type-dependent phrase — the current figure, the current pace figure ("Budget now", "Target now"), the whole-period figure, the final figure, the three status labels, the remaining-amount caption, and the completion celebration. Each type needs a whole-period noun and a current-pace noun, because the dashboard shows both figures side by side.
 
 `typeRawValue` is a plain `String` with a default rather than an enum attribute, and is read through an accessor that falls back to a known type. A newer build writing an unrecognised value must not fault an older device that syncs the record.
 
@@ -242,7 +242,7 @@ The period's date range and, for a connected tracker, its connection and account
 On iOS and iPadOS a list row is the tracker's own dashboard in miniature, in two bands sharing one leading gutter:
 
 - **Identity.** The badge, the tracker's name across the full width of the card, the zoom marker, and one caption line giving how much of the period is left and the date it ends on. The name wraps to a second line rather than truncating: it is the one thing on the row the user chose themselves.
-- **Data.** The rings, then the status wording with the ahead/behind figure in the status colour, then the current figure and today's pace figure side by side, each named with the type's own noun.
+- **Data.** The rings, then the status wording with the ahead/behind figure in the status colour, then the current figure and the current pace figure side by side, each named with the type's own noun.
 
 The row shows both of the figures the ahead/behind figure is the difference between, because a difference alone cannot say whether a tracker is nearly finished or barely started. Wording and figures come from the same `TrackerPace` and terminology table the dashboard uses, so the row and the screen it opens can never disagree.
 

@@ -31,7 +31,7 @@ struct TrackerPace: Equatable {
     let currentValue: Decimal
 
     /// Where the tracked value should be right now to be exactly on pace,
-    /// in the tracker's own terms (e.g. "target balance today").
+    /// in the tracker's own terms (e.g. the target balance right now).
     let targetValueToday: Decimal
 
     /// The tracker's total allowance for the period — carried alongside the

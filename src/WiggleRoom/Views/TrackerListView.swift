@@ -294,8 +294,8 @@ private struct TrackerRow: View {
 
     /// The two figures the status figure is the difference *between*: what
     /// the tracker reads now, and what it would read to be exactly on pace
-    /// today. Both are named with the type's own nouns ("Balance",
-    /// "Budget today"; "Weight", "Target today").
+    /// now. Both are named with the type's own nouns ("Balance",
+    /// "Budget now"; "Weight", "Target now").
     private var figuresLine: some View {
         HStack(spacing: 8) {
             figure(label: tracker.terminology.currentFigure, value: currentValueText)

@@ -130,13 +130,13 @@ nonisolated enum TrackerOrientation {
 /// drift from another (§5, §11).
 ///
 /// Two nouns are needed throughout, not one: the dashboard shows the
-/// whole-period figure and today's figure side by side, so reusing a single
+/// whole-period figure and the current-pace figure side by side, so reusing a single
 /// word for both (e.g. "Target" twice on a Saving tracker) makes the screen
 /// unreadable.
 struct TrackerTerminology {
     /// The current reading's own name — "Balance", "Mileage", "Weight".
     let currentFigure: String
-    /// Today's on-pace figure — "Budget today", "Target today".
+    /// The on-pace figure for right now — "Budget now", "Target now".
     let paceFigure: String
     /// The whole-period figure — "Budget", "Goal", "Allowance".
     let wholePeriodFigure: String
@@ -386,7 +386,7 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
         case .spendingMoney:
             TrackerTerminology(
                 currentFigure: "Balance",
-                paceFigure: "Budget today",
+                paceFigure: "Budget now",
                 wholePeriodFigure: "Budget",
                 finalFigure: "Final budget",
                 goodLabel: "Below Budget",
@@ -399,7 +399,7 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
         case .spendingCredit:
             TrackerTerminology(
                 currentFigure: "Balance",
-                paceFigure: "Limit today",
+                paceFigure: "Limit now",
                 wholePeriodFigure: "Limit",
                 finalFigure: "Final limit",
                 goodLabel: "Below Limit",
@@ -412,7 +412,7 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
         case .savingMoney:
             TrackerTerminology(
                 currentFigure: "Balance",
-                paceFigure: "Target today",
+                paceFigure: "Target now",
                 wholePeriodFigure: "Goal",
                 finalFigure: "Goal",
                 goodLabel: "Ahead of Target",
@@ -425,7 +425,7 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
         case .mileage:
             TrackerTerminology(
                 currentFigure: "Mileage",
-                paceFigure: "Allowance today",
+                paceFigure: "Allowance now",
                 wholePeriodFigure: "Allowance",
                 finalFigure: "Final allowance",
                 goodLabel: "Below Allowance",
@@ -438,7 +438,7 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
         case .weightLoss:
             TrackerTerminology(
                 currentFigure: "Weight",
-                paceFigure: "Target today",
+                paceFigure: "Target now",
                 wholePeriodFigure: "Goal weight",
                 finalFigure: "Goal weight",
                 goodLabel: "Ahead of Target",
@@ -455,7 +455,7 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
             // pace line, not the direction of travel.
             TrackerTerminology(
                 currentFigure: "Value",
-                paceFigure: "Target today",
+                paceFigure: "Target now",
                 wholePeriodFigure: "Target",
                 finalFigure: "Target",
                 goodLabel: "Ahead of Target",
