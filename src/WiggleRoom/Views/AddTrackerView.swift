@@ -53,6 +53,11 @@ struct AddTrackerView: View {
     /// showing no longer exists. `nil`/unused when creating a new tracker.
     var onDelete: (() -> Void)?
 
+    /// Called with the new tracker's id after one is created, right before
+    /// this view dismisses itself — lets the tracker list hold the new row
+    /// back until the sheet is gone, then animate it in. Unused when editing.
+    var onCreate: ((UUID) -> Void)?
+
     @Query(filter: #Predicate<ConnectedSource> { $0.providerId != "manual" })
     private var addedSources: [ConnectedSource]
 
@@ -912,6 +917,7 @@ struct AddTrackerView: View {
             let store = store
             Task { _ = try? await store.refreshFromSource(tracker, force: true) }
         }
+        onCreate?(tracker.id)
         dismiss()
     }
 

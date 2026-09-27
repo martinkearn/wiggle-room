@@ -20,7 +20,23 @@ struct TrackerListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(DeepLinkRouter.self) private var deepLinkRouter
     @Query(sort: \Tracker.startDate, order: .reverse) private var allTrackers: [Tracker]
-    private var trackers: [Tracker] { TrackerOrdering.ordered(allTrackers) }
+    private var trackers: [Tracker] {
+        let ordered = TrackerOrdering.ordered(allTrackers)
+        guard let heldBackTrackerID else { return ordered }
+        return ordered.filter { $0.id != heldBackTrackerID }
+    }
+
+    /// A tracker just created from the add sheet, kept out of the list until
+    /// the sheet has gone. It is saved while the sheet still covers the
+    /// list, so without this its row, and the rings inside it, would arrive
+    /// out of sight.
+    @State private var heldBackTrackerID: UUID?
+
+    /// The tracker whose row plays `NewRowArrival`, cleared once it has, so
+    /// only the new row animates and the rest of the list stays still.
+    @State private var arrivingTrackerID: UUID?
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var isPresentingAddTracker = false
     @State private var isPresentingSettings = false
@@ -47,6 +63,9 @@ struct TrackerListView: View {
                                 TrackerDetailView(tracker: tracker)
                             } label: {
                                 TrackerRow(tracker: tracker, now: now)
+                                    .modifier(NewRowArrival(isArriving: tracker.id == arrivingTrackerID) {
+                                        arrivingTrackerID = nil
+                                    })
                             }
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
@@ -86,8 +105,11 @@ struct TrackerListView: View {
                     }
                 }
             }
-            .sheet(isPresented: $isPresentingAddTracker) {
-                AddTrackerView()
+            .sheet(isPresented: $isPresentingAddTracker, onDismiss: releaseNewTracker) {
+                AddTrackerView(onCreate: { id in
+                    heldBackTrackerID = id
+                    arrivingTrackerID = id
+                })
             }
             .navigationDestination(isPresented: $isPresentingSettings) {
                 // `SettingsView` is iOS-only (§7.1); this file still compiles
@@ -109,6 +131,25 @@ struct TrackerListView: View {
         // alive while a tracker is pushed, and sees each reading or pace
         // crossing once however many surfaces are showing it.
         .trackerHaptics(for: trackers, now: now)
+    }
+
+    /// Lets a just-created tracker into the list once the add sheet has
+    /// gone, the other rows moving aside for it while the new row plays its
+    /// own arrival. Deletion keeps the system's animation: a flourish is the
+    /// wrong note for losing something.
+    private func releaseNewTracker() {
+        guard heldBackTrackerID != nil else { return }
+        withAnimation(reduceMotion ? nil : .default) {
+            heldBackTrackerID = nil
+        }
+        // A row that lands off screen never appears to play its arrival;
+        // don't leave it waiting to play whenever it's later scrolled to.
+        let id = arrivingTrackerID
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            if arrivingTrackerID == id {
+                arrivingTrackerID = nil
+            }
+        }
     }
 
     private func deleteTrackers(at offsets: IndexSet) {
@@ -370,6 +411,57 @@ private struct TrackerRow: View {
             parts.append("Zoomed to \(Tracker.zoomRangeText(window))")
         }
         return parts.joined(separator: ", ")
+    }
+}
+
+/// A newly created tracker's row arriving: a spring from slightly under full
+/// size with a small rock, in the hand-drawn spirit of the badge and rings
+/// rather than a plain fade. The rings inside the row grow from empty at the
+/// same moment (`RingsView`'s arrival), so this is tuned against them:
+/// quicker and calmer than it would be alone, leaving the rings' overshoot
+/// as the main event. The row simply appears under Reduce Motion.
+private struct NewRowArrival: ViewModifier {
+    let isArriving: Bool
+    let onFinished: () -> Void
+
+    @State private var hasSettled: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let startScale: CGFloat = 0.92
+    private static let startTilt = -1.5
+    private static let spring = Animation.spring(response: 0.45, dampingFraction: 0.6)
+
+    init(isArriving: Bool, onFinished: @escaping () -> Void) {
+        self.isArriving = isArriving
+        self.onFinished = onFinished
+        // Only a row created while its tracker is arriving starts unsettled;
+        // every other row, and this one if it's recreated later, is at rest.
+        _hasSettled = State(initialValue: !isArriving)
+    }
+
+    func body(content: Content) -> some View {
+        let isAtRest = hasSettled || reduceMotion
+        content
+            .scaleEffect(isAtRest ? 1 : Self.startScale)
+            .rotationEffect(.degrees(isAtRest ? 0 : Self.startTilt))
+            .onAppear {
+                guard !hasSettled else { return }
+                guard !reduceMotion else {
+                    hasSettled = true
+                    onFinished()
+                    return
+                }
+                // Deferred past the list insertion's own transaction, which
+                // would otherwise swallow it — as `RingsView` defers its
+                // arrival for the same reason.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    withAnimation(Self.spring) {
+                        hasSettled = true
+                    } completion: {
+                        onFinished()
+                    }
+                }
+            }
     }
 }
 
