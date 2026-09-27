@@ -56,6 +56,10 @@ struct WatchTrackerListView: View {
             }
             .navigationTitle("")
         }
+        // The watch list is the one view alive whenever any tracker is on
+        // screen, so each event is felt once. No clock ticks here, so the
+        // status is as of each render, as the rows' own is.
+        .trackerHaptics(for: trackers, now: .now)
     }
 }
 

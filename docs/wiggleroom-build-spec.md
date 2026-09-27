@@ -237,7 +237,7 @@ The rings say *why* they moved. Each change has one of three causes, each cause 
 
 - **Arrival: the tracker was opened.** Both rings grow from empty with an overshoot spring, the inner ring 40–90ms behind the outer. It is deferred 0.05s past the system's own launch or push transaction, which would otherwise swallow it. A change landing before the arrival settles redirects it rather than playing a second animation, so a connected tracker's on-open refresh grows the rings straight to the refreshed figure.
 - **Update: a new latest reading.** Both rings drain to empty and refill. Keyed on the reading's identity, not its value, so re-logging the same figure still registers.
-- **Drift: the target moved, the reading did not.** Never from empty. Each ring that moved dips to 97% of where it was drawn and springs to its new value, while its outline's `wobble` swells to 0.35 and settles over about 0.6s. Drift plays only once a ring has moved at least 0.0025 of a turn since it was last drawn, so the 30-second clock leaves slow trackers' rows still. Each surface waits a random 0–400ms before drifting, so a list never wobbles in unison.
+- **Drift: the target moved, the reading did not.** Never from empty. Each ring that moved dips to 94% of where it was drawn and springs to its new value, while its outline's `wobble` swells to 0.6 and settles over about 0.6s. Drift plays only once a ring has moved at least 0.0025 of a turn since it was last drawn, so the 30-second clock leaves slow trackers' rows still. Each surface waits a random 0–400ms before drifting, so a list never wobbles in unison.
 - **Zoom** slides both rings straight to their new fills.
 
 Every scheduled step carries a token, so a newer change never leaves an older refill or drift return queued behind it. The arrival, refill and drift springs vary by up to ±10% per play. A full ring's closing overlap is latched on its target fraction, so it holds through a drift's dip. An update's drain still removes it.
@@ -247,6 +247,17 @@ Live figures move with the rings. The ring's centre figure, the tracker screen's
 Under Reduce Motion the rings draw at their final value with no growth, an update goes straight to the new value, drift does nothing, figures swap without rolling and the status word stays still. The status colour still cross-fades.
 
 Widgets, complications and the Live Activity render a static snapshot before any deferred animation could run, so they pass `isAnimated: false` and draw the real value with none of this motion and no randomness.
+
+### Haptics
+
+Two moments are felt as well as seen, on the same triggers the rings use:
+
+- **A reading lands.** A light impact when a tracker's latest reading changes, whether it was logged or fetched.
+- **The pace status changes.** Feedback weighted by the status the tracker lands on: warning into amber, error into red, success back to green. A crossing takes the place of the reading tap when one reading causes both.
+
+Each event is felt once, however many surfaces show the tracker. The haptics are driven from one view per device that stays alive whenever a tracker is on screen: the iOS tracker list's navigation stack and the watch's root list. They are never driven from a row or from `RingsView`. If several trackers change together, as in a background refresh, one haptic plays for the most severe change. A tracker with no readings has no pace to cross.
+
+Drift has no haptic: a tap in the hand twice a minute would not be subtle. Haptics are not gated on Reduce Motion, so these moments stay marked for someone who has turned the ring animation off. macOS has no haptics, and `.sensoryFeedback` is a no-op there. The completion celebration's success haptic uses the same `.sensoryFeedback` mechanism.
 
 ### Tracker screen layout
 

@@ -105,6 +105,10 @@ struct TrackerListView: View {
                 navigateToPendingDeepLinkIfAny()
             }
         }
+        // On the stack rather than a row or the tracker screen: it stays
+        // alive while a tracker is pushed, and sees each reading or pace
+        // crossing once however many surfaces are showing it.
+        .trackerHaptics(for: trackers, now: now)
     }
 
     private func deleteTrackers(at offsets: IndexSet) {

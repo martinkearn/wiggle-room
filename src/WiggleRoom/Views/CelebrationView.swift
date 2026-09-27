@@ -4,9 +4,6 @@
 //
 
 import SwiftUI
-#if os(iOS)
-import UIKit
-#endif
 
 /// A one-shot, full-screen celebratory moment shown when a tracker closes
 /// (its period ends) still under budget/on track — the "completing a video
@@ -83,13 +80,14 @@ struct CelebrationView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { dismiss() }
+        // Once, as the celebration springs in — not again as it dismisses.
+        .sensoryFeedback(.success, trigger: isAnimating) { wasAnimating, isAnimating in
+            !wasAnimating && isAnimating
+        }
         .onAppear {
             withAnimation(.spring(response: 0.55, dampingFraction: 0.62)) {
                 isAnimating = true
             }
-            #if os(iOS)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            #endif
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                 dismiss()
             }

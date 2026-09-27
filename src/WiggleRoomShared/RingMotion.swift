@@ -68,12 +68,12 @@ extension RingMotion {
     static let drain = Animation.easeIn(duration: drainDuration)
     static let refillSpring = Spring(response: 1.1, dampingRatio: 0.62)
 
-    static let driftDip = 0.97
+    static let driftDip = 0.94
     static let driftDipDuration = 0.15
     static let driftReturnSpring = Spring(response: 0.5, dampingRatio: 0.55)
     /// The wobble peaks at this during the dip, then settles back to rest
     /// over `driftWobbleSettle` — about 0.6s end to end.
-    static let driftWobble = 0.35
+    static let driftWobble = 0.6
     static let driftWobbleSettle = Animation.easeInOut(duration: 0.45)
     /// Per surface and per play, so a list of rows never wobbles in unison.
     static let driftStagger: ClosedRange<Double> = 0...0.4
