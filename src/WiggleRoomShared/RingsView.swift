@@ -59,6 +59,13 @@ struct RingsView: View {
     /// random reaches that path, so a widget re-rendering can't flicker.
     var isAnimated: Bool = true
 
+    /// True while a refresh the user asked for is in flight (a pull, or the
+    /// macOS Update button): both outlines hold a slow wobble in place of
+    /// the system spinner, settling when the fetch lands. Separate from the
+    /// drift's own wobble, which adds on top. Still under Reduce Motion, and
+    /// never on a snapshot.
+    var isRefreshing = false
+
     /// The fractions actually drawn on screen — deliberately separate from
     /// `paceFraction`/`actualFraction` (the real, current values) so the
     /// animations can take them somewhere other than straight to the new
@@ -79,6 +86,9 @@ struct RingsView: View {
     /// during a drift.
     @State private var outerWobble = 0.0
     @State private var innerWobble = 0.0
+
+    /// The refresh's own wobble (`isRefreshing`), added to both rings'.
+    @State private var refreshWobble = 0.0
 
     /// What the rings were last sent to, and so what the next change is
     /// measured against (`RingMotion.reason`). `nil` until the arrival
@@ -177,9 +187,9 @@ struct RingsView: View {
                 let side = min(geometry.size.width, geometry.size.height)
                 ZStack {
                     ring(.outer, fraction: isAnimated ? drawnOuter : paceFraction, target: paceFraction,
-                         wobble: outerWobble, color: WiggleRoomColors.paceRing)
+                         wobble: outerWobble + refreshWobble, color: WiggleRoomColors.paceRing)
                     ring(.inner, fraction: isAnimated ? drawnInner : actualFraction, target: actualFraction,
-                         wobble: innerWobble, color: statusColor)
+                         wobble: innerWobble + refreshWobble, color: statusColor)
                         .overlay { overflowMarker }
                         .padding(ringGap)
 
@@ -241,6 +251,14 @@ struct RingsView: View {
             case let .drift(outer, inner): drift(from: drawnKey, to: key, outer: outer, inner: inner)
             case .morph: morph(to: key)
             case .settle: break
+            }
+        }
+        .onChange(of: isRefreshing, initial: true) { _, isRefreshing in
+            guard isAnimated, !reduceMotion else { return }
+            // A new animation on the same value replaces the repeating one,
+            // so the swing settles from wherever it had reached.
+            withAnimation(isRefreshing ? RingMotion.refreshWobbleSwing : RingMotion.refreshWobbleSettle) {
+                refreshWobble = isRefreshing ? RingMotion.refreshWobble : 0
             }
         }
     }
