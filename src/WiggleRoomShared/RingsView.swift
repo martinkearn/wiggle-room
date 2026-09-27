@@ -24,13 +24,13 @@ import SwiftData
 /// Current Budget) already use these exact same two colors, so a legend
 /// here would just be repeating what's already unambiguous at a glance.
 ///
-/// Both rings spring in on first appearance, and fully **re-cycle** — drain
-/// back to empty and refill, with a little overshoot bounce at the end —
-/// any time their fraction changes afterwards (a live auto-refresh tick or a
-/// newly logged/edited balance). Motion is where the personality lives; the
-/// rings are hand-wobbled outlines (the app icon's own, `IconRingShape`),
-/// trimmed by arc length so their fill is still exact, and the numbers are
-/// never anything but exact (§3.4).
+/// The rings move differently depending on *why* their fill changed (§6,
+/// `RingMotion`): they grow from empty when the tracker is opened, drain
+/// and refill when a new reading lands, and dip and wobble briefly when only
+/// the target has drifted. Motion is where the personality lives; the rings
+/// are hand-wobbled outlines (the app icon's own, `IconRingShape`), trimmed
+/// by arc length so their fill is still exact, and the numbers are never
+/// anything but exact (§3.4).
 struct RingsView: View {
     let tracker: Tracker
     let now: Date
@@ -53,58 +53,61 @@ struct RingsView: View {
     /// essentially immediately, well before a deferred `onAppear` animation
     /// would ever get a chance to run, so the rings would render frozen at
     /// their starting fraction of 0 (empty) rather than the real value.
-    /// Pass `false` there to skip all of the appear/recycle machinery below
-    /// and just show the real fraction immediately, at full opacity, with no
-    /// animation — a plain, correct ring rather than a blank one.
+    /// Pass `false` there to skip all of the motion machinery below and
+    /// just show the real fraction immediately, at full opacity, with no
+    /// animation — a plain, correct ring rather than a blank one. Nothing
+    /// random reaches that path, so a widget re-rendering can't flicker.
     var isAnimated: Bool = true
-
-    /// Whether the rings spring in from empty when the view first appears.
-    /// The tracker detail screen turns this off: it refreshes itself on open,
-    /// and that refresh's own drain-and-refill animation is the one intended
-    /// "arrival" effect, so also animating the initial draw played it twice.
-    var animatesOnAppear: Bool = true
 
     /// The fractions actually drawn on screen — deliberately separate from
     /// `paceFraction`/`actualFraction` (the real, current values) so the
-    /// re-cycle animation can drive them through 0 and back up rather than
-    /// just interpolating from old value to new.
-    @State private var displayedPaceFractionState: Double?
-    @State private var displayedActualFractionState: Double?
+    /// animations can take them somewhere other than straight to the new
+    /// value: through empty for an update, a little below it for a drift.
+    /// `nil` until the arrival starts, drawing as empty until then (or as
+    /// the real value under Reduce Motion, which has no arrival).
+    @State private var drawnOuterState: Double?
+    @State private var drawnInnerState: Double?
 
-    /// Until the first appear-animation runs these fall back to empty (when
-    /// animating in) or straight to the real value (when not).
-    private var displayedPaceFraction: Double {
-        displayedPaceFractionState ?? (animatesOnAppear ? 0 : paceFraction)
+    private var drawnOuter: Double {
+        drawnOuterState ?? (reduceMotion ? paceFraction : 0)
     }
-    private var displayedActualFraction: Double {
-        displayedActualFractionState ?? (animatesOnAppear ? 0 : actualFraction)
+    private var drawnInner: Double {
+        drawnInnerState ?? (reduceMotion ? actualFraction : 0)
     }
 
-    /// True once the initial spring-in has run — guards against treating
-    /// that first fill as a "change" that triggers a drain/refill cycle.
-    @State private var hasAppeared = false
+    /// Each ring's `IconRingShape.wobble`, which only leaves its resting 0
+    /// during a drift.
+    @State private var outerWobble = 0.0
+    @State private var innerWobble = 0.0
 
-    /// Identifies the most recent recycle animation kicked off, so a second
-    /// change arriving mid-drain doesn't leave a stale, now-outdated refill
-    /// still scheduled to run after this one.
-    @State private var recycleToken = UUID()
+    /// What the rings were last sent to, and so what the next change is
+    /// measured against (`RingMotion.reason`). `nil` until the arrival
+    /// starts.
+    @State private var drawnKey: RingMotion.Key?
+
+    /// The newest key seen, for the deferred arrival to read: its closure
+    /// holds a copy of this view from before the deferral, whose `now` may
+    /// already be out of date.
+    @State private var latestKey: RingMotion.Key?
+
+    /// False until the arrival animation has settled. A change landing
+    /// before then redirects the arrival rather than starting a second
+    /// animation.
+    @State private var hasArrived = false
+
+    /// Identifies the most recent motion kicked off, so a second change
+    /// arriving mid-animation doesn't leave a stale, now-outdated step (an
+    /// update's refill, a drift's dip or return, the arrival settling) still
+    /// scheduled to run behind the newer one.
+    @State private var motionToken = UUID()
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// A single value combining both real fractions, so one `onChange`
-    /// handles "either changed" without risking two overlapping recycle
-    /// animations firing for the same underlying update.
-    /// `isZoomed` rides along so a zoom toggle can be told apart from a
-    /// data change: zooming morphs straight to the new fills, while the
-    /// drain-and-refill cycle stays reserved for new data.
-    private struct FractionKey: Equatable {
-        let pace: Double
-        let actual: Double
-        let isZoomed: Bool
-    }
-
-    private var fractionKey: FractionKey {
-        FractionKey(pace: paceFraction, actual: actualFraction, isZoomed: zoomWindow != nil)
+    /// Everything that moves the rings, in one value so a single `onChange`
+    /// sees every change and `RingMotion.reason` can say which kind it was.
+    private var motionKey: RingMotion.Key {
+        RingMotion.Key(outer: paceFraction, inner: actualFraction,
+                       readingID: tracker.latestReading?.id, isZoomed: zoomWindow != nil)
     }
 
     /// The window the rings are magnified to, or `nil` for the whole period
@@ -173,8 +176,10 @@ struct RingsView: View {
             GeometryReader { geometry in
                 let side = min(geometry.size.width, geometry.size.height)
                 ZStack {
-                    ring(.outer, fraction: isAnimated ? displayedPaceFraction : paceFraction, color: WiggleRoomColors.paceRing)
-                    ring(.inner, fraction: isAnimated ? displayedActualFraction : actualFraction, color: statusColor)
+                    ring(.outer, fraction: isAnimated ? drawnOuter : paceFraction, target: paceFraction,
+                         wobble: outerWobble, color: WiggleRoomColors.paceRing)
+                    ring(.inner, fraction: isAnimated ? drawnInner : actualFraction, target: actualFraction,
+                         wobble: innerWobble, color: statusColor)
                         .overlay { overflowMarker }
                         .padding(ringGap)
 
@@ -192,9 +197,15 @@ struct RingsView: View {
         }
         .modifier(ZoomAccessibility(description: zoomAccessibilityDescription))
         .onAppear {
-            guard isAnimated else { return }
-            guard animatesOnAppear else {
-                hasAppeared = true
+            // Once per view: a row scrolled back into view, or a screen
+            // navigated back to, keeps its rings as they are.
+            guard isAnimated, latestKey == nil else { return }
+            let key = motionKey
+            latestKey = key
+            guard !reduceMotion else {
+                // Drawn at the final value, with no growth.
+                snap(to: key)
+                hasArrived = true
                 return
             }
             // Deferred by a beat rather than animating immediately: a plain
@@ -207,34 +218,81 @@ struct RingsView: View {
             // second later, after that transaction has settled, makes the
             // very first fill-in animate reliably no matter how the screen
             // was opened.
-            let paceTarget = paceFraction
-            let actualTarget = actualFraction
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                withAnimation(.spring(response: 0.85, dampingFraction: 0.68)) {
-                    displayedPaceFractionState = paceTarget
-                    displayedActualFractionState = actualTarget
-                }
-                hasAppeared = true
+                guard drawnKey == nil, let key = latestKey else { return }
+                arrive(at: key)
             }
         }
-        .onChange(of: fractionKey) { oldValue, newValue in
-            guard isAnimated, hasAppeared else { return }
-            if oldValue.isZoomed != newValue.isZoomed {
-                morph(paceTarget: newValue.pace, actualTarget: newValue.actual)
-            } else {
-                recycle(paceTarget: newValue.pace, actualTarget: newValue.actual)
+        .onChange(of: motionKey) { _, key in
+            guard isAnimated else { return }
+            latestKey = key
+            // Before the arrival starts, it simply picks up the newest key.
+            guard let drawnKey else { return }
+            let reason = RingMotion.reason(from: drawnKey, to: key, hasArrived: hasArrived)
+            guard reason != .settle else { return }
+            guard !reduceMotion else {
+                // Straight to the new value: no drain, no drift, no slide.
+                snap(to: key)
+                return
             }
+            switch reason {
+            case .arrival: arrive(at: key, retargeting: true)
+            case .update: update(to: key)
+            case let .drift(outer, inner): drift(from: drawnKey, to: key, outer: outer, inner: inner)
+            case .morph: morph(to: key)
+            case .settle: break
+            }
+        }
+    }
+
+    /// The tracker was opened: both rings grow from empty with an overshoot
+    /// spring, the inner one a random beat behind the outer so the pair
+    /// reads as drawn in sequence rather than stamped on at once.
+    /// `retargeting` redirects an arrival already in flight to a newer
+    /// value: opening a connected tracker refreshes it straight away, and a
+    /// new balance landing mid-growth should change where the rings grow to,
+    /// not play a second animation after the first.
+    private func arrive(at key: RingMotion.Key, retargeting: Bool = false) {
+        let token = UUID()
+        motionToken = token
+        drawnKey = key
+        let spring = RingMotion.arrivalSpring.jittered()
+        let lag = retargeting ? 0 : Double.random(in: RingMotion.innerArrivalLag)
+        withAnimation(.spring(spring)) {
+            drawnOuterState = key.outer
+        }
+        withAnimation(.spring(spring).delay(lag)) {
+            drawnInnerState = key.inner
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + lag + spring.settlingDuration) {
+            guard motionToken == token else { return }
+            hasArrived = true
         }
     }
 
     /// Zooming in or out slides both rings straight to their new fills —
     /// the same data seen closer or further away, not new data, so it
-    /// deliberately doesn't drain and refill. Instant under Reduce Motion.
-    private func morph(paceTarget: Double, actualTarget: Double) {
-        recycleToken = UUID()
-        withAnimation(reduceMotion ? nil : .spring(response: 0.6, dampingFraction: 0.85)) {
-            displayedPaceFractionState = paceTarget
-            displayedActualFractionState = actualTarget
+    /// deliberately doesn't drain and refill.
+    private func morph(to key: RingMotion.Key) {
+        motionToken = UUID()
+        drawnKey = key
+        withAnimation(RingMotion.morphAnimation) {
+            drawnOuterState = key.outer
+            drawnInnerState = key.inner
+            outerWobble = 0
+            innerWobble = 0
+        }
+    }
+
+    /// Reduce Motion: straight to the value, with nothing in between.
+    private func snap(to key: RingMotion.Key) {
+        motionToken = UUID()
+        drawnKey = key
+        withTransaction(\.disablesAnimations, true) {
+            drawnOuterState = key.outer
+            drawnInnerState = key.inner
+            outerWobble = 0
+            innerWobble = 0
         }
     }
 
@@ -265,41 +323,79 @@ struct RingsView: View {
                     .boundingRect.origin
                 Image(systemName: overflow == .beyondFull ? "chevron.right" : "chevron.left")
                     .font(.system(size: lineWidth * 0.7, weight: .black))
-                    .foregroundStyle(overflow == .beyondFull ? Color.white : statusColor)
+                    .crossFadingForeground(overflow == .beyondFull ? Color.white : statusColor, isEnabled: isAnimated)
                     .position(start)
             }
             .accessibilityHidden(true)
         }
     }
 
-    /// Drains both rings back to empty, then refills them to the given
-    /// targets with a spring that overshoots slightly before settling — a
-    /// full "re-cycle" rather than a plain interpolation from old value to
-    /// new, so a live refresh or a newly logged balance reads as a clear,
-    /// deliberate moment rather than a subtle nudge. Takes a little over two
-    /// seconds end to end.
-    private func recycle(paceTarget: Double, actualTarget: Double) {
+    /// A new reading landed: drain both rings back to empty, then refill
+    /// them with a spring that overshoots slightly before settling — a full
+    /// cycle rather than a plain interpolation from old value to new, so a
+    /// real change of data reads as a clear, deliberate moment rather than a
+    /// subtle nudge. A little over two seconds end to end.
+    private func update(to key: RingMotion.Key) {
         let token = UUID()
-        recycleToken = token
-        withAnimation(.easeIn(duration: 0.4)) {
-            displayedPaceFractionState = 0
-            displayedActualFractionState = 0
+        motionToken = token
+        drawnKey = key
+        withAnimation(RingMotion.drain) {
+            drawnOuterState = 0
+            drawnInnerState = 0
+            outerWobble = 0
+            innerWobble = 0
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            // A newer change may have arrived and scheduled its own refill
+        DispatchQueue.main.asyncAfter(deadline: .now() + RingMotion.drainDuration) {
+            // A newer change may have arrived and started its own motion
             // while this one's drain was still playing — don't stomp on it.
-            guard recycleToken == token else { return }
-            withAnimation(.spring(response: 1.1, dampingFraction: 0.62)) {
-                displayedPaceFractionState = paceTarget
-                displayedActualFractionState = actualTarget
+            guard motionToken == token else { return }
+            withAnimation(.spring(RingMotion.refillSpring.jittered())) {
+                drawnOuterState = key.outer
+                drawnInnerState = key.inner
+            }
+        }
+    }
+
+    /// The target moved but the reading didn't, so never from empty: each
+    /// ring that visibly moved dips a few percent below where it was drawn
+    /// and springs to its new value while its outline's wobble swells and
+    /// settles, so the line looks briefly redrawn by hand. Subtle enough to
+    /// notice only if you're looking at it. Starts after a random stagger so
+    /// rows sharing one clock tick don't wobble in unison.
+    private func drift(from old: RingMotion.Key, to key: RingMotion.Key, outer: Bool, inner: Bool) {
+        let token = UUID()
+        motionToken = token
+        drawnKey = key
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double.random(in: RingMotion.driftStagger)) {
+            guard motionToken == token else { return }
+            withAnimation(.easeOut(duration: RingMotion.driftDipDuration)) {
+                if outer {
+                    drawnOuterState = old.outer * RingMotion.driftDip
+                    outerWobble = RingMotion.driftWobble
+                }
+                if inner {
+                    drawnInnerState = old.inner * RingMotion.driftDip
+                    innerWobble = RingMotion.driftWobble
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + RingMotion.driftDipDuration) {
+                guard motionToken == token else { return }
+                withAnimation(.spring(RingMotion.driftReturnSpring.jittered())) {
+                    drawnOuterState = key.outer
+                    drawnInnerState = key.inner
+                }
+                withAnimation(RingMotion.driftWobbleSettle) {
+                    outerWobble = 0
+                    innerWobble = 0
+                }
             }
         }
     }
 
     /// Below this fraction, a round-capped trimmed stroke's two end-caps
     /// overlap enough to render as a solid dot rather than a recognizable
-    /// sliver of arc — exactly the range the recycle animation sweeps
-    /// through on every drain and every refill. Fading the stroke out across
+    /// sliver of arc — exactly the range the arrival and update animations
+    /// sweep through on every drain and every fill. Fading the stroke out across
     /// this range means the ring visibly empties and refills rather than
     /// shrinking to a stray dot and reappearing as one.
     private let dotFadeThreshold = 0.035
@@ -321,14 +417,16 @@ struct RingsView: View {
                     Text(centerStatusLine.uppercased())
                         .font(.wiggleText(.caption, weight: .bold))
                         .tracking(0.5)
-                        .foregroundStyle(statusColor)
                         .multilineTextAlignment(.center)
+                        .crossFadingForeground(statusColor, isEnabled: isAnimated)
+                        .paceStatusBeat(status, isEnabled: isAnimated)
                 }
                 Text(centerAmountText)
                     .font(.wiggleNumber(size: 32, weight: .bold))
-                    .foregroundStyle(statusColor)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
+                    .crossFadingForeground(statusColor, isEnabled: isAnimated)
+                    .rollingFigure(pace.displayedDifference, text: centerAmountText, isEnabled: isAnimated)
                 if showsStatusLabel && status == .warning {
                     Text(tracker.terminology.differenceCaption)
                         .font(.wiggleText(.caption2))
@@ -357,7 +455,7 @@ struct RingsView: View {
     /// `fraction` doesn't interpolate in lockstep with the trimmed shape's
     /// own animation (`Shape.trim` is animated natively by SwiftUI; a
     /// `.position()` computed in a `GeometryReader` is not, in practice, kept
-    /// perfectly in sync with it), so during the recycle animation the two
+    /// perfectly in sync with it), so during the update animation the two
     /// visibly drifted apart — a floating dot detached from the arc's actual
     /// tip. The round line cap alone gives the same soft-tip look with no
     /// second, separately-animated element that can desync.
@@ -377,10 +475,15 @@ struct RingsView: View {
     /// Double conversion.
     private let closureThreshold = 0.98
 
-    private func ring(_ kind: IconRingShape.Ring, fraction: Double, color: Color) -> some View {
+    /// `fraction` is what's drawn, `target` the real value it's heading for.
+    private func ring(_ kind: IconRingShape.Ring, fraction: Double, target: Double, wobble: Double, color: Color) -> some View {
         let opacity = progressOpacity(for: fraction)
-        let isClosed = fraction >= closureThreshold
-        let shape = IconRingShape(ring: kind, fitsRect: true)
+        // Latched on the target rather than the drawn fraction, so a full
+        // ring's overlap holds steady through a drift's dip below
+        // `closureThreshold` instead of popping off and back on. An update's
+        // drain genuinely empties the ring, so it still loses it there.
+        let isClosed = target >= closureThreshold && fraction > 0
+        let shape = IconRingShape(ring: kind, fitsRect: true, wobble: wobble)
         let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
         return ZStack {
             shape
@@ -393,12 +496,14 @@ struct RingsView: View {
                 .stroke(tracker.referenceColor.opacity(0.24), style: style)
             shape
                 .trim(from: 0, to: fraction)
-                .stroke(color, style: style)
+                .stroke(style: style)
+                .crossFadingForeground(color, isEnabled: isAnimated)
                 .opacity(opacity)
             if isClosed {
                 shape
                     .trim(from: 0, to: closureOverlapFraction)
-                    .stroke(color, style: style)
+                    .stroke(style: style)
+                    .crossFadingForeground(color, isEnabled: isAnimated)
                     .opacity(opacity)
             }
         }

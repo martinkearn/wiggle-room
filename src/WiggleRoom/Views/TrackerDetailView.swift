@@ -165,7 +165,7 @@ struct TrackerDetailView: View {
                 }
 
                 VStack(spacing: 10) {
-                    RingsView(tracker: tracker, now: now, animatesOnAppear: false)
+                    RingsView(tracker: tracker, now: now)
                         .frame(width: 260, height: 260)
                         .padding(.vertical, 18)
                         .frame(maxWidth: .infinity)
