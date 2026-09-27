@@ -80,6 +80,13 @@ extension RingMotion {
 
     static let morphAnimation = Animation.spring(response: 0.6, dampingFraction: 0.85)
 
+    /// While a refresh the user asked for is in flight, both outlines swing
+    /// out to this wobble and back, 0.9s each way, in place of the system
+    /// spinner — then settle to rest when it lands.
+    static let refreshWobble = 0.5
+    static let refreshWobbleSwing = Animation.easeInOut(duration: 0.9).repeatForever(autoreverses: true)
+    static let refreshWobbleSettle = Animation.easeOut(duration: 0.4)
+
     static let statusFade = Animation.easeInOut(duration: 0.45)
     static let statusBeatScale: CGFloat = 1.06
     static let statusBeat = Animation.spring(response: 0.4, dampingFraction: 0.5)

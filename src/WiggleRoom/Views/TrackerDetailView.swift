@@ -71,6 +71,14 @@ struct TrackerDetailView: View {
     /// the same tracker.
     @State private var isRefreshingFromSource = false
 
+    /// Refreshes the user asked for (a pull, or the macOS Update button)
+    /// still in flight — a count, since a second pull can land before the
+    /// first finishes. While any are, the rings wobble in place of the
+    /// system spinner and the pull hint says the figure is updating. The
+    /// on-open refresh doesn't count: the rings are playing their arrival
+    /// then, and one motion at a time is the rule (§6).
+    @State private var userRefreshesInFlight = 0
+
     /// The bound account's display name for a real, non-manual source —
     /// `Tracker` only stores `sourceTargetId` (a bare id), not a
     /// human-readable label, so this is resolved live once on appear
@@ -165,7 +173,7 @@ struct TrackerDetailView: View {
                 }
 
                 VStack(spacing: 10) {
-                    RingsView(tracker: tracker, now: now)
+                    RingsView(tracker: tracker, now: now, isRefreshing: userRefreshesInFlight > 0)
                         .frame(width: 260, height: 260)
                         .padding(.vertical, 18)
                         .frame(maxWidth: .infinity)
@@ -474,14 +482,20 @@ struct TrackerDetailView: View {
     #if !os(macOS)
     /// The system pull-to-refresh gesture's action (`.refreshable` above) —
     /// for a manual tracker this opens the log sheet; for a real
-    /// auto-fetching connected source (Starling) it re-fetches instead, with
-    /// no new gesture or control to learn. A short pause before opening the
-    /// log sheet gives the refresh control a beat to visibly settle before
-    /// the sheet takes over, rather than the sheet snapping up mid-pull.
+    /// auto-fetching connected source (Starling, Health) it re-fetches
+    /// instead, with no new gesture or control to learn. A short pause before
+    /// opening the log sheet gives the refresh control a beat to visibly
+    /// settle before the sheet takes over, rather than the sheet snapping up
+    /// mid-pull.
+    ///
+    /// A fetch returns from here at once rather than awaiting: the system
+    /// spinner stays up exactly as long as this runs and can't be restyled,
+    /// so it goes away with the pull and the rings' own wobble shows the
+    /// fetch instead (`RingsView.isRefreshing`).
     private func handleUpdateGesture() async {
         guard !isCompleted else { return }
         guard tracker.isManualEntry else {
-            await refreshFromSourceIfNeeded(force: true)
+            Task { await refreshFromSourceIfNeeded(force: true, showsProgress: true) }
             return
         }
         try? await Task.sleep(for: .milliseconds(300))
@@ -494,12 +508,17 @@ struct TrackerDetailView: View {
     /// button alike, now that this screen has no ongoing ticker of its own.
     /// `force` skips the already-in-flight guard, since a user's own manual
     /// pull should always go through even if the on-appear fetch happens to
-    /// still be in flight.
-    private func refreshFromSourceIfNeeded(force: Bool = false) async {
+    /// still be in flight. `showsProgress` marks a refresh the user asked
+    /// for, which the rings and pull hint show (`userRefreshesInFlight`).
+    private func refreshFromSourceIfNeeded(force: Bool = false, showsProgress: Bool = false) async {
         guard !tracker.isManualEntry, !isCompleted else { return }
         guard force || !isRefreshingFromSource else { return }
         isRefreshingFromSource = true
-        defer { isRefreshingFromSource = false }
+        if showsProgress { userRefreshesInFlight += 1 }
+        defer {
+            isRefreshingFromSource = false
+            if showsProgress { userRefreshesInFlight -= 1 }
+        }
         do {
             try await store.refreshFromSource(tracker)
             refreshErrorMessage = nil
@@ -611,10 +630,21 @@ struct TrackerDetailView: View {
     /// re-fetches the balance; either way the balance figure changes.
     /// ("Refresh" is reserved for re-evaluating the budget against the
     /// current time, which never changes the balance.)
+    ///
+    /// Says the figure is updating while a pull's fetch is in flight — the
+    /// only sign of it under Reduce Motion, where the rings stay still, and
+    /// what VoiceOver hears now the system spinner is gone.
     private var pullToUpdateHint: some View {
-        Label("Pull down to update current \(tracker.terminology.currentFigure.lowercased())", systemImage: "arrow.down")
-            .font(.wiggleText(.caption2))
-            .foregroundStyle(.secondary)
+        let figure = tracker.terminology.currentFigure.lowercased()
+        return Group {
+            if userRefreshesInFlight > 0 {
+                Label("Updating current \(figure)\u{2026}", systemImage: "arrow.triangle.2.circlepath")
+            } else {
+                Label("Pull down to update current \(figure)", systemImage: "arrow.down")
+            }
+        }
+        .font(.wiggleText(.caption2))
+        .foregroundStyle(.secondary)
     }
     #else
     /// macOS has no pull-to-refresh gesture, so it keeps an explicit button
@@ -627,7 +657,7 @@ struct TrackerDetailView: View {
             if tracker.isManualEntry {
                 isPresentingLogReading = true
             } else {
-                Task { await refreshFromSourceIfNeeded(force: true) }
+                Task { await refreshFromSourceIfNeeded(force: true, showsProgress: true) }
             }
         } label: {
             Label(
