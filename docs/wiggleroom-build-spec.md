@@ -248,6 +248,17 @@ Under Reduce Motion the rings draw at their final value with no growth, an updat
 
 Widgets, complications and the Live Activity render a static snapshot before any deferred animation could run, so they pass `isAnimated: false` and draw the real value with none of this motion and no randomness.
 
+### Haptics
+
+Two moments are felt as well as seen, on the same triggers the rings use:
+
+- **A reading lands.** A light impact when a tracker's latest reading changes, whether it was logged or fetched.
+- **The pace status changes.** Feedback weighted by the status the tracker lands on: warning into amber, error into red, success back to green. A crossing takes the place of the reading tap when one reading causes both.
+
+Each event is felt once, however many surfaces show the tracker. The haptics are driven from one view per device that stays alive whenever a tracker is on screen: the iOS tracker list's navigation stack and the watch's root list. They are never driven from a row or from `RingsView`. If several trackers change together, as in a background refresh, one haptic plays for the most severe change. A tracker with no readings has no pace to cross.
+
+Drift has no haptic: a tap in the hand twice a minute would not be subtle. Haptics are not gated on Reduce Motion, so these moments stay marked for someone who has turned the ring animation off. macOS has no haptics, and `.sensoryFeedback` is a no-op there. The completion celebration's success haptic uses the same `.sensoryFeedback` mechanism.
+
 ### Tracker screen layout
 
 A tracker's own screen is headed by its name and nothing else. It carries the same badge — glyph and colour — that the tracker wears in the list, so the screen is recognisably the row that opened it, and the badge sits immediately beside the name in the heading on every platform: in the navigation bar itself on iOS and iPadOS, and in the in-content header on macOS, where the window title cannot take the app's own typeface.
