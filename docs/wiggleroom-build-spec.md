@@ -248,6 +248,8 @@ Under Reduce Motion the rings draw at their final value with no growth, an updat
 
 Widgets, complications and the Live Activity render a static snapshot before any deferred animation could run, so they pass `isAnimated: false` and draw the real value with none of this motion and no randomness.
 
+The empty-state mark (`EmptyRingsMark`) breathes on live screens: its outline's `wobble` swings between 0.7 and 1.3 around its resting 1 over a four-second cycle, so the lines look redrawn by hand. It is opt-in through `breathes`, which defaults to off, because a widget or complication snapshot would catch the breath at an arbitrary point and flicker between reloads. The list and shared empty states, the macOS menu bar dropdown and the watch list opt in. The widgets and the complication do not. The breath is a SwiftUI phase animation rather than a timer, so it runs only while the mark is on screen and the app is active. It stops under Reduce Motion and while the display is dimmed, such as the always-on watch face.
+
 ### Haptics
 
 Two moments are felt as well as seen, on the same triggers the rings use:

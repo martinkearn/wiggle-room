@@ -476,7 +476,7 @@ private struct EmptyTrackersView: View {
         VStack(spacing: 22) {
             Spacer()
 
-            EmptyRingsMark(size: 132)
+            EmptyRingsMark(size: 132, breathes: true)
                 .padding(.bottom, 4)
 
             VStack(spacing: 8) {

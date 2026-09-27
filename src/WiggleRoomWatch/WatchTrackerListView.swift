@@ -19,7 +19,7 @@ struct WatchTrackerListView: View {
             Group {
                 if trackers.isEmpty {
                     VStack(spacing: 8) {
-                        EmptyRingsMark(size: 64)
+                        EmptyRingsMark(size: 64, breathes: true)
                         Text("No Trackers")
                             .font(WiggleRoomFont.headline(17, weight: 650))
                         Text("Add a tracker on your iPhone.")
