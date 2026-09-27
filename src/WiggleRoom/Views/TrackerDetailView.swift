@@ -165,7 +165,7 @@ struct TrackerDetailView: View {
                 }
 
                 VStack(spacing: 10) {
-                    RingsView(tracker: tracker, now: now, animatesOnAppear: false)
+                    RingsView(tracker: tracker, now: now)
                         .frame(width: 260, height: 260)
                         .padding(.vertical, 18)
                         .frame(maxWidth: .infinity)
@@ -653,11 +653,19 @@ struct TrackerDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(16)
-        .background(tint.opacity(0.10), in: WobblyCard.shape(variant))
-        .overlay(
+        // Wash and border are drawn in the foreground style so a
+        // status-tinted card cross-fades when the status changes, without
+        // the fade reaching the card's figures or its size.
+        .background {
             WobblyCard.shape(variant)
-                .strokeBorder(tint.opacity(0.20), lineWidth: 1)
-        )
+                .fill(.foreground.opacity(0.10))
+                .crossFadingForeground(tint)
+        }
+        .overlay {
+            WobblyCard.shape(variant)
+                .strokeBorder(.foreground.opacity(0.20), lineWidth: 1)
+                .crossFadingForeground(tint)
+        }
     }
 
     private var remainingInAllowanceCaption: String? {
@@ -718,10 +726,12 @@ struct TrackerDetailView: View {
             Text(title)
                 .font(WiggleRoomFont.cardLabel)
                 .foregroundStyle(.secondary)
-            Text(tracker.formattedValue(value))
+            let text = tracker.formattedValue(value)
+            Text(text)
                 .font(.wiggleNumber(size: 24, weight: .bold))
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
+                .rollingFigure(value, text: text)
             // One stack for every sub-line so spacing between them is
             // identical on every card.
             VStack(spacing: 2) {

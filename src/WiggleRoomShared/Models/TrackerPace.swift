@@ -100,10 +100,13 @@ struct TrackerPace: Equatable {
     /// takes a "+" and below it a "−", whether that's a mileage figure
     /// running hot or a savings balance running cold.
     func displayDifference(for tracker: Tracker) -> String {
-        guard status == .warning else {
-            return tracker.formattedValue(abs(goodness))
-        }
-        return tracker.formattedValue(currentValue - targetValueToday, signed: true)
+        tracker.formattedValue(displayedDifference, signed: status == .warning)
+    }
+
+    /// The number `displayDifference` prints, for a figure that rolls
+    /// between values and needs to know which way.
+    var displayedDifference: Decimal {
+        status == .warning ? currentValue - targetValueToday : abs(goodness)
     }
 
     /// The status wording shown alongside the difference figure — the type's

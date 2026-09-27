@@ -27,9 +27,9 @@ struct TrackerListView: View {
     @State private var navigationPath = NavigationPath()
 
     // Mirrors TrackerDetailView's own ticker (§7.1) — without this, a row's
-    // ring only ever redraws when its underlying data changes, so it would
-    // never show the same live-refresh re-cycle the dashboard does; every
-    // ring in the app should visibly tick on the same schedule. Aligned to
+    // ring and figures only ever move when its underlying data changes, so
+    // they would fall behind the clock; every ring in the app ticks on the
+    // same schedule, and drifts when a tick visibly moves it. Aligned to
     // the *earliest* upcoming end date among all listed trackers, so a
     // tracker close to completing still gets its final on-time tick even
     // while sitting in a list alongside trackers with much later end dates.
@@ -278,9 +278,12 @@ private struct TrackerRow: View {
                 Text(pace.statusLine(for: tracker))
                     .font(WiggleRoomFont.cardLabel)
                     .foregroundStyle(.secondary)
-                Text(pace.displayDifference(for: tracker))
+                    .paceStatusBeat(status)
+                let difference = pace.displayDifference(for: tracker)
+                Text(difference)
                     .font(.wiggleNumber(.title3, weight: .bold))
-                    .foregroundStyle(status.color)
+                    .crossFadingForeground(status.color)
+                    .rollingFigure(pace.displayedDifference, text: difference)
             }
             .lineLimit(1)
             .minimumScaleFactor(0.6)
@@ -298,24 +301,29 @@ private struct TrackerRow: View {
     /// "Budget now"; "Weight", "Target now").
     private var figuresLine: some View {
         HStack(spacing: 8) {
-            figure(label: tracker.terminology.currentFigure, value: currentValueText)
+            figure(label: tracker.terminology.currentFigure,
+                   value: tracker.latestReading == nil ? nil : pace.currentValue, text: currentValueText)
             Text("\u{00B7}")
                 .font(.wiggleText(.caption2))
                 .foregroundStyle(.tertiary)
-            figure(label: tracker.terminology.paceFigure, value: tracker.formattedValue(pace.targetValueToday))
+            figure(label: tracker.terminology.paceFigure,
+                   value: pace.targetValueToday, text: tracker.formattedValue(pace.targetValueToday))
         }
         .lineLimit(1)
         .minimumScaleFactor(0.7)
     }
 
-    private func figure(label: String, value: String) -> some View {
+    /// `value` is the number `text` shows, so the figure rolls the right
+    /// way when it changes; `nil` for the em dash.
+    private func figure(label: String, value: Decimal?, text: String) -> some View {
         HStack(spacing: 4) {
             Text(label)
                 .font(.wiggleText(.caption2))
                 .foregroundStyle(.secondary)
-            Text(value)
+            Text(text)
                 .font(.wiggleNumber(.caption, weight: .semibold))
                 .foregroundStyle(.primary)
+                .rollingFigure(value, text: text)
         }
     }
 
