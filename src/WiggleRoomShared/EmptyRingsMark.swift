@@ -75,14 +75,45 @@ struct IconRingShape: Shape {
 struct EmptyRingsMark: View {
     var size: CGFloat = 132
 
+    /// Opts in to a very slow breathing wobble, as if the lines were being
+    /// redrawn by hand — for live empty states, where idle motion has no
+    /// data to compete with. Off by default so a widget or complication, a
+    /// static snapshot that would catch the breath at an arbitrary point
+    /// and flicker between reloads, can never be opted in by accident.
+    var breathes = false
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Dimmed display: the always-on watch face or Lock Screen. The breath
+    /// stops there rather than keep the display updating for nobody.
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+
+    /// The breath swings the outline either side of its resting `wobble`
+    /// of 1, over a four-second cycle.
+    private static let breath: [Double] = [0.7, 1.3]
+    private static let halfBreath = Animation.easeInOut(duration: 2)
+
     var body: some View {
+        if breathes && !reduceMotion && !isLuminanceReduced {
+            // A continuous phase animation rather than a timer: it only
+            // runs while the mark is on screen and the app is active.
+            PhaseAnimator(Self.breath) { wobble in
+                rings(wobble: wobble)
+            } animation: { _ in
+                Self.halfBreath
+            }
+        } else {
+            rings(wobble: 1)
+        }
+    }
+
+    private func rings(wobble: Double) -> some View {
         let line = size * 0.09
         let style = StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round)
-        ZStack {
-            IconRingShape(ring: .outer, fitsRect: true, wobble: 1)
+        return ZStack {
+            IconRingShape(ring: .outer, fitsRect: true, wobble: wobble)
                 .trim(from: 0, to: 0.75)
                 .stroke(WiggleRoomColors.brand.opacity(0.5), style: style)
-            IconRingShape(ring: .inner, fitsRect: true, wobble: 1)
+            IconRingShape(ring: .inner, fitsRect: true, wobble: wobble)
                 .trim(from: 0, to: 0.68)
                 .stroke(WiggleRoomColors.good.opacity(0.7), style: style)
                 .padding(size * 0.17)
@@ -93,5 +124,5 @@ struct EmptyRingsMark: View {
 }
 
 #Preview {
-    EmptyRingsMark()
+    EmptyRingsMark(breathes: true)
 }

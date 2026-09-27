@@ -23,7 +23,7 @@ struct WiggleEmptyState: View {
             Spacer()
 
             ZStack {
-                EmptyRingsMark(size: 120)
+                EmptyRingsMark(size: 120, breathes: true)
                 Image(systemName: symbol)
                     .font(.wiggleText(size: 34, weight: .medium))
                     .foregroundStyle(WiggleRoomColors.brand)
