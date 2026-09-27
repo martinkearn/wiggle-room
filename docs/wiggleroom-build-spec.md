@@ -231,6 +231,23 @@ A tracker whose period is longer than five days can be zoomed. Zoom magnifies th
 
 The app's rings, cards, and chart strokes use a deliberately irregular, hand-drawn style. Accessibility labels must communicate the same information without relying on colour or geometry alone.
 
+### Ring motion
+
+The rings say *why* they moved. Each change has one of three causes, each cause has its own animation, and only one plays at a time. `RingMotion.reason` decides which from the old and new state: the two fractions, the latest reading's id, and the zoom flag.
+
+- **Arrival: the tracker was opened.** Both rings grow from empty with an overshoot spring, the inner ring 40–90ms behind the outer. It is deferred 0.05s past the system's own launch or push transaction, which would otherwise swallow it. A change landing before the arrival settles redirects it rather than playing a second animation, so a connected tracker's on-open refresh grows the rings straight to the refreshed figure.
+- **Update: a new latest reading.** Both rings drain to empty and refill. Keyed on the reading's identity, not its value, so re-logging the same figure still registers.
+- **Drift: the target moved, the reading did not.** Never from empty. Each ring that moved dips to 97% of where it was drawn and springs to its new value, while its outline's `wobble` swells to 0.35 and settles over about 0.6s. Drift plays only once a ring has moved at least 0.0025 of a turn since it was last drawn, so the 30-second clock leaves slow trackers' rows still. Each surface waits a random 0–400ms before drifting, so a list never wobbles in unison.
+- **Zoom** slides both rings straight to their new fills.
+
+Every scheduled step carries a token, so a newer change never leaves an older refill or drift return queued behind it. The arrival, refill and drift springs vary by up to ±10% per play. A full ring's closing overlap is latched on its target fraction, so it holds through a drift's dip. An update's drain still removes it.
+
+Live figures move with the rings. The ring's centre figure, the tracker screen's two figure cards and the list row's three figures roll their digits (`.contentTransition(.numericText(value:))`), up for a rising value and down for a falling one. Each carries its own animation keyed on its formatted text, because neither the pace clock nor a reading arriving through SwiftData changes it inside an animation. When the pace status changes, the status colour cross-fades on the rings, the figures and the cards, and the status word takes a single spring of emphasis. Both are keyed on `PaceStatus` itself.
+
+Under Reduce Motion the rings draw at their final value with no growth, an update goes straight to the new value, drift does nothing, figures swap without rolling and the status word stays still. The status colour still cross-fades.
+
+Widgets, complications and the Live Activity render a static snapshot before any deferred animation could run, so they pass `isAnimated: false` and draw the real value with none of this motion and no randomness.
+
 ### Tracker screen layout
 
 A tracker's own screen is headed by its name and nothing else. It carries the same badge — glyph and colour — that the tracker wears in the list, so the screen is recognisably the row that opened it, and the badge sits immediately beside the name in the heading on every platform: in the navigation bar itself on iOS and iPadOS, and in the in-content header on macOS, where the window title cannot take the app's own typeface.
