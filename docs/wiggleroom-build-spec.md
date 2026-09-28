@@ -21,6 +21,8 @@ The product is designed for one person's use across their own Apple devices. It 
 - App Groups for same-device access by apps and extensions
 - HealthKit on iOS and iPadOS only, via a per-SDK entitlements file (a macOS App ID cannot carry the HealthKit capability)
 
+The minimum systems are iOS and iPadOS 26.5, macOS 26.5 and watchOS 26.0. The app is built with Xcode 27 or later (the iOS 27 and macOS 27 SDKs), locally and in CI.
+
 visionOS and Mac Catalyst are not currently supported.
 
 ## 3. Tracker model
@@ -168,7 +170,7 @@ A connected source's `displayName` must be unique (case-insensitive) among the u
 
 ## 5. Persistence and sync
 
-The main app uses one SwiftData schema containing:
+Every process uses one SwiftData schema, `WiggleRoomSchema`, containing:
 
 - `Tracker`
 - `ValueSnapshot`
@@ -330,6 +332,7 @@ Where the answer is no, the tracker is a read-only view: it displays exactly as 
 
 - Single-tracker status and chart widgets
 - All-trackers widget
+- Small, medium, large and extra-large sizes. Extra-large is offered on iPad, and on iPhone and Mac from iOS and macOS 27; the system leaves it out of the widget gallery on earlier versions.
 - Configurable tracker selection through App Intents
 - Siri intents for opening trackers, checking status, and logging readings
 
@@ -375,15 +378,47 @@ Development-signed builds sync against the Development CloudKit schema. TestFlig
 - The Development schema only gains a field once a development-signed build has uploaded a record containing it.
 - Fields deployed to Production cannot be removed.
 
+`cloudkit/schema.ckdb` is the committed schema: every record type and field the app syncs, exported from Development. It is a superset of the models, because it keeps retired fields such as `CD_direction` that Production can never drop. Every process opens its store with the one model list in `WiggleRoomSchema`.
+
+When a model changes, the file needs updating only if CloudKit gains something:
+
+| Model change | Update `cloudkit/schema.ckdb` and deploy? |
+|---|---|
+| Add a stored property | Yes. |
+| Rename a stored property | Yes. CloudKit sees a new field; the old one stays in Production, unused. |
+| Add a model | Yes. It is a new record type. |
+| Remove a stored property | No. Production keeps the field for good, so the file keeps it too; the app simply stops writing it. |
+| Change a stored property's type | Avoid. A deployed field's type cannot change, so add a property under a new name instead, which is an addition. |
+| Computed properties, `@Transient` properties, logic or UI | No. None of them reach CloudKit. |
+
+The file is replaced by a fresh export, never edited by hand, except as a stand-in until the owner can export (see below).
+
+Two checks enforce the schema, each catching a different mistake:
+
+- **Model changed, schema file not updated.** `CloudKitSchemaTests` runs in the pull-request build check, with no secrets. For every model it expects `CD_entityName`, `CD_<name>` for each stored attribute and each to-one relationship, and `CD_<name>_ckAsset` for externally stored data (a to-many relationship has no field). It fails if any of these is missing from the committed file. It compares names only.
+- **Schema not deployed.** Both TestFlight workflows export the Production schema with `xcrun cktool` before installing any signing material, and `.github/scripts/check-cloudkit-schema.py` fails the run if Production lacks a record type or `CD_` field from the committed file, or types one differently. Extra fields in Production are fine. The step authenticates with the `CLOUDKIT_MANAGEMENT_TOKEN` repository secret, a CloudKit management token that expires after a year; an expired token fails the step with a message saying so.
+
+Neither check deploys anything. A Production deploy is only possible in CloudKit Console. CI also does not import the committed file into Development.
+
+A model change therefore goes:
+
+1. Change the model.
+2. Run a development-signed build that saves a record, so Development gains the field. Alternatively, add the field by hand in CloudKit Console → Development → Record Types.
+3. Export Development's schema into `cloudkit/schema.ckdb` (CloudKit Console → Development → **Export Schema…**, or `xcrun cktool export-schema --environment development`) and commit it with the model change. Clean any experimental fields out of Development first, since Deploy Schema Changes pushes everything in it.
+4. In CloudKit Console, **Deploy Schema Changes**, before merging or after the gate fails.
+5. Merge. If step 4 was skipped, both TestFlight workflows fail at the schema check; deploy, then re-run the failed jobs.
+
+Never test the gate by deploying a fake field to Production. To see it fail, add a fake field to a local copy of the committed file and run the script against a local Production export.
+
 ## 11. Verification
 
 Before distribution:
 
-1. Build the active Xcode project successfully.
+1. Build the active Xcode project successfully with Xcode 27 or later.
 2. Run unit tests for tracker calculations, providers, request limits, and persistence actions.
 3. Verify an iOS archive and a macOS archive.
 4. Confirm embedded extensions use the parent's build number.
-5. If a SwiftData model changed, deploy the CloudKit schema to Production (see CloudKit schema).
+5. If a SwiftData model changed, update `cloudkit/schema.ckdb` and deploy the CloudKit schema to Production (see CloudKit schema).
 6. Test manual entry and Starling failure states without real credentials in source or fixtures.
 7. Test Apple Health with synthetic weight samples: a first connection, refused access (which must stay quiet rather than erroring), and a Mac or watch showing the read-only view.
 8. Test CloudKit sync using fictional tracker names and values, and confirm the CloudKit Sync screen reports successful downloads and uploads.

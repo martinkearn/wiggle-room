@@ -1,0 +1,95 @@
+DEFINE SCHEMA
+
+    RECORD TYPE CD_ConnectedSource (
+        CD_credentialKeychainKey STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_credentialToken       STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_displayName           STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_entityName            STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_id                    STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_providerId            STRING QUERYABLE SEARCHABLE SORTABLE,
+        "___createTime"          TIMESTAMP,
+        "___createdBy"           REFERENCE,
+        "___etag"                STRING,
+        "___modTime"             TIMESTAMP,
+        "___modifiedBy"          REFERENCE,
+        "___recordID"            REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE CD_StarlingRequestLogEntry (
+        CD_date         TIMESTAMP QUERYABLE SORTABLE,
+        CD_entityName   STRING QUERYABLE SEARCHABLE SORTABLE,
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE CD_Tracker (
+        CD_colorIndex              INT64 QUERYABLE SORTABLE,
+        CD_connectedSource         STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_direction               BYTES,
+        CD_endDate                 TIMESTAMP QUERYABLE SORTABLE,
+        CD_entityName              STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_glyph                   STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_hasCelebratedCompletion INT64 QUERYABLE SORTABLE,
+        CD_id                      STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_isZoomed                INT64 QUERYABLE SORTABLE,
+        CD_lastAutoFetchAttempt    TIMESTAMP QUERYABLE SORTABLE,
+        CD_lastCheckedDate         TIMESTAMP QUERYABLE SORTABLE,
+        CD_name                    STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_reminderCadenceDays     INT64 QUERYABLE SORTABLE,
+        CD_reminderCadenceMinutes  INT64 QUERYABLE SORTABLE,
+        CD_sortOrder               INT64 QUERYABLE SORTABLE,
+        CD_sourceTargetId          STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_startDate               TIMESTAMP QUERYABLE SORTABLE,
+        CD_startingValue           DOUBLE QUERYABLE SORTABLE,
+        CD_totalAllowance          DOUBLE QUERYABLE SORTABLE,
+        CD_typeRawValue            STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_unit                    STRING QUERYABLE SEARCHABLE SORTABLE,
+        "___createTime"            TIMESTAMP,
+        "___createdBy"             REFERENCE,
+        "___etag"                  STRING,
+        "___modTime"               TIMESTAMP,
+        "___modifiedBy"            REFERENCE,
+        "___recordID"              REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE CD_ValueSnapshot (
+        CD_date         TIMESTAMP QUERYABLE SORTABLE,
+        CD_entityName   STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_id           STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_tracker      STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_value        DOUBLE QUERYABLE SORTABLE,
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE Users (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        roles           LIST<INT64>,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );

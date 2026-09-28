@@ -24,3 +24,9 @@ For distribution builds, ensure the parent app and every embedded app or extensi
 ## Siri phrases
 
 Whenever a phrase is added, removed, or reworded in `src/WiggleRoom/Intents/WiggleRoomShortcuts.swift`, update `src/WiggleRoom/Views/SiriPhrasesView.swift` in the same change. The settings page is maintained manually because App Shortcut phrases cannot be read back at runtime.
+
+## CloudKit schema
+
+Whenever a stored property is added to or renamed on a `@Model` type, or a model is added to `WiggleRoomSchema`, update `cloudkit/schema.ckdb` in the same change so `CloudKitSchemaTests` passes. Add the new `CD_` field with its CloudKit type as a stand-in, and never delete retired fields from the file. Removing a stored property needs no change to the file. Never change a stored property's type; add a property under a new name instead.
+
+Then tell the owner that the change needs three steps before the TestFlight workflows will pass: a development-signed build to add the field to Development, a fresh export of Development's schema to replace the stand-in, and **Deploy Schema Changes** to Production in CloudKit Console. No tool in this repository can deploy to Production. The build specification's CloudKit schema section lists which model changes need this.

@@ -16,7 +16,7 @@ Before configuring the secrets, ensure that:
 - Your fork uses bundle identifiers, App Groups, and CloudKit containers owned by your Apple Developer team.
 - You can access the repository's **Settings → Secrets and variables → Actions** page.
 
-The repository workflows expect all fourteen secrets listed below. GitHub does not allow empty Actions secrets, and it does not display a secret again after it is saved.
+The repository workflows expect all fifteen secrets listed below. GitHub does not allow empty Actions secrets, and it does not display a secret again after it is saved.
 
 ## Required secrets
 
@@ -36,6 +36,24 @@ The repository workflows expect all fourteen secrets listed below. GitHub does n
 | `WATCH_COMPLICATION_APP_STORE_PROFILE_BASE64` | Supplies the App Store provisioning profile for the watch complication. |
 | `MAC_APP_STORE_PROFILE_BASE64` | Supplies the Mac App Store provisioning profile for the macOS app. |
 | `MAC_WIDGET_APP_STORE_PROFILE_BASE64` | Supplies the Mac App Store provisioning profile for the macOS widget extension. |
+| `CLOUDKIT_MANAGEMENT_TOKEN` | Lets both workflows read the Production CloudKit schema and stop before signing if it lacks a field the app writes. |
+
+## `CLOUDKIT_MANAGEMENT_TOKEN`
+
+### What it is for
+
+TestFlight builds sync against the Production CloudKit schema, which changes only when someone selects **Deploy Schema Changes** in CloudKit Console. Before installing any signing material, both workflows run `xcrun cktool export-schema` against Production and compare it with the committed `cloudkit/schema.ckdb`. If Production is missing a record type or field from that file, or holds one with a different type, the run fails with the missing fields named. Deploy the schema in CloudKit Console, then re-run the failed jobs. The workflows never deploy anything themselves: Apple provides no API for a Production deploy.
+
+The workflows pass the token to `cktool` through the `CLOUDKIT_MANAGEMENT_TOKEN` environment variable, so it never appears in process arguments.
+
+### How to obtain it
+
+1. Open [CloudKit Console](https://icloud.developer.apple.com/) and sign in with an account on the team that owns the app's CloudKit container.
+2. Open **Settings** and create a **management token**. The container's **Tokens & Keys** page only has API tokens and server-to-server keys, which are the wrong kind. Alternatively, run `xcrun cktool save-token --type management`, which walks through creating one.
+3. Copy the token and add it to GitHub as `CLOUDKIT_MANAGEMENT_TOKEN`.
+4. Note the token's expiry somewhere you will see it. Management tokens last one year by default. An expired token makes both workflows fail at the schema check, with a message saying the token has probably expired, rather than silently passing.
+
+A management token is scoped to one team and one user. It can read both schemas, write the Development schema, and reset Development, which deletes all Development data. It cannot change Production. Only the TestFlight workflows' schema-check step receives it; never expose it to the build check, which runs on pull requests from forks and coding agents.
 
 ## Add a repository secret
 
@@ -433,17 +451,18 @@ The workflows decode each profile, verify its bundle identifier, install it unde
 
 ## Verify the configuration
 
-After all fourteen secrets are present:
+After all fifteen secrets are present:
 
 1. Confirm every secret name exactly matches this guide.
 2. Confirm both Base64 secrets were created from `.p12` files that include their private keys.
 3. Confirm each password matches its corresponding `.p12`.
 4. Confirm the API Key ID, Issuer ID, and `.p8` all belong to the same team API key.
 5. Confirm `APPLE_TEAM_ID` identifies the team that owns the app and capabilities.
-6. Confirm every provisioning profile targets the expected bundle identifier and contains the same Apple Distribution certificate imported by CI.
-7. Run the iOS and macOS workflows manually or push to `main`.
-8. Inspect failures only through GitHub Actions logs; never print secret values while troubleshooting.
-9. After successful uploads, confirm both builds appear in App Store Connect under TestFlight.
+6. Confirm `CLOUDKIT_MANAGEMENT_TOKEN` is a management token (not an API token) for that team, and its expiry is noted.
+7. Confirm every provisioning profile targets the expected bundle identifier and contains the same Apple Distribution certificate imported by CI.
+8. Run the iOS and macOS workflows manually or push to `main`.
+9. Inspect failures only through GitHub Actions logs; never print secret values while troubleshooting.
+10. After successful uploads, confirm both builds appear in App Store Connect under TestFlight.
 
 Workflow runs perform real TestFlight uploads. Each attempt receives a unique, platform-specific build number from the monotonic GitHub Actions workflow run number, including reruns.
 
@@ -455,5 +474,6 @@ Feature branches may be added temporarily to a workflow's `push.branches` list f
 - Replace the Key ID, Issuer ID, and private-key secrets together when rotating the API key.
 - Replace both the Base64 and password secrets when rotating a `.p12`.
 - Re-export certificate secrets before their Apple certificates expire.
+- Replace `CLOUDKIT_MANAGEMENT_TOKEN` before it expires, and revoke it in CloudKit Console if it may have been exposed.
 - Delete temporary local `.p12`, `.cer`, CSR, and clipboard contents when they are no longer needed, while retaining approved secure backups where required.
 - Never expose values in screenshots, support requests, issues, or workflow debugging output.

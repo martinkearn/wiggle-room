@@ -2,7 +2,7 @@
 
 Wiggle Room is a SwiftUI app for tracking a quantity against the pace needed to reach a target at the end of a fixed period. Every tracker is one of seven types — Spending Money, Spending Credit, Saving Money, Mileage, Weight loss, Rising Number, or Falling Number — chosen when it is created. The type sets the units, which way the number travels, which side of the pace line is the good side, and the wording used everywhere it appears.
 
-The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep a user's trackers and reading history in sync across their own devices.
+The app runs on iPhone and iPad with iOS 26.5 or later, Mac with macOS 26.5 or later, and Apple Watch with watchOS 26 or later. SwiftData and CloudKit keep a user's trackers and reading history in sync across their own devices.
 
 ## Features
 
@@ -17,7 +17,7 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 
 ## Requirements
 
-- A current stable version of Xcode
+- Xcode 27 or later
 - An Apple ID configured in Xcode
 - Apple Developer Program membership for CloudKit on physical devices and TestFlight distribution
 - An optional Starling personal access token to use the Starling provider
@@ -44,22 +44,28 @@ Tracker backups and transfers are available under **Settings → Export & Import
 
 Pull requests targeting `main` run a build check that compiles the app for iOS and macOS in the Release configuration, unsigned. It needs no repository secrets, so it also covers pull requests raised from forks and by coding agents. Merging a branch that does not compile is what this check exists to prevent, since the distribution workflows below only run after a merge has already landed.
 
+Every workflow runs on GitHub's `xcode-27` runner image, currently a public preview, because the general `macos-latest` image stops at Xcode 26. Each job fails early if its Xcode is older than 27, rather than building against older SDKs.
+
+The build check also runs `CloudKitSchemaTests` on an iOS Simulator. It fails when a SwiftData model has a field that the committed CloudKit schema, [`cloudkit/schema.ckdb`](cloudkit/schema.ckdb), lacks. Any change that adds a model, or adds or renames a stored property, must update that file in the same pull request. Removing a property needs no change, because CloudKit keeps deployed fields for good. The build specification's [CloudKit schema](docs/wiggleroom-build-spec.md#cloudkit-schema) section lists which changes need an update.
+
 ## TestFlight deployment
 
 Pushes to `main` start separate GitHub Actions workflows for iOS and macOS. Both workflows also support manual dispatch from the GitHub Actions interface.
 
 Every workflow attempt receives a new build number derived from the monotonic GitHub Actions workflow run number, workflow attempt, and platform. This keeps iOS and macOS archive numbers distinct, including reruns. The number is applied consistently to the app and all embedded extensions before the workflow creates a signed archive and uploads it to the existing App Store Connect record.
 
-A change that adds a SwiftData model, or adds or renames a stored property, needs its CloudKit schema deployed to Production in CloudKit Console before the TestFlight build ships, or every upload from that build is rejected. See the build specification's [CloudKit schema](docs/wiggleroom-build-spec.md#cloudkit-schema) section.
+A change that adds a SwiftData model, or adds or renames a stored property, needs its CloudKit schema deployed to Production in CloudKit Console before the TestFlight build ships, or every upload from that build is rejected. Both workflows enforce this: before any signing step they export the Production schema and fail if it lacks anything in `cloudkit/schema.ckdb`. The deploy itself stays manual. See the build specification's [CloudKit schema](docs/wiggleroom-build-spec.md#cloudkit-schema) section.
 
 Each archive carries the triggering commit into TestFlight's "What to Test" notes, written as `TestFlight/WhatToTest.en-US.txt` inside the archive before export, so testers can see which change the build contains. The notes hold the commit message, the short commit hash and branch, and a link to the workflow run that produced the build.
 
-The workflows require GitHub repository secrets for App Store Connect authentication and signing. For the complete list, purpose, setup, certificate export, fork configuration, rotation, and troubleshooting instructions, see the [GitHub Actions TestFlight setup guide](docs/github-actions-setup.md).
+The workflows require GitHub repository secrets for App Store Connect authentication, signing, and the CloudKit schema check. The schema check's `CLOUDKIT_MANAGEMENT_TOKEN` expires after a year, so replace it before then. For the complete list, purpose, setup, certificate export, fork configuration, rotation, and troubleshooting instructions, see the [GitHub Actions TestFlight setup guide](docs/github-actions-setup.md).
 
 ## Project structure
 
 ```text
 wiggle-room/
+├── cloudkit/
+│   └── schema.ckdb             # Committed CloudKit schema, checked in CI
 ├── docs/
 │   ├── github-actions-setup.md
 │   └── wiggleroom-build-spec.md

@@ -20,7 +20,9 @@ env:
 jobs:
   distribute:
     name: Archive and upload iOS
-    runs-on: macos-latest
+    # GitHub's Xcode 27 image (a public preview); macos-latest stops at
+    # Xcode 26. See .github/scripts/check-xcode.sh.
+    runs-on: xcode-27
     timeout-minutes: 60
 
     steps:
@@ -29,8 +31,29 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Show Xcode version
-        run: xcodebuild -version
+      - name: Check Xcode version
+        run: .github/scripts/check-xcode.sh
+
+      - name: Check CloudKit Production schema
+        env:
+          CLOUDKIT_MANAGEMENT_TOKEN: ${{ secrets.CLOUDKIT_MANAGEMENT_TOKEN }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # TestFlight builds sync against Production, which only changes
+          # when someone deploys to it in CloudKit Console. Stops here, before
+          # any signing material is installed, if Production lacks a field in
+          # cloudkit/schema.ckdb: otherwise CloudKit rejects every upload
+          # from this build while downloads keep working. cktool reads the
+          # token from the environment, keeping it out of process arguments.
+          if ! xcrun cktool export-schema \
+            --team-id "$TEAM_ID" \
+            --container-id iCloud.martinkearn.WiggleRoom \
+            --environment production \
+            --output-file "$RUNNER_TEMP/production.ckdb"; then
+            echo "::error title=CloudKit schema check::cktool could not read the Production schema. If this is an authorisation error, the CLOUDKIT_MANAGEMENT_TOKEN secret has probably expired (management tokens last one year)."
+            exit 1
+          fi
+          python3 .github/scripts/check-cloudkit-schema.py cloudkit/schema.ckdb "$RUNNER_TEMP/production.ckdb"
 
       - name: Set build number
         run: |
