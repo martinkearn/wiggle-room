@@ -18,10 +18,10 @@ import SwiftData
 /// return only `container.mainContext`) crashes on first use.
 @MainActor
 func makeInMemoryModelContainer() -> ModelContainer {
-    // Keep this identical to the app's schema. SwiftData model metadata is
+    // The app's own schema, not a subset. SwiftData model metadata is
     // process-wide, and omitting a model used by TrackerStore can leave the
     // in-memory context without an eligible store connection.
-    let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self, StarlingRequestLogEntry.self])
+    let schema = WiggleRoomSchema.schema
     let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
     do {
         return try ModelContainer(for: schema, configurations: [configuration])

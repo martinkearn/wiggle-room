@@ -52,11 +52,9 @@ enum WidgetDataStore {
     @MainActor
     static func makeContainer() throws -> ModelContainer {
         if let cachedContainer { return cachedContainer }
-        // Must stay identical to every other process's schema for this same
-        // store (`WiggleRoomApp`, `IntentDataStore`, `WiggleRoomWatchApp`) —
-        // a mismatched schema between processes sharing one on-disk/CloudKit
-        // store is a real corruption risk, not just a compile-time detail.
-        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self, StarlingRequestLogEntry.self])
+        // The shared schema every process sharing this store must use (see
+        // `WiggleRoomSchema`).
+        let schema = WiggleRoomSchema.schema
         // Shared App Group container (see `AppGroup`) — the same on-disk
         // store the host app (WiggleRoom/WiggleRoomWatch) opens, so this
         // extension sees a same-device change the instant it's asked for,

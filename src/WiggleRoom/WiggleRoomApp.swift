@@ -26,7 +26,7 @@ struct WiggleRoomApp: App {
     #endif
 
     init() {
-        let schema = Schema([Tracker.self, ConnectedSource.self, ValueSnapshot.self, StarlingRequestLogEntry.self])
+        let schema = WiggleRoomSchema.schema
 
         // Full cross-device sync via CloudKit (§6), now that the paid Apple
         // Developer Program account is active and the iCloud capability is
