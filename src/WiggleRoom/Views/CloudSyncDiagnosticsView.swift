@@ -4,6 +4,7 @@
 //
 
 import CloudKit
+import CoreData
 import Observation
 import SwiftData
 import SwiftUI
@@ -20,6 +21,11 @@ final class CloudSyncDiagnostics {
     static let shared = CloudSyncDiagnostics()
 
     private(set) var persistenceMode: PersistenceMode = .starting
+    /// The setup, download and upload events CloudKit has reported in this
+    /// process since launch. Nothing is persisted: a relaunch starts empty,
+    /// and the next setup event arrives within moments.
+    private(set) var syncActivity: [CloudSyncEvent.Kind: CloudSyncActivity] = [:]
+    @ObservationIgnored private var eventObserver: (any NSObjectProtocol)?
 
     private init() {}
 
@@ -29,6 +35,35 @@ final class CloudSyncDiagnostics {
 
     func recordLocalFallback(error: any Error) {
         persistenceMode = .localFallback(error.localizedDescription)
+    }
+
+    /// Starts recording CloudKit's setup, import and export events. Call it
+    /// before the `ModelContainer` is created, or the setup event can be
+    /// missed. Safe to call more than once.
+    func startObservingSyncEvents() {
+        guard eventObserver == nil else { return }
+        // No queue: the block runs on whichever thread Core Data posts
+        // from, copies the event into plain values and hands them to the
+        // main actor without waiting. Posting waits for every observer to
+        // return, so an observer on the main queue would hold CloudKit's
+        // sync work until the main thread was free — the pattern behind the
+        // watchdog kill described in `CloudSyncWidgetRefresher`.
+        eventObserver = NotificationCenter.default.addObserver(
+            forName: NSPersistentCloudKitContainer.eventChangedNotification,
+            object: nil,
+            queue: nil
+        ) { @Sendable notification in
+            guard let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+                    as? NSPersistentCloudKitContainer.Event,
+                  let syncEvent = CloudSyncEvent(event) else { return }
+            Task { @MainActor in
+                CloudSyncDiagnostics.shared.record(syncEvent)
+            }
+        }
+    }
+
+    func record(_ event: CloudSyncEvent) {
+        syncActivity[event.kind, default: CloudSyncActivity()].record(event)
     }
 }
 
@@ -75,6 +110,7 @@ struct CloudSyncDiagnosticsView: View {
             Form {
                 CloudSyncStatusSection(
                     persistenceMode: diagnostics.persistenceMode,
+                    syncActivity: diagnostics.syncActivity,
                     accountStatus: snapshot.accountStatus,
                     reachability: snapshot.reachability,
                     zoneCount: snapshot.zoneCount,
@@ -114,6 +150,7 @@ struct CloudSyncDiagnosticsView: View {
         List {
             CloudSyncStatusSection(
                 persistenceMode: diagnostics.persistenceMode,
+                syncActivity: diagnostics.syncActivity,
                 accountStatus: snapshot.accountStatus,
                 reachability: snapshot.reachability,
                 zoneCount: snapshot.zoneCount,
@@ -227,6 +264,7 @@ struct CloudSyncDiagnosticsView: View {
 
 private struct CloudSyncStatusSection: View {
     let persistenceMode: CloudSyncDiagnostics.PersistenceMode
+    let syncActivity: [CloudSyncEvent.Kind: CloudSyncActivity]
     let accountStatus: String
     let reachability: String
     let zoneCount: Int?
@@ -235,6 +273,11 @@ private struct CloudSyncStatusSection: View {
     var body: some View {
         Section("Status") {
             LabeledContent("Storage mode", value: storageModeDescription)
+            // Whether the store loaded with CloudKit says nothing about
+            // whether sync is working, so the events come straight after it.
+            ForEach(CloudSyncEvent.Kind.allCases, id: \.self) { kind in
+                CloudSyncEventRow(kind: kind, activity: syncActivity[kind] ?? CloudSyncActivity())
+            }
             LabeledContent("iCloud account", value: accountStatus)
             LabeledContent("CloudKit", value: reachability)
             if let zoneCount {
@@ -271,6 +314,68 @@ private struct CloudSyncStatusSection: View {
             return message
         }
         return nil
+    }
+}
+
+/// One kind of CloudKit event: the result of the last one to finish, and
+/// underneath it the reason when that was a failure, so a rejected upload
+/// is visible without opening a log.
+private struct CloudSyncEventRow: View {
+    let kind: CloudSyncEvent.Kind
+    let activity: CloudSyncActivity
+
+    var body: some View {
+        LabeledContent(title) {
+            VStack(alignment: .trailing, spacing: 2) {
+                outcome
+                if activity.lastFinished != nil, activity.inProgress != nil {
+                    Text("Running again now")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        if let failureReason = activity.lastFinished?.failureReason {
+            Text(failureReason)
+                .font(.caption)
+                .foregroundStyle(.red)
+                .textSelection(.enabled)
+        }
+    }
+
+    @ViewBuilder
+    private var outcome: some View {
+        if let event = activity.lastFinished, let endedAt = event.endedAt {
+            if event.succeeded {
+                Text("Succeeded \(Self.time(endedAt))")
+            } else {
+                Text("Failed \(Self.time(endedAt))")
+                    .foregroundStyle(.red)
+            }
+        } else if let running = activity.inProgress {
+            Text("In progress since \(Self.time(running.startedAt))")
+        } else {
+            Text("None since launch")
+        }
+    }
+
+    private var title: String {
+        switch kind {
+        case .setup:
+            "Setup"
+        case .download:
+            "Last download"
+        case .upload:
+            "Last upload"
+        }
+    }
+
+    /// Just the time for today, which is almost always the case since events
+    /// are only kept since launch; the date as well for an app left running.
+    private static func time(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date)
+            ? date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(.dateTime.day().month().hour().minute())
     }
 }
 
@@ -371,7 +476,7 @@ private struct CloudSyncTechnicalSection: View {
                     Text("Never")
                 }
             }
-            Text("CloudKit does not expose an exact last-sync-completed time for SwiftData. The health check confirms account and database access; local counts update when imported records reach this device.")
+            Text("Setup, download and upload results are the sync events CloudKit has reported since the app launched. The health check confirms account and database access; local counts update when imported records reach this device.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

@@ -6,12 +6,18 @@
 import Foundation
 import SwiftData
 
-/// Shortcuts/Siri can invoke an intent while the app isn't running, so
-/// intents can't rely on the live `TrackerStore`/`ModelContainer` the app's
-/// own `WindowGroup` builds — same reasoning as `WidgetDataStore` in the
-/// widget extension. Opens its own container against the same CloudKit
-/// container (once per process, then reused — see `cachedContainer`), rather
-/// than trying to share the app's in-memory one.
+/// The store that intents, Spotlight indexing and notification actions use.
+///
+/// Inside the app, that is the app's own container and `TrackerStore`,
+/// which `WiggleRoomApp` registers as it launches (`useAppStore`). Only one
+/// CloudKit-mirrored container may exist per store per process: a second
+/// one fails CloudKit setup ("There is another instance of this persistent
+/// store actively syncing with CloudKit in this process", Cocoa error
+/// 134422) and competes with the first for the same export activity.
+///
+/// Where nothing has been registered, such as a process in which
+/// `WiggleRoomApp` never ran, this opens its own container against the same
+/// App Group store and CloudKit container, once per process.
 enum IntentDataStore {
     /// One container kept alive for the life of the process. A `Tracker`
     /// fetched from a container that has since been deallocated is
@@ -21,6 +27,23 @@ enum IntentDataStore {
     /// `TrackerSpotlightIndexer` read `tracker.id` after it had gone.
     @MainActor
     private static var cachedContainer: ModelContainer?
+
+    /// The app's own store, when running inside the app.
+    @MainActor
+    private static var appStore: TrackerStore?
+
+    /// Makes every later call use the app's container and store instead of
+    /// opening a second container. Call it as soon as the app's container
+    /// exists, before anything can reach this type.
+    @MainActor
+    static func useAppStore(_ store: TrackerStore, container: ModelContainer) {
+        assert(
+            cachedContainer == nil || cachedContainer === container,
+            "IntentDataStore opened its own container before the app registered one"
+        )
+        cachedContainer = container
+        appStore = store
+    }
 
     @MainActor
     static func makeContainer() throws -> ModelContainer {
@@ -62,6 +85,7 @@ enum IntentDataStore {
 
     @MainActor
     static func store() throws -> TrackerStore {
+        if let appStore { return appStore }
         let container = try makeContainer()
         return TrackerStore(modelContext: container.mainContext)
     }

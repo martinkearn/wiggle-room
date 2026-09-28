@@ -50,6 +50,8 @@ Pushes to `main` start separate GitHub Actions workflows for iOS and macOS. Both
 
 Every workflow attempt receives a new build number derived from the monotonic GitHub Actions workflow run number, workflow attempt, and platform. This keeps iOS and macOS archive numbers distinct, including reruns. The number is applied consistently to the app and all embedded extensions before the workflow creates a signed archive and uploads it to the existing App Store Connect record.
 
+A change that adds a SwiftData model, or adds or renames a stored property, needs its CloudKit schema deployed to Production in CloudKit Console before the TestFlight build ships, or every upload from that build is rejected. See the build specification's [CloudKit schema](docs/wiggleroom-build-spec.md#cloudkit-schema) section.
+
 Each archive carries the triggering commit into TestFlight's "What to Test" notes, written as `TestFlight/WhatToTest.en-US.txt` inside the archive before export, so testers can see which change the build contains. The notes hold the commit message, the short commit hash and branch, and a link to the workflow run that produced the build.
 
 The workflows require GitHub repository secrets for App Store Connect authentication and signing. For the complete list, purpose, setup, certificate export, fork configuration, rotation, and troubleshooting instructions, see the [GitHub Actions TestFlight setup guide](docs/github-actions-setup.md).
