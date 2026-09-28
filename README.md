@@ -46,7 +46,7 @@ Pull requests targeting `main` run a build check that compiles the app for iOS a
 
 Every workflow runs on GitHub's `xcode-27` runner image, currently a public preview, because the general `macos-latest` image stops at Xcode 26. Each job fails early if its Xcode is older than 27, rather than building against older SDKs.
 
-The build check also runs `CloudKitSchemaTests` on an iOS Simulator. It fails when a SwiftData model has a field that the committed CloudKit schema, [`cloudkit/schema.ckdb`](cloudkit/schema.ckdb), lacks. Any change that adds or renames a stored property on a model must update that file in the same pull request.
+The build check also runs `CloudKitSchemaTests` on an iOS Simulator. It fails when a SwiftData model has a field that the committed CloudKit schema, [`cloudkit/schema.ckdb`](cloudkit/schema.ckdb), lacks. Any change that adds a model, or adds or renames a stored property, must update that file in the same pull request. Removing a property needs no change, because CloudKit keeps deployed fields for good. The build specification's [CloudKit schema](docs/wiggleroom-build-spec.md#cloudkit-schema) section lists which changes need an update.
 
 ## TestFlight deployment
 

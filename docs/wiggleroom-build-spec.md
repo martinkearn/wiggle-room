@@ -380,6 +380,19 @@ Development-signed builds sync against the Development CloudKit schema. TestFlig
 
 `cloudkit/schema.ckdb` is the committed schema: every record type and field the app syncs, exported from Development. It is a superset of the models, because it keeps retired fields such as `CD_direction` that Production can never drop. Every process opens its store with the one model list in `WiggleRoomSchema`.
 
+When a model changes, the file needs updating only if CloudKit gains something:
+
+| Model change | Update `cloudkit/schema.ckdb` and deploy? |
+|---|---|
+| Add a stored property | Yes. |
+| Rename a stored property | Yes. CloudKit sees a new field; the old one stays in Production, unused. |
+| Add a model | Yes. It is a new record type. |
+| Remove a stored property | No. Production keeps the field for good, so the file keeps it too; the app simply stops writing it. |
+| Change a stored property's type | Avoid. A deployed field's type cannot change, so add a property under a new name instead, which is an addition. |
+| Computed properties, `@Transient` properties, logic or UI | No. None of them reach CloudKit. |
+
+The file is replaced by a fresh export, never edited by hand, except as a stand-in until the owner can export (see below).
+
 Two checks enforce the schema, each catching a different mistake:
 
 - **Model changed, schema file not updated.** `CloudKitSchemaTests` runs in the pull-request build check, with no secrets. For every model it expects `CD_entityName`, `CD_<name>` for each stored attribute and each to-one relationship, and `CD_<name>_ckAsset` for externally stored data (a to-many relationship has no field). It fails if any of these is missing from the committed file. It compares names only.
