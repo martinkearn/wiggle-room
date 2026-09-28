@@ -44,7 +44,7 @@ Tracker backups and transfers are available under **Settings → Export & Import
 
 Pull requests targeting `main` run a build check that compiles the app for iOS and macOS in the Release configuration, unsigned. It needs no repository secrets, so it also covers pull requests raised from forks and by coding agents. Merging a branch that does not compile is what this check exists to prevent, since the distribution workflows below only run after a merge has already landed.
 
-Every workflow selects the newest released Xcode on the runner and fails if it is older than Xcode 27, rather than building with the runner image's older default.
+Every workflow runs on GitHub's `xcode-27` runner image, currently a public preview, because the general `macos-latest` image stops at Xcode 26. Each job fails early if its Xcode is older than 27, rather than building against older SDKs.
 
 The build check also runs `CloudKitSchemaTests` on an iOS Simulator. It fails when a SwiftData model has a field that the committed CloudKit schema, [`cloudkit/schema.ckdb`](cloudkit/schema.ckdb), lacks. Any change that adds or renames a stored property on a model must update that file in the same pull request.
 

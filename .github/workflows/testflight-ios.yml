@@ -20,7 +20,9 @@ env:
 jobs:
   distribute:
     name: Archive and upload iOS
-    runs-on: macos-latest
+    # GitHub's Xcode 27 image (a public preview); macos-latest stops at
+    # Xcode 26. See .github/scripts/check-xcode.sh.
+    runs-on: xcode-27
     timeout-minutes: 60
 
     steps:
@@ -29,8 +31,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Select Xcode
-        run: .github/scripts/select-xcode.sh
+      - name: Check Xcode version
+        run: .github/scripts/check-xcode.sh
 
       - name: Check CloudKit Production schema
         env:

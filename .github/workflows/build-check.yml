@@ -27,7 +27,9 @@ env:
 jobs:
   build:
     name: Build ${{ matrix.platform }}
-    runs-on: macos-latest
+    # GitHub's Xcode 27 image (a public preview); macos-latest stops at
+    # Xcode 26. See .github/scripts/check-xcode.sh.
+    runs-on: xcode-27
     timeout-minutes: 45
 
     strategy:
@@ -45,8 +47,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Select Xcode
-        run: .github/scripts/select-xcode.sh
+      - name: Check Xcode version
+        run: .github/scripts/check-xcode.sh
 
       - name: Build ${{ matrix.platform }}
         run: |
@@ -63,15 +65,17 @@ jobs:
 
   cloudkit-schema:
     name: Check models against the committed CloudKit schema
-    runs-on: macos-latest
+    # GitHub's Xcode 27 image (a public preview); macos-latest stops at
+    # Xcode 26. See .github/scripts/check-xcode.sh.
+    runs-on: xcode-27
     timeout-minutes: 45
 
     steps:
       - name: Check out repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Select Xcode
-        run: .github/scripts/select-xcode.sh
+      - name: Check Xcode version
+        run: .github/scripts/check-xcode.sh
 
       - name: Pick an iOS Simulator
         run: |
