@@ -2,7 +2,7 @@
 
 Wiggle Room is a SwiftUI app for tracking a quantity against the pace needed to reach a target at the end of a fixed period. Every tracker is one of seven types — Spending Money, Spending Credit, Saving Money, Mileage, Weight loss, Rising Number, or Falling Number — chosen when it is created. The type sets the units, which way the number travels, which side of the pace line is the good side, and the wording used everywhere it appears.
 
-The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep a user's trackers and reading history in sync across their own devices.
+The app runs on iPhone and iPad with iOS 26.5 or later, Mac with macOS 26.5 or later, and Apple Watch with watchOS 26 or later. SwiftData and CloudKit keep a user's trackers and reading history in sync across their own devices.
 
 ## Features
 
@@ -17,7 +17,7 @@ The app runs on iPhone, iPad, Mac, and Apple Watch. SwiftData and CloudKit keep 
 
 ## Requirements
 
-- A current stable version of Xcode
+- Xcode 27 or later
 - An Apple ID configured in Xcode
 - Apple Developer Program membership for CloudKit on physical devices and TestFlight distribution
 - An optional Starling personal access token to use the Starling provider
@@ -43,6 +43,8 @@ Tracker backups and transfers are available under **Settings → Export & Import
 ## Continuous integration
 
 Pull requests targeting `main` run a build check that compiles the app for iOS and macOS in the Release configuration, unsigned. It needs no repository secrets, so it also covers pull requests raised from forks and by coding agents. Merging a branch that does not compile is what this check exists to prevent, since the distribution workflows below only run after a merge has already landed.
+
+Every workflow selects the newest released Xcode on the runner and fails if it is older than Xcode 27, rather than building with the runner image's older default.
 
 The build check also runs `CloudKitSchemaTests` on an iOS Simulator. It fails when a SwiftData model has a field that the committed CloudKit schema, [`cloudkit/schema.ckdb`](cloudkit/schema.ckdb), lacks. Any change that adds or renames a stored property on a model must update that file in the same pull request.
 

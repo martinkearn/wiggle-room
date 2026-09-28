@@ -21,6 +21,8 @@ The product is designed for one person's use across their own Apple devices. It 
 - App Groups for same-device access by apps and extensions
 - HealthKit on iOS and iPadOS only, via a per-SDK entitlements file (a macOS App ID cannot carry the HealthKit capability)
 
+The minimum systems are iOS and iPadOS 26.5, macOS 26.5 and watchOS 26.0. The app is built with Xcode 27 or later (the iOS 27 and macOS 27 SDKs), locally and in CI.
+
 visionOS and Mac Catalyst are not currently supported.
 
 ## 3. Tracker model
@@ -330,6 +332,7 @@ Where the answer is no, the tracker is a read-only view: it displays exactly as 
 
 - Single-tracker status and chart widgets
 - All-trackers widget
+- Small, medium, large and extra-large sizes. Extra-large is offered on iPad, and on iPhone and Mac from iOS and macOS 27; the system leaves it out of the widget gallery on earlier versions.
 - Configurable tracker selection through App Intents
 - Siri intents for opening trackers, checking status, and logging readings
 
@@ -398,7 +401,7 @@ Never test the gate by deploying a fake field to Production. To see it fail, add
 
 Before distribution:
 
-1. Build the active Xcode project successfully.
+1. Build the active Xcode project successfully with Xcode 27 or later.
 2. Run unit tests for tracker calculations, providers, request limits, and persistence actions.
 3. Verify an iOS archive and a macOS archive.
 4. Confirm embedded extensions use the parent's build number.

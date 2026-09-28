@@ -29,8 +29,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Show Xcode version
-        run: xcodebuild -version
+      - name: Select Xcode
+        run: .github/scripts/select-xcode.sh
 
       - name: Check CloudKit Production schema
         env:
