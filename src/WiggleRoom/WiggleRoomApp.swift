@@ -47,6 +47,8 @@ struct WiggleRoomApp: App {
             groupContainer: .identifier(AppGroup.identifier),
             cloudKitDatabase: .automatic
         )
+        // Before the container exists, so its setup event isn't missed.
+        CloudSyncDiagnostics.shared.startObservingSyncEvents()
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [cloudConfiguration])
             CloudSyncDiagnostics.shared.recordCloudKitStore()
@@ -61,6 +63,11 @@ struct WiggleRoomApp: App {
 
         let trackerStore = TrackerStore(modelContext: modelContainer.mainContext)
         _store = State(initialValue: trackerStore)
+        // Intents, Spotlight indexing and notification actions run in this
+        // process too, and must share this container rather than open a
+        // second CloudKit-mirrored one for the same store. Registered before
+        // anything below can reach `IntentDataStore`.
+        IntentDataStore.useAppStore(trackerStore, container: modelContainer)
         CloudSyncWidgetRefresher.start(modelContainer: modelContainer)
         NotificationActionHandler.shared.register()
         StarlingRequestLogger.configure(container: modelContainer)

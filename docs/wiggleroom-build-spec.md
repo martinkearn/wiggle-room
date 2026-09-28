@@ -183,6 +183,10 @@ Every process registers for remote (silent push) notifications so an already-run
 
 If the CloudKit-backed container cannot be created, the app records that state in its diagnostics and may fall back to local persistence rather than crash.
 
+A process opens exactly one CloudKit-mirrored container for the store. A second one in the same process fails CloudKit setup (Cocoa error 134422, "another instance of this persistent store actively syncing with CloudKit in this process") and competes with the first. Inside the app, App Intents, Spotlight indexing and notification actions therefore use the app's own container and `TrackerStore`, which the app registers with `IntentDataStore` as it launches. A process in which the app never ran opens its own. Widgets, the complication and the watch app each run in their own process with their own container.
+
+A container loading with CloudKit does not mean sync is working: the server can reject every upload while downloads still arrive, so each device drifts quietly away from the others. The CloudKit Sync screen therefore reports the last setup, download and upload event CloudKit has posted since the app launched (`NSPersistentCloudKitContainer.eventChangedNotification`, which SwiftData's mirroring posts too), with when it finished and, for a failure, why. For a partial failure the reason is the per-record errors, because that is where CloudKit names the actual problem, such as a field missing from the Production schema. A failed result stays on screen while CloudKit retries, until another result replaces it. The watch app has no diagnostics screen, so it does not record these events.
+
 Widget and complication configuration pickers read tracker names from a small snapshot cached in the App Group container, refreshed whenever any process fetches current tracker data, rather than always waiting on a fresh CloudKit round trip before showing a list.
 
 ### Live queries and view nesting
@@ -363,6 +367,14 @@ Signing, provisioning, CloudKit containers, App Groups, and bundle identifiers m
 
 A provisioning profile carries the capabilities its App ID had when the profile was generated, so a new entitlement means enabling the capability and regenerating the affected profiles. The iOS app's App ID needs HealthKit; macOS must not have it, since a macOS App ID cannot carry it. An unsigned build check cannot catch a mismatch here — only an archive can.
 
+### CloudKit schema
+
+Development-signed builds sync against the Development CloudKit schema. TestFlight and App Store builds sync against Production, which changes only when someone deploys to it.
+
+- A change that adds a SwiftData model, or adds or renames a stored property on one, needs **CloudKit Console → Deploy Schema Changes** (Development → Production) before its TestFlight build ships. Until then the server rejects every upload batch containing the new field, while downloads keep working.
+- The Development schema only gains a field once a development-signed build has uploaded a record containing it.
+- Fields deployed to Production cannot be removed.
+
 ## 11. Verification
 
 Before distribution:
@@ -371,10 +383,11 @@ Before distribution:
 2. Run unit tests for tracker calculations, providers, request limits, and persistence actions.
 3. Verify an iOS archive and a macOS archive.
 4. Confirm embedded extensions use the parent's build number.
-5. Test manual entry and Starling failure states without real credentials in source or fixtures.
-6. Test Apple Health with synthetic weight samples: a first connection, refused access (which must stay quiet rather than erroring), and a Mac or watch showing the read-only view.
-7. Test CloudKit sync using fictional tracker names and values.
-8. Confirm widgets and watch surfaces handle an empty or delayed local store.
+5. If a SwiftData model changed, deploy the CloudKit schema to Production (see CloudKit schema).
+6. Test manual entry and Starling failure states without real credentials in source or fixtures.
+7. Test Apple Health with synthetic weight samples: a first connection, refused access (which must stay quiet rather than erroring), and a Mac or watch showing the read-only view.
+8. Test CloudKit sync using fictional tracker names and values, and confirm the CloudKit Sync screen reports successful downloads and uploads.
+9. Confirm widgets and watch surfaces handle an empty or delayed local store.
 
 ## 12. Out of scope
 

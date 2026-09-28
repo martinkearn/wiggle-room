@@ -38,7 +38,7 @@ struct LogReadingIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let container = try IntentDataStore.makeContainer()
-        let store = TrackerStore(modelContext: container.mainContext)
+        let store = try IntentDataStore.store()
         let trackerId = tracker.id
         let descriptor = FetchDescriptor<Tracker>(predicate: #Predicate { $0.id == trackerId })
         guard let liveTracker = try container.mainContext.fetch(descriptor).first,
