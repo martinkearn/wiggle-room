@@ -70,21 +70,52 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Show Xcode version
-        run: xcodebuild -version
+      - name: Select the newest Xcode
+        run: |
+          # Unlike a build, a test run needs a Simulator the selected Xcode
+          # can run for the project's deployment target, so take the newest
+          # Xcode the runner image has rather than its default.
+          XCODE="$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)"
+          sudo xcode-select --switch "$XCODE"
+          xcodebuild -version
 
       - name: Pick an iOS Simulator
         run: |
-          # Whichever iPhone the runner image has on its newest iOS runtime,
-          # rather than a hard-coded name that disappears when the image
-          # moves on.
-          SIMULATOR_ID="$(xcrun simctl list devices available --json | python3 -c '
-          import json, sys
-          runtimes = json.load(sys.stdin)["devices"]
-          print(next(device["udid"]
-                     for runtime, devices in sorted(runtimes.items(), reverse=True) if ".iOS-" in runtime
-                     for device in devices if device["name"].startswith("iPhone")))
+          # If the runner's newest Xcode is still older than the project's
+          # iOS deployment target, no Simulator is eligible for it. The build
+          # jobs above only warn in that case, but a test run fails outright.
+          # This test only reads the model schema, so it runs at the newest
+          # iOS the runner's Xcode has instead.
+          SDK_VERSION="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          TARGET_VERSION="$(grep -o 'IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*' "$PROJECT_PATH/project.pbxproj" \
+            | awk '{ print $3 }' | sort -V | tail -n 1)"
+          if [[ "$(printf '%s\n' "$SDK_VERSION" "$TARGET_VERSION" | sort -V | head -n 1)" != "$TARGET_VERSION" ]]; then
+            echo "::warning title=CloudKit schema check::Xcode's newest iOS Simulator SDK is $SDK_VERSION, older than the project's deployment target $TARGET_VERSION. Running the test at iOS $SDK_VERSION."
+            echo "DEPLOYMENT_TARGET_OVERRIDE=IPHONEOS_DEPLOYMENT_TARGET=$SDK_VERSION" >> "$GITHUB_ENV"
+            OVERRIDE="IPHONEOS_DEPLOYMENT_TARGET=$SDK_VERSION"
+          fi
+
+          # Asks Xcode which Simulators it will accept for this scheme,
+          # rather than guessing from simctl, then takes the newest iPhone.
+          SIMULATOR_ID="$(xcodebuild -showdestinations \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            ${OVERRIDE:+"$OVERRIDE"} \
+            | python3 -c '
+          import re, sys
+          simulators = [
+              (tuple(int(part) for part in match["os"].split(".")), match["id"])
+              for match in re.finditer(
+                  r"platform:iOS Simulator, (?:arch:[^,]+, )?id:(?P<id>[0-9A-F-]{36}), OS:(?P<os>[0-9.]+), name:iPhone",
+                  sys.stdin.read(),
+              )
+          ]
+          print(max(simulators)[1] if simulators else "")
           ')"
+          if [[ -z "$SIMULATOR_ID" ]]; then
+            echo "::error title=CloudKit schema check::Xcode offers no iPhone Simulator for the $SCHEME scheme on this runner."
+            exit 1
+          fi
           echo "SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
 
       - name: Run CloudKitSchemaTests
@@ -97,4 +128,5 @@ jobs:
             -project "$PROJECT_PATH" \
             -scheme "$SCHEME" \
             -destination "id=$SIMULATOR_ID" \
-            -only-testing:WiggleRoomTests/CloudKitSchemaTests
+            -only-testing:WiggleRoomTests/CloudKitSchemaTests \
+            ${DEPLOYMENT_TARGET_OVERRIDE:+"$DEPLOYMENT_TARGET_OVERRIDE"}
