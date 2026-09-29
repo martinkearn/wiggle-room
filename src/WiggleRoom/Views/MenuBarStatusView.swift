@@ -65,11 +65,10 @@ struct MenuBarStatusView: View {
                             .truncationMode(.tail)
                     }
 
-                    // showsStatusLabel: false — the status word ("JUST OVER
-                    // BUDGET") is redundant here since it's repeated in the
-                    // rows directly below the ring, but the number itself
-                    // isn't shown anywhere else in this compact dropdown,
-                    // so it stays.
+                    // showsStatusLabel: false — this ring is too small for
+                    // the status wording and the figure together, so the ring
+                    // shows the bare figure and the wording sits on its own
+                    // line below it.
                     RingsView(tracker: tracker, now: PaceClock.shared.now, lineWidth: 14, showsStatusLabel: false)
                         .frame(width: 132, height: 132)
                         .padding(8)
@@ -79,6 +78,12 @@ struct MenuBarStatusView: View {
                                 center: .center, startRadius: 20, endRadius: 100
                             ))
                         )
+                    if tracker.latestReading != nil {
+                        Text("\(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))")
+                            .font(.wiggleText(.subheadline, weight: .semibold))
+                            .foregroundStyle(pace.status.color)
+                            .multilineTextAlignment(.center)
+                    }
                     VStack(spacing: 6) {
                         HStack {
                             Text(tracker.terminology.currentFigure)

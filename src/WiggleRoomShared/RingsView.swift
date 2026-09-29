@@ -42,8 +42,9 @@ struct RingsView: View {
     /// (`centerAmountText`) always shows whenever `showsCenterContent` is
     /// true — this only controls the label. `false` where the ring is too
     /// compact for the words (the macOS menu bar dropdown, the watch detail
-    /// screen); the number is then led by its status icon instead, so ahead
-    /// or behind still reads without relying on colour.
+    /// screen). The ring then shows the bare number, with no status icon,
+    /// which would squeeze the figure into truncation at that size; those
+    /// screens put the status wording on a line below the ring instead.
     var showsStatusLabel: Bool = true
 
     /// Widgets render from a static `TimelineEntry` snapshot rather than a
@@ -379,18 +380,12 @@ struct RingsView: View {
                         .crossFadingForeground(statusColor, isEnabled: isAnimated)
                         .paceStatusBeat(status, isEnabled: isAnimated)
                 }
-                Group {
-                    if showsStatusLabel {
-                        Text(centerAmountText)
-                    } else {
-                        pace.iconDifference(for: tracker)
-                    }
-                }
-                .font(.wiggleNumber(size: 32, weight: .bold))
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-                .crossFadingForeground(statusColor, isEnabled: isAnimated)
-                .rollingFigure(pace.displayedDifference, text: centerAmountText, isEnabled: isAnimated)
+                Text(centerAmountText)
+                    .font(.wiggleNumber(size: 32, weight: .bold))
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .crossFadingForeground(statusColor, isEnabled: isAnimated)
+                    .rollingFigure(pace.displayedDifference, text: centerAmountText, isEnabled: isAnimated)
             }
         } else {
             Text("No data yet")

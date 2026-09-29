@@ -154,6 +154,15 @@ struct WatchTrackerDetailView: View {
                                 center: .center, startRadius: 10, endRadius: 90
                             ))
                         )
+                    // The ring is too small for the status wording, so it
+                    // sits here instead. A completed tracker's final card
+                    // already carries it.
+                    if tracker.latestReading != nil, !tracker.isCompleted(asOf: now) {
+                        Text("\(pace.statusLine(for: tracker)) \(pace.displayDifference(for: tracker))")
+                            .font(.wiggleText(.footnote, weight: .semibold))
+                            .foregroundStyle(pace.status.color)
+                            .multilineTextAlignment(.center)
+                    }
 
                     figureCards
 
