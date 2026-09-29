@@ -42,7 +42,7 @@ A `Tracker` represents one allowance over a date range.
 | `sourceTargetId` | Provider-specific account or target identifier |
 | `sortOrder` | Synced custom ordering |
 | `colorIndex`, `glyph` | Visual identity |
-| `isZoomed` | Whether the rings and chart are zoomed to five days (see Zoom) |
+| `chartZoomRawValue` | How closely the trend chart is zoomed: whole period, month or week (see Zoom) |
 | `reminderCadenceMinutes` | Optional manual-entry reminder |
 
 ### Tracker types
@@ -227,24 +227,25 @@ The palette is audited against the status colours whenever either changes. Only 
 
 ### Zoom
 
-A tracker whose period is longer than five days can be zoomed. Zoom magnifies the rings and chart like a pinch-zoom on a static image. It never changes stored data, the centre figure, the status colour, or the figure cards, which all stay whole-period.
+Zoom applies to the trend chart only. It never changes stored data, the rings, the centre figure, the status colour, or the figure cards, which all stay whole-period.
 
-- **Window.** Five local calendar days: two days before today, today, and two days after. The window slides, keeping its length, so it never extends outside the tracking period, and it moves forward at local midnight.
-- **Eligibility.** A completed tracker, or one whose period is five days or fewer, renders unzoomed. Its stored `isZoomed` flag is kept but ignored.
-- **Rings.** Each ring shows only the part of its whole-period ring that falls inside the window, stretched to fill the circle. The outer ring is the share of the window elapsed. The inner ring maps the pace line's expected consumption at the window's start and end onto empty and full, so a tracker on pace has both rings level. A value outside that slice pins the inner ring at empty or full, and a chevron marks it where the ring is wide enough.
-- **Chart.** The x-axis covers the window with daily ticks. The y-axis is fitted to the pace line, the readings and the carried-forward "now" point inside the window. Lines crossing the window's edges are interpolated to the edge before reaching Swift Charts.
-- **State.** `isZoomed` syncs with the tracker and is included in exports. Archives without it import as not zoomed.
+- **Levels.** The whole period (the default), a month, or a week. Month is offered when the period is two calendar months or longer; week when it is longer than seven days.
+- **Window.** Whole local calendar days centred on today: fifteen days either side for a month, three for a week. The window is never slid to stay inside the tracking period, so today is always the centre; near either end the chart has empty space on that side and the pace line stops at the period's edge. The window moves forward at local midnight.
+- **Eligibility.** Zoom applies only while the tracker is in progress. Before the period starts, after it ends, or when the stored level is not offered for the period (for example after the dates are edited), the chart shows the whole period. The stored level is kept but ignored.
+- **Controls.** A caption and − and + magnifier buttons sit directly above the chart on the iOS, iPadOS, macOS and watchOS detail screens. The caption reads "Whole period" or the days the window covers. The buttons step through the offered levels and are disabled at either end. The controls are hidden when only the whole period is offered.
+- **Chart.** The x-axis is pinned to the window, with ticks placed around today: every day for a week, every seven days for a month. The y-axis is fitted to the pace line, the readings and the carried-forward "now" point inside the window. Lines crossing the window's edges are interpolated to the edge before reaching Swift Charts.
+- **Widgets.** The chart widget follows the tracker's zoom, reloads at local midnight while zoomed, and marks a zoomed chart with a small magnifier beside the name in medium and larger sizes.
+- **State.** `chartZoomRawValue` syncs with the tracker and is included in exports as `chartZoom`. Archives without it import as the whole period. It replaces the retired `isZoomed` flag, which also zoomed the rings; that flag is ignored in both the store and older archives.
 
 The app's rings, cards, and chart strokes use a deliberately irregular, hand-drawn style. Accessibility labels must communicate the same information without relying on colour or geometry alone.
 
 ### Ring motion
 
-The rings say *why* they moved. Each change has one of three causes, each cause has its own animation, and only one plays at a time. `RingMotion.reason` decides which from the old and new state: the two fractions, the latest reading's id, and the zoom flag.
+The rings say *why* they moved. Each change has one of three causes, each cause has its own animation, and only one plays at a time. `RingMotion.reason` decides which from the old and new state: the two fractions and the latest reading's id.
 
 - **Arrival: the tracker was opened.** Both rings grow from empty with an overshoot spring, the inner ring 40–90ms behind the outer. It is deferred 0.05s past the system's own launch or push transaction, which would otherwise swallow it. A change landing before the arrival settles redirects it rather than playing a second animation, so a connected tracker's on-open refresh grows the rings straight to the refreshed figure.
 - **Update: a new latest reading.** Both rings drain to empty and refill. Keyed on the reading's identity, not its value, so re-logging the same figure still registers.
 - **Drift: the target moved, the reading did not.** Never from empty. Each ring that moved dips to 94% of where it was drawn and springs to its new value, while its outline's `wobble` swells to 0.6 and settles over about 0.6s. Drift plays only once a ring has moved at least 0.0025 of a turn since it was last drawn, so the 30-second clock leaves slow trackers' rows still. Each surface waits a random 0–400ms before drifting, so a list never wobbles in unison.
-- **Zoom** slides both rings straight to their new fills.
 
 Every scheduled step carries a token, so a newer change never leaves an older refill or drift return queued behind it. The arrival, refill and drift springs vary by up to ±10% per play. A full ring's closing overlap is latched on its target fraction, so it holds through a drift's dip. An update's drain still removes it.
 
@@ -279,7 +280,7 @@ The period's date range and, for a connected tracker, its connection and account
 
 On iOS and iPadOS a list row is the tracker's own dashboard in miniature, in two bands sharing one leading gutter:
 
-- **Identity.** The badge, the tracker's name across the full width of the card, the zoom marker, and one caption line giving how much of the period is left and the date it ends on. The name wraps to a second line rather than truncating: it is the one thing on the row the user chose themselves.
+- **Identity.** The badge, the tracker's name across the full width of the card, and one caption line giving how much of the period is left and the date it ends on. The name wraps to a second line rather than truncating: it is the one thing on the row the user chose themselves.
 - **Data.** The rings, then the status wording with the ahead/behind figure in the status colour, then the current figure and the current pace figure side by side, each named with the type's own noun.
 
 The row shows both of the figures the ahead/behind figure is the difference between, because a difference alone cannot say whether a tracker is nearly finished or barely started. Wording and figures come from the same `TrackerPace` and terminology table the dashboard uses, so the row and the screen it opens can never disagree.
@@ -295,7 +296,7 @@ macOS keeps its own compact sidebar row, which is a navigation list rather than 
 ### iOS and iPadOS
 
 - Tracker list and detail navigation
-- A toolbar zoom toggle on eligible trackers' detail screens, with the zoomed date range shown under the rings; list rows, the menu bar, and medium and larger widgets mark zoomed trackers with a small magnifier
+- Chart zoom controls directly above the detail screen's trend chart (see Zoom)
 - Pull-to-refresh/update behavior
 - Add and edit trackers and connected sources, reached from a `+` in the tracker list's top-right toolbar; the empty state keeps its own prominent button, since there is no list for a `+` to sit above yet
 - Settings for General app preferences, sources, ordering, CloudKit diagnostics, Siri phrases, and an About screen reporting the running version, build number and source commit, with a separate Danger Zone menu for reset operations
@@ -324,7 +325,7 @@ Where the answer is no, the tracker is a read-only view: it displays exactly as 
 
 ### watchOS
 
-- Tracker list and compact detail presentation, including the zoom toggle
+- Tracker list and compact detail presentation, including the chart zoom controls
 - Manual reading entry
 - WidgetKit complication
 

@@ -33,6 +33,7 @@ DEFINE SCHEMA
     );
 
     RECORD TYPE CD_Tracker (
+        CD_chartZoomRawValue       STRING QUERYABLE SEARCHABLE SORTABLE,
         CD_colorIndex              INT64 QUERYABLE SORTABLE,
         CD_connectedSource         STRING QUERYABLE SEARCHABLE SORTABLE,
         CD_direction               BYTES,

@@ -19,8 +19,6 @@ nonisolated enum RingMotion: Equatable {
     /// The target moved but the reading did not: a small dip and wobble on
     /// whichever rings visibly moved.
     case drift(outer: Bool, inner: Bool)
-    /// The zoom was toggled: slide straight to the new fills.
-    case morph
     /// Nothing moved far enough to see. The drawn arc stays where it is.
     case settle
 
@@ -31,7 +29,6 @@ nonisolated enum RingMotion: Equatable {
         var outer: Double
         var inner: Double
         var readingID: UUID?
-        var isZoomed: Bool
     }
 
     /// Below this change in either fraction the arc does not visibly move,
@@ -45,7 +42,6 @@ nonisolated enum RingMotion: Equatable {
     /// until the arrival animation has finished.
     static func reason(from old: Key, to new: Key, hasArrived: Bool) -> RingMotion {
         guard hasArrived else { return .arrival }
-        if old.isZoomed != new.isZoomed { return .morph }
         if old.readingID != new.readingID { return .update }
         let outer = abs(new.outer - old.outer) >= minimumDriftDelta
         let inner = abs(new.inner - old.inner) >= minimumDriftDelta
@@ -77,8 +73,6 @@ extension RingMotion {
     static let driftWobbleSettle = Animation.easeInOut(duration: 0.45)
     /// Per surface and per play, so a list of rows never wobbles in unison.
     static let driftStagger: ClosedRange<Double> = 0...0.4
-
-    static let morphAnimation = Animation.spring(response: 0.6, dampingFraction: 0.85)
 
     /// While a refresh the user asked for is in flight, both outlines swing
     /// out to this wobble and back, 0.9s each way, in place of the system

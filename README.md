@@ -9,7 +9,7 @@ The app runs on iPhone and iPad with iOS 26.5 or later, Mac with macOS 26.5 or l
 - Seven tracker types: Spending Money, Spending Credit, Saving Money, Mileage, Weight loss, and plain Rising and Falling Numbers
 - Manual readings, optional Starling Bank balance integration, and Apple Health weight readings on iPhone and iPad
 - Pace, target, and projected-final calculations, with a traffic-light status that knows whether higher or lower is better
-- Reading history and trend charts, with a five-day zoom for long trackers
+- Reading history and trend charts, with month and week zoom centred on today
 - iOS and macOS apps, Apple Watch companion app, widgets, complications, Live Activities, Siri Shortcuts, and Spotlight integration
 - Cross-device sync through the user's private CloudKit database
 - Per-tracker colours, symbols, reminders, and custom ordering

@@ -116,14 +116,7 @@ struct RingsView: View {
     /// Everything that moves the rings, in one value so a single `onChange`
     /// sees every change and `RingMotion.reason` can say which kind it was.
     private var motionKey: RingMotion.Key {
-        RingMotion.Key(outer: paceFraction, inner: actualFraction,
-                       readingID: tracker.latestReading?.id, isZoomed: zoomWindow != nil)
-    }
-
-    /// The window the rings are magnified to, or `nil` for the whole period
-    /// (see `TrackerZoom`). The centre content always stays whole-period.
-    private var zoomWindow: DateInterval? {
-        tracker.zoomWindow(asOf: now)
+        RingMotion.Key(outer: paceFraction, inner: actualFraction, readingID: tracker.latestReading?.id)
     }
 
     private var fractions: RingFractions {
@@ -190,7 +183,6 @@ struct RingsView: View {
                          wobble: outerWobble + refreshWobble, color: WiggleRoomColors.paceRing)
                     ring(.inner, fraction: isAnimated ? drawnInner : actualFraction, target: actualFraction,
                          wobble: innerWobble + refreshWobble, color: statusColor)
-                        .overlay { overflowMarker }
                         .padding(ringGap)
 
                     if showsCenterContent {
@@ -205,7 +197,6 @@ struct RingsView: View {
             }
             .aspectRatio(1, contentMode: .fit)
         }
-        .modifier(ZoomAccessibility(description: zoomAccessibilityDescription))
         .onAppear {
             // Once per view: a row scrolled back into view, or a screen
             // navigated back to, keeps its rings as they are.
@@ -249,7 +240,6 @@ struct RingsView: View {
             case .arrival: arrive(at: key, retargeting: true)
             case .update: update(to: key)
             case let .drift(outer, inner): drift(from: drawnKey, to: key, outer: outer, inner: inner)
-            case .morph: morph(to: key)
             case .settle: break
             }
         }
@@ -288,20 +278,6 @@ struct RingsView: View {
         }
     }
 
-    /// Zooming in or out slides both rings straight to their new fills —
-    /// the same data seen closer or further away, not new data, so it
-    /// deliberately doesn't drain and refill.
-    private func morph(to key: RingMotion.Key) {
-        motionToken = UUID()
-        drawnKey = key
-        withAnimation(RingMotion.morphAnimation) {
-            drawnOuterState = key.outer
-            drawnInnerState = key.inner
-            outerWobble = 0
-            innerWobble = 0
-        }
-    }
-
     /// Reduce Motion: straight to the value, with nothing in between.
     private func snap(to key: RingMotion.Key) {
         motionToken = UUID()
@@ -311,40 +287,6 @@ struct RingsView: View {
             drawnInnerState = key.inner
             outerWobble = 0
             innerWobble = 0
-        }
-    }
-
-    /// Spoken with the rings when zoomed, so VoiceOver users know the rings
-    /// show a magnified window rather than the whole period.
-    private var zoomAccessibilityDescription: String? {
-        guard let zoomWindow else { return nil }
-        var text = "Zoomed to \(Tracker.zoomRangeText(zoomWindow))"
-        if fractions.overflow != nil {
-            text += ", \(tracker.terminology.currentFigure.lowercased()) is beyond the zoomed range"
-        }
-        return text
-    }
-
-    /// A small chevron at the inner ring's starting point when the tracker
-    /// is so far off pace that its value lies outside the zoomed window's
-    /// slice: pointing back (anticlockwise) when the ring is pinned empty,
-    /// onward (clockwise) when pinned full. Too small to read on the
-    /// thinnest rings, so those just show the pinned ring.
-    @ViewBuilder
-    private var overflowMarker: some View {
-        if let overflow = fractions.overflow, lineWidth >= 8 {
-            GeometryReader { geometry in
-                let rect = CGRect(origin: .zero, size: geometry.size)
-                let start = IconRingShape(ring: .inner, fitsRect: true)
-                    .path(in: rect)
-                    .trimmedPath(from: 0, to: 0.0001)
-                    .boundingRect.origin
-                Image(systemName: overflow == .beyondFull ? "chevron.right" : "chevron.left")
-                    .font(.system(size: lineWidth * 0.7, weight: .black))
-                    .crossFadingForeground(overflow == .beyondFull ? Color.white : statusColor, isEnabled: isAnimated)
-                    .position(start)
-            }
-            .accessibilityHidden(true)
         }
     }
 
@@ -532,27 +474,4 @@ struct RingsView: View {
     RingsView(tracker: SharedPreviewData.makeSampleTracker(), now: .now)
         .frame(width: 260, height: 260)
         .padding()
-}
-
-/// Adds a zoom description to a view's accessibility value only when there
-/// is one, leaving unzoomed views exactly as they were.
-/// `combinesChildren: false` keeps a container's own children (a chart's
-/// data points) navigable and adds the description as its label instead.
-struct ZoomAccessibility: ViewModifier {
-    let description: String?
-    var combinesChildren = true
-
-    func body(content: Content) -> some View {
-        if let description {
-            if combinesChildren {
-                content
-                    .accessibilityElement(children: .combine)
-                    .accessibilityValue(description)
-            } else {
-                content.accessibilityLabel(description)
-            }
-        } else {
-            content
-        }
-    }
 }

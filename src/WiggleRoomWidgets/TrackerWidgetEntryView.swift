@@ -130,7 +130,6 @@ struct TrackerWidgetEntryView: View {
                         .font(WiggleRoomFont.headline(16, weight: 650))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    ZoomIndicator(tracker: tracker, now: entry.date)
                     if tracker.isCompleted(asOf: entry.date) {
                         CompletedBadge()
                     }
@@ -171,7 +170,6 @@ struct TrackerWidgetEntryView: View {
                     .font(WiggleRoomFont.headline(20, weight: 650))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                ZoomIndicator(tracker: tracker, now: entry.date, size: 13)
                 if tracker.isCompleted(asOf: entry.date) {
                     CompletedBadge()
                 }
@@ -256,7 +254,6 @@ struct TrackerWidgetEntryView: View {
                     .font(WiggleRoomFont.headline(24, weight: 650))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                ZoomIndicator(tracker: tracker, now: entry.date, size: 15)
                 if isCompleted {
                     CompletedBadge()
                 }

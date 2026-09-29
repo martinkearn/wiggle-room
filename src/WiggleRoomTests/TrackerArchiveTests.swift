@@ -39,7 +39,7 @@ final class TrackerArchiveTests: XCTestCase {
         tracker.sortOrder = 3
         tracker.colorIndex = 4
         tracker.glyph = "airplane"
-        tracker.isZoomed = true
+        tracker.chartZoom = .month
         store.addTracker(tracker)
         let reading = ValueSnapshot(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000201")!,
@@ -74,7 +74,7 @@ final class TrackerArchiveTests: XCTestCase {
         XCTAssertEqual(archived.sortOrder, 3)
         XCTAssertEqual(archived.colorIndex, 4)
         XCTAssertEqual(archived.glyph, "airplane")
-        XCTAssertEqual(archived.isZoomed, true)
+        XCTAssertEqual(archived.chartZoom, "month")
         XCTAssertEqual(archived.readings.first?.id, reading.id)
         XCTAssertEqual(archived.readings.first?.value, "987.65")
         XCTAssertEqual(archived.readings.first?.date, reading.date)
@@ -166,11 +166,11 @@ final class TrackerArchiveTests: XCTestCase {
         XCTAssertEqual(imported.sourceTargetId, "synthetic-account")
     }
 
-    func testImportRestoresZoomAndTreatsMissingZoomAsNotZoomed() throws {
+    func testImportRestoresChartZoomAndTreatsMissingZoomAsWholePeriod() throws {
         let sourceContainer = makeInMemoryModelContainer()
         let sourceStore = TrackerStore(modelContext: sourceContainer.mainContext)
         let zoomed = makeTracker(name: "Zoomed Example", source: sourceStore.manualEntrySource)
-        zoomed.isZoomed = true
+        zoomed.chartZoom = .week
         sourceStore.addTracker(zoomed)
         let archive = TrackerArchiveService.makeArchive(trackers: [zoomed])
 
@@ -184,18 +184,20 @@ final class TrackerArchiveTests: XCTestCase {
             modelContext: destinationContext
         )
         let imported = try XCTUnwrap(destinationContext.fetch(FetchDescriptor<Tracker>()).first)
-        XCTAssertTrue(imported.isZoomed)
+        XCTAssertEqual(imported.chartZoom, .week)
 
-        // An archive written before zoom existed has no `isZoomed` key.
+        // An archive written before chart zoom existed has no `chartZoom`
+        // key, and may still carry the retired `isZoomed` flag.
         let encoded = try TrackerArchiveService.encode(archive)
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         var trackers = try XCTUnwrap(json["trackers"] as? [[String: Any]])
-        trackers[0]["isZoomed"] = nil
+        trackers[0]["chartZoom"] = nil
+        trackers[0]["isZoomed"] = true
         trackers[0]["name"] = "Legacy Example"
         trackers[0]["id"] = "00000000-0000-0000-0000-000000000401"
         json["trackers"] = trackers
         let legacy = try TrackerArchiveService.decode(JSONSerialization.data(withJSONObject: json))
-        XCTAssertNil(legacy.trackers.first?.isZoomed)
+        XCTAssertNil(legacy.trackers.first?.chartZoom)
 
         let legacyContainer = makeInMemoryModelContainer()
         let legacyContext = legacyContainer.mainContext
@@ -206,7 +208,7 @@ final class TrackerArchiveTests: XCTestCase {
             modelContext: legacyContext
         )
         let importedLegacy = try XCTUnwrap(legacyContext.fetch(FetchDescriptor<Tracker>()).first)
-        XCTAssertFalse(importedLegacy.isZoomed)
+        XCTAssertEqual(importedLegacy.chartZoom, .full)
     }
 
     private func makeTracker(name: String, source: ConnectedSource) -> Tracker {
