@@ -37,15 +37,13 @@ struct RingsView: View {
     var lineWidth: CGFloat = 20
     var showsCenterContent: Bool = true
 
-    /// Whether the center content's status-word line ("JUST OVER BUDGET")
-    /// and its "difference from budget" caption are shown alongside the
-    /// number. The number itself (`centerAmountText`) always shows
-    /// whenever `showsCenterContent` is true — this only controls the
-    /// surrounding label text. `false` for the macOS menu bar dropdown
-    /// (`MenuBarStatusView`), where the same status word and figure
-    /// already appear in the rows directly below the ring, so repeating
-    /// the word specifically (not the number, which isn't repeated
-    /// elsewhere in that compact context) would be pure duplication.
+    /// Whether the center content's status-word line ("JUST OVER BUDGET
+    /// BY") is shown above the number. The number itself
+    /// (`centerAmountText`) always shows whenever `showsCenterContent` is
+    /// true — this only controls the label. `false` where the ring is too
+    /// compact for the words (the macOS menu bar dropdown, the watch detail
+    /// screen); the number is then led by its status icon instead, so ahead
+    /// or behind still reads without relying on colour.
     var showsStatusLabel: Bool = true
 
     /// Widgets render from a static `TimelineEntry` snapshot rather than a
@@ -381,17 +379,18 @@ struct RingsView: View {
                         .crossFadingForeground(statusColor, isEnabled: isAnimated)
                         .paceStatusBeat(status, isEnabled: isAnimated)
                 }
-                Text(centerAmountText)
-                    .font(.wiggleNumber(size: 32, weight: .bold))
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                    .crossFadingForeground(statusColor, isEnabled: isAnimated)
-                    .rollingFigure(pace.displayedDifference, text: centerAmountText, isEnabled: isAnimated)
-                if showsStatusLabel && status == .warning {
-                    Text(tracker.terminology.differenceCaption)
-                        .font(.wiggleText(.caption2))
-                        .foregroundStyle(.secondary)
+                Group {
+                    if showsStatusLabel {
+                        Text(centerAmountText)
+                    } else {
+                        pace.iconDifference(for: tracker)
+                    }
                 }
+                .font(.wiggleNumber(size: 32, weight: .bold))
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .crossFadingForeground(statusColor, isEnabled: isAnimated)
+                .rollingFigure(pace.displayedDifference, text: centerAmountText, isEnabled: isAnimated)
             }
         } else {
             Text("No data yet")

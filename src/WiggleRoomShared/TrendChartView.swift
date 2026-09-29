@@ -180,7 +180,7 @@ struct TrendChartView: View {
         let low = values.min() ?? 0
         let high = values.max() ?? 0
         let padding = high > low ? (high - low) * 0.1 : 1
-        return (low - padding)...(high + padding)
+        return Tracker.paddedLowerBound(low, padding: padding)...(high + padding)
     }
 
     /// The trend line's anchor points. Rather than a single straight line
@@ -442,9 +442,21 @@ struct TrendChartView: View {
         }
         .chartYAxis {
             if showsAxes {
-                AxisMarks(position: .leading) { _ in
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, lineCap: .round, dash: [2, 4]))
-                    AxisValueLabel()
+                // No figure in the app carries a minus sign, and Swift Charts
+                // would print one on any gridline below zero. Those gridlines
+                // stay but go unlabelled; when the chart does reach below
+                // zero, the zero line is drawn solid so the crossing reads.
+                // The figure cards give the exact amount in words.
+                AxisMarks(position: .leading) { value in
+                    let number = value.as(Double.self)
+                        ?? value.as(Decimal.self).map { NSDecimalNumber(decimal: $0).doubleValue }
+                        ?? 0
+                    AxisGridLine(stroke: number == 0 && yDomain.lowerBound < 0
+                                 ? StrokeStyle(lineWidth: 1, lineCap: .round)
+                                 : StrokeStyle(lineWidth: 0.5, lineCap: .round, dash: [2, 4]))
+                    if number >= 0 {
+                        AxisValueLabel()
+                    }
                 }
             }
         }

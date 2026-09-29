@@ -69,7 +69,7 @@ struct TrackerChartEntryView: View {
                     Text(tracker.name)
                         .font(WiggleRoomFont.headline(13, weight: 650))
                         .minimumScaleFactor(0.6)
-                    Text(pace(tracker).displayDifference(for: tracker))
+                    pace(tracker).iconDifference(for: tracker)
                         .font(.wiggleNumber(.caption, weight: .bold))
                 }
                 .lineLimit(1)
@@ -104,6 +104,12 @@ struct TrackerChartEntryView: View {
         }
     }
 
+    /// Whether this size shows the status wording ("Just Over Budget by")
+    /// under the header — only the large and extra-large sizes have room.
+    private var showsStatusLine: Bool {
+        family != .systemSmall && family != .systemMedium
+    }
+
     private func header(_ tracker: Tracker, nameSize: CGFloat, figure: Font.TextStyle) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(tracker.name)
@@ -115,11 +121,19 @@ struct TrackerChartEntryView: View {
             }
             if tracker.isCompleted(asOf: entry.date) { CompletedBadge() }
             Spacer(minLength: 4)
-            Text(pace(tracker).displayDifference(for: tracker))
-                .font(.wiggleNumber(figure, weight: .bold))
-                .foregroundStyle(pace(tracker).status.color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
+            // The large sizes show the status wording under this header, so
+            // only the smaller ones need the icon to say ahead or behind.
+            Group {
+                if showsStatusLine {
+                    Text(pace(tracker).displayDifference(for: tracker))
+                } else {
+                    pace(tracker).iconDifference(for: tracker)
+                }
+            }
+            .font(.wiggleNumber(figure, weight: .bold))
+            .foregroundStyle(pace(tracker).status.color)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
         }
     }
 }

@@ -227,37 +227,41 @@ extension Tracker {
     /// Formats a value in this tracker's unit, placing a currency symbol on
     /// the left with no space ("£1,234.56"), any other symbol on the right
     /// with a space ("8,400 mi"), and nothing at all for a unitless
-    /// plain-number tracker ("8,400"). `signed` prefixes a "+" for non-negative
-    /// values (negative values always show their own "-"). A whole value
-    /// drops its decimals entirely ("£684", "85 kg"); anything with a
-    /// fractional part shows exactly the unit's own precision ("£692.40",
-    /// "84.6 kg") — and for a zero-precision unit that means no decimals at
-    /// all, since a fraction of a mile isn't a meaningful reading.
-    func formattedValue(_ value: Decimal, signed: Bool = false) -> String {
-        Tracker.formattedValue(value, unit: trackerUnit, signed: signed)
+    /// plain-number tracker ("8,400"). A whole value drops its decimals
+    /// entirely ("£684", "85 kg"); anything with a fractional part shows
+    /// exactly the unit's own precision ("£692.40", "84.6 kg") — and for a
+    /// zero-precision unit that means no decimals at all, since a fraction of
+    /// a mile isn't a meaningful reading.
+    ///
+    /// No figure ever carries a sign. A value below zero shows its magnitude
+    /// followed by the type's own word for it ("£20 overdrawn", "£20 in
+    /// credit", "20 below zero"), because a minus sign reads differently
+    /// depending on which way a tracker runs.
+    func formattedValue(_ value: Decimal) -> String {
+        Tracker.formattedValue(value, unit: trackerUnit, type: trackerType)
     }
 
-    /// Unit-only version of `formattedValue(_:signed:)`, usable before a
+    /// Unit-and-type version of `formattedValue(_:)`, usable before a
     /// `Tracker` exists yet — e.g. while a user is still filling in the "New
     /// Tracker" form.
-    static func formattedValue(_ value: Decimal, unit: TrackerUnit, signed: Bool = false) -> String {
+    static func formattedValue(_ value: Decimal, unit: TrackerUnit, type: TrackerType) -> String {
         let absoluteValue = abs(value)
         let isWhole = (absoluteValue as NSDecimalNumber).doubleValue.truncatingRemainder(dividingBy: 1) == 0
         let fractionLength = isWhole ? 0 : unit.precision
         let magnitude = absoluteValue.formatted(.number.precision(.fractionLength(fractionLength)))
-        let sign: String
-        if value < 0 {
-            sign = "-"
-        } else if signed {
-            sign = "+"
-        } else {
-            sign = ""
-        }
+        let figure: String
         switch unit.placement {
-        case .prefix: return "\(sign)\(unit.symbol)\(magnitude)"
-        case .suffix: return "\(sign)\(magnitude) \(unit.symbol)"
-        case .bare: return "\(sign)\(magnitude)"
+        case .prefix: figure = "\(unit.symbol)\(magnitude)"
+        case .suffix: figure = "\(magnitude) \(unit.symbol)"
+        case .bare: figure = magnitude
         }
+        // A value that rounds to zero at the unit's precision is shown as
+        // zero, not as "£0 overdrawn".
+        var input = absoluteValue
+        var displayed = Decimal()
+        NSDecimalRound(&displayed, &input, unit.precision, .plain)
+        guard value < 0, displayed != 0 else { return figure }
+        return "\(figure) \(type.terminology.belowZero)"
     }
 }
 

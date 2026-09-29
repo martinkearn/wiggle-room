@@ -104,7 +104,7 @@ struct AllTrackersEntryView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                         Spacer(minLength: 4)
-                        Text(pace(tracker).displayDifference(for: tracker))
+                        pace(tracker).iconDifference(for: tracker)
                             .font(.wiggleNumber(.caption, weight: .bold))
                     }
                 }
@@ -162,7 +162,7 @@ struct AllTrackersEntryView: View {
                     .minimumScaleFactor(0.7)
                     .foregroundStyle(.primary)
             }
-            Text(p.displayDifference(for: tracker))
+            p.iconDifference(for: tracker)
                 .font(.wiggleNumber(.caption2, weight: .bold))
                 .foregroundStyle(p.status.color)
                 .lineLimit(1)

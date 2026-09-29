@@ -55,13 +55,24 @@ extension Tracker {
     /// outside the scale of everything else on screen — this keeps both the
     /// chart and the card from ever stating that number as if it were
     /// trustworthy on its own.
+    ///
+    /// The padding never takes the range below zero unless a value is
+    /// already there. A tracker that starts or ends at zero (a credit card
+    /// from £0, a budget spent down to £0) would otherwise get an axis — and
+    /// a projection — below zero that none of its figures ever reach.
     var plausibleTrendRange: ClosedRange<Decimal> {
         var values = [startingValue, projectedFinalValue]
         values += sortedReadings.map(\.value)
         let low = values.min() ?? 0
         let high = values.max() ?? 0
         let padding = max((high - low) * 0.1, 1)
-        return (low - padding)...(high + padding)
+        return Self.paddedLowerBound(low, padding: padding)...(high + padding)
+    }
+
+    /// `low - padding`, stopped at zero when `low` itself is zero or above.
+    /// Shared by `plausibleTrendRange` and the zoomed chart's own Y range.
+    static func paddedLowerBound<Value: Comparable & SignedNumeric>(_ low: Value, padding: Value) -> Value {
+        low >= 0 ? max(low - padding, 0) : low - padding
     }
 
     /// Where the trend line (§3.5) projects this tracker's value to land by

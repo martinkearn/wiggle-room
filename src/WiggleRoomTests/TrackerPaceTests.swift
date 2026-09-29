@@ -313,8 +313,8 @@ final class TrackerPaceTests: XCTestCase {
         // someone who is exactly on pace.
         let pace = tracker.pace(actualValue: 91, asOf: halfway)
         XCTAssertEqual(pace.status, .warning)
-        XCTAssertEqual(pace.statusLine(for: tracker), "Slightly Behind Target")
-        XCTAssertEqual(pace.displayDifference(for: tracker), "+1 kg", "amber shows the signed distance from today's target")
+        XCTAssertEqual(pace.statusLine(for: tracker), "Slightly Behind Target by")
+        XCTAssertEqual(pace.displayDifference(for: tracker), "1 kg", "amber shows the same unsigned distance as green and red")
     }
 
     func testStatus_weightBeyondTheFloor_isBad() {
@@ -363,7 +363,7 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.expectedConsumedByNow, tracker.totalAllowance)
     }
 
-    // MARK: - displayDifference(for:) sign rules
+    // MARK: - displayDifference(for:) is never signed
 
     func testDisplayDifference_good_showsUnsignedMagnitude() {
         let tracker = spendingTracker()
@@ -380,21 +380,36 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.displayDifference(for: tracker), "£300")
     }
 
-    func testDisplayDifference_warning_showsSignedDistanceFromTarget() {
+    func testDisplayDifference_warning_showsUnsignedMagnitude() {
         let tracker = spendingTracker()
         let pace = tracker.pace(actualValue: 1440, asOf: halfway) // 60 behind, inside the 150 band
         XCTAssertEqual(pace.status, .warning)
-        XCTAssertEqual(pace.displayDifference(for: tracker), "-£60",
-                       "the early-warning band isn't a clean over/under yet, so it keeps the sign")
+        XCTAssertEqual(pace.displayDifference(for: tracker), "£60")
+        XCTAssertEqual(pace.displayedDifference, 60)
     }
 
-    func testDisplayDifference_warningOnAnIncreasingTracker_signMirrorsTheNumber() {
+    func testDisplayDifference_warningOnAnIncreasingTracker_showsUnsignedMagnitude() {
         let tracker = mileageTracker()
-        // 100 miles over the target, inside the 150 mile band. A higher
-        // number than planned takes a "+", however that reads as news.
+        // 100 miles over the target, inside the 150 mile band: the figure
+        // reads the same whichever way the tracker runs.
         let pace = tracker.pace(actualValue: 11600, asOf: halfway)
         XCTAssertEqual(pace.status, .warning)
-        XCTAssertEqual(pace.displayDifference(for: tracker), "+100 mi")
+        XCTAssertEqual(pace.displayDifference(for: tracker), "100 mi")
+    }
+
+    // MARK: - PaceStatus.symbolName
+
+    func testSymbolName_eachStatusHasItsOwnSymbol() {
+        let symbols = [PaceStatus.good, .warning, .bad].map(\.symbolName)
+        XCTAssertEqual(Set(symbols).count, 3)
+    }
+
+    func testSymbolName_onlyAmberIsOutlined() {
+        // Outline vs filled keeps "slightly behind" and "behind" apart on a
+        // monochrome Lock Screen, where amber and red are the same colour.
+        XCTAssertTrue(PaceStatus.good.symbolName.hasSuffix(".fill"))
+        XCTAssertFalse(PaceStatus.warning.symbolName.hasSuffix(".fill"))
+        XCTAssertTrue(PaceStatus.bad.symbolName.hasSuffix(".fill"))
     }
 
     // MARK: - statusLine(for:) wording per type
@@ -403,12 +418,11 @@ final class TrackerPaceTests: XCTestCase {
         let spending = spendingTracker()
         XCTAssertEqual(spending.pace(actualValue: 1600, asOf: halfway).statusLine(for: spending), "Below Budget by")
         XCTAssertEqual(spending.pace(actualValue: 1200, asOf: halfway).statusLine(for: spending), "Over Budget by")
-        XCTAssertEqual(spending.pace(actualValue: 1440, asOf: halfway).statusLine(for: spending), "Just Over Budget",
-                       "the warning label already reads as a complete phrase")
+        XCTAssertEqual(spending.pace(actualValue: 1440, asOf: halfway).statusLine(for: spending), "Just Over Budget by")
 
         let mileage = mileageTracker()
         XCTAssertEqual(mileage.pace(actualValue: 11400, asOf: halfway).statusLine(for: mileage), "Below Allowance by")
-        XCTAssertEqual(mileage.pace(actualValue: 11600, asOf: halfway).statusLine(for: mileage), "Just Over Allowance")
+        XCTAssertEqual(mileage.pace(actualValue: 11600, asOf: halfway).statusLine(for: mileage), "Just Over Allowance by")
         XCTAssertEqual(mileage.pace(actualValue: 11700, asOf: halfway).statusLine(for: mileage), "Over Allowance by")
 
         let saving = savingTracker()

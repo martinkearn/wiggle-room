@@ -89,36 +89,42 @@ struct TrackerPace: Equatable {
         return -goodness > amberBand ? .bad : .warning
     }
 
-    /// The at-a-glance difference figure, formatted for `tracker`. When the
-    /// tracker is clearly on one side or the other this drops the +/- sign:
-    /// the colour and the status word already say which direction, so a sign
-    /// on top of that is redundant rather than clarifying.
-    ///
-    /// In the amber band there's no clean over/under to name yet, so the
-    /// signed distance from today's target is shown instead — signed the way
-    /// the number itself moved, not the way the news reads. Above the target
-    /// takes a "+" and below it a "−", whether that's a mileage figure
-    /// running hot or a savings balance running cold.
+    /// The at-a-glance difference figure, formatted for `tracker`: how far
+    /// the tracker is from pace, never signed. A sign would read differently
+    /// depending on which way the tracker runs, so which side of pace it is
+    /// on is carried by the status colour, the status wording, and — where
+    /// the wording isn't shown — the status icon (`PaceStatus.symbolName`).
     func displayDifference(for tracker: Tracker) -> String {
-        tracker.formattedValue(displayedDifference, signed: status == .warning)
+        tracker.formattedValue(displayedDifference)
     }
 
     /// The number `displayDifference` prints, for a figure that rolls
     /// between values and needs to know which way.
     var displayedDifference: Decimal {
-        status == .warning ? currentValue - targetValueToday : abs(goodness)
+        abs(goodness)
     }
 
     /// The status wording shown alongside the difference figure — the type's
-    /// own good/bad label followed by "by" ("Below Budget by", "Behind Target
-    /// by"), or the amber label on its own, which already reads as a complete
-    /// phrase. Shared by the dashboard ring's centre content and the tracker
-    /// list row so the two read identically rather than the list showing a
-    /// bare number with no status word at all.
+    /// own label for the status followed by "by" ("Below Budget by", "Just
+    /// Over Budget by", "Behind Target by"). Shared by the dashboard ring's
+    /// centre content and the tracker list row so the two read identically
+    /// rather than the list showing a bare number with no status word at all.
     func statusLine(for tracker: Tracker) -> String {
-        let label = status.label(for: tracker)
-        guard status != .warning else { return label }
-        return "\(label) by"
+        "\(status.label(for: tracker)) by"
+    }
+
+    /// The difference figure led by its status icon, for surfaces that show
+    /// the figure *without* the status wording (Lock Screen and watch
+    /// complications, compact widgets, the watch list). Where the wording is
+    /// on screen it already says ahead or behind, so those surfaces use
+    /// `displayDifference(for:)` alone.
+    ///
+    /// VoiceOver reads the status label in place of the icon ("Just Over
+    /// Allowance, 18 mi").
+    func iconDifference(for tracker: Tracker) -> Text {
+        let figure = displayDifference(for: tracker)
+        return Text("\(Image(systemName: status.symbolName)) \(figure)")
+            .accessibilityLabel("\(status.label(for: tracker)), \(figure)")
     }
 
     /// How much of the allowance is left to use *right now* — "£100 left in
@@ -139,7 +145,10 @@ struct TrackerPace: Equatable {
 /// `.good` always means "green", whether that's a spending tracker running
 /// below budget, a savings balance running ahead of target, or a weight
 /// tracker below where it's meant to be today.
-enum PaceStatus {
+///
+/// The raw value lets a status travel inside Codable state, such as a Live
+/// Activity's `ContentState`.
+enum PaceStatus: String {
     case good
     case warning
     case bad
@@ -149,6 +158,22 @@ enum PaceStatus {
         case .good: WiggleRoomColors.good
         case .warning: WiggleRoomColors.warning
         case .bad: WiggleRoomColors.bad
+        }
+    }
+
+    /// The SF Symbol that shows this status where colour can't be relied on
+    /// — the monochrome Lock Screen, a tinted watch face — and wherever the
+    /// difference figure appears without its status wording. The only place
+    /// the app decides which icon means what, so swapping the icon set means
+    /// changing only this.
+    ///
+    /// Amber is the one outlined symbol, so "slightly behind" and "behind"
+    /// stay distinct even when both are drawn in a single colour.
+    var symbolName: String {
+        switch self {
+        case .good: "checkmark.circle.fill"
+        case .warning: "exclamationmark.circle"
+        case .bad: "exclamationmark.circle.fill"
         }
     }
 

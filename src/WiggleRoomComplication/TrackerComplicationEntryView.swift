@@ -54,10 +54,18 @@ struct TrackerComplicationEntryView: View {
         let p = pace(for: tracker)
         let fraction = tracker.ringFractions(asOf: entry.date).elapsed
         return WobblyGauge(fraction: fraction, color: p.status.color) {
-            Text(p.displayDifference(for: tracker))
-                .font(.wiggleNumber(.caption2))
-                .minimumScaleFactor(0.5)
-                .lineLimit(1)
+            VStack(spacing: 0) {
+                Image(systemName: p.status.symbolName)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(p.status.color)
+                    .accessibilityHidden(true)
+                Text(p.displayDifference(for: tracker))
+                    .font(.wiggleNumber(.caption2))
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(p.status.label(for: tracker)), \(p.displayDifference(for: tracker))")
         }
         .containerBackground(for: .widget) { Color.clear }
     }
@@ -73,7 +81,7 @@ struct TrackerComplicationEntryView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text(p.displayDifference(for: tracker))
+                p.iconDifference(for: tracker)
                     .font(.wiggleNumber(.title3))
                     .foregroundStyle(p.status.color)
                     .lineLimit(1)
@@ -85,7 +93,7 @@ struct TrackerComplicationEntryView: View {
     }
 
     private func inline(_ tracker: Tracker) -> some View {
-        Text("\(tracker.name): \(pace(for: tracker).displayDifference(for: tracker))")
+        Text("\(tracker.name): \(pace(for: tracker).iconDifference(for: tracker))")
             .containerBackground(for: .widget) { Color.clear }
     }
 }

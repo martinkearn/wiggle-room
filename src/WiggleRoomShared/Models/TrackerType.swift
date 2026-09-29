@@ -151,15 +151,15 @@ struct TrackerTerminology {
     /// "still to save".
     let remainingCaption: String
     /// The bare noun for the pace line itself — "Budget", "Target",
-    /// "Allowance". Used where a label has room for one word only: the
-    /// chart's legend, and the ring's amber caption below.
+    /// "Allowance". Used where a label has room for one word only, such as
+    /// the chart's legend.
     let paceNoun: String
     /// Headline for the completion celebration.
     let celebration: String
-
-    /// The small caption under the ring's centre figure while amber, where
-    /// the number shown is a signed distance rather than a clean over/under.
-    var differenceCaption: String { "difference from \(paceNoun.lowercased())" }
+    /// Follows the magnitude of a value below zero — "overdrawn", "in
+    /// credit", "below zero" — since no figure is ever shown with a minus
+    /// sign. See `Tracker.formattedValue(_:)`.
+    let belowZero: String
 }
 
 /// What a tracker actually tracks (§1). The type is chosen at creation and
@@ -394,7 +394,8 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 badLabel: "Over Budget",
                 remainingCaption: "left in this budget",
                 paceNoun: "Budget",
-                celebration: "Closed Below Budget!"
+                celebration: "Closed Below Budget!",
+                belowZero: "overdrawn"
             )
         case .spendingCredit:
             TrackerTerminology(
@@ -407,7 +408,8 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 badLabel: "Over Limit",
                 remainingCaption: "left in this limit",
                 paceNoun: "Limit",
-                celebration: "Closed Below Limit!"
+                celebration: "Closed Below Limit!",
+                belowZero: "in credit"
             )
         case .savingMoney:
             TrackerTerminology(
@@ -420,7 +422,8 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 badLabel: "Behind Target",
                 remainingCaption: "still to save",
                 paceNoun: "Target",
-                celebration: "Goal Reached!"
+                celebration: "Goal Reached!",
+                belowZero: "overdrawn"
             )
         case .mileage:
             TrackerTerminology(
@@ -433,7 +436,8 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 badLabel: "Over Allowance",
                 remainingCaption: "left in this allowance",
                 paceNoun: "Allowance",
-                celebration: "Closed Below Allowance!"
+                celebration: "Closed Below Allowance!",
+                belowZero: "below zero"
             )
         case .weightLoss:
             TrackerTerminology(
@@ -446,7 +450,8 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 badLabel: "Behind Target",
                 remainingCaption: "still to lose",
                 paceNoun: "Target",
-                celebration: "Target Weight Reached!"
+                celebration: "Target Weight Reached!",
+                belowZero: "below zero"
             )
         case .numberRising, .numberFalling:
             // A plain number has no domain noun to borrow, so both plain
@@ -463,7 +468,8 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 badLabel: "Behind Target",
                 remainingCaption: "still to go",
                 paceNoun: "Target",
-                celebration: "Target Reached!"
+                celebration: "Target Reached!",
+                belowZero: "below zero"
             )
         }
     }

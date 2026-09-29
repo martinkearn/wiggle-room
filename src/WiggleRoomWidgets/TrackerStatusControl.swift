@@ -18,13 +18,16 @@ struct SelectTrackerControlIntent: ControlConfigurationIntent {
 }
 
 /// A Control Center / Lock Screen control: the tracker's name with its
-/// under/over figure in the label; tapping opens its dashboard.
+/// ahead/behind figure in the label, and the status icon as its symbol, since
+/// a control is drawn without the status colour or wording. Tapping opens the
+/// tracker's dashboard.
 struct TrackerStatusControl: ControlWidget {
     struct Value {
         var url: URL
         var name: String
         var status: String
-        var glyph: String = "chart.line.uptrend.xyaxis"
+        var symbol: String = PaceStatus.good.symbolName
+        var accessibilityStatus: String = "On pace"
     }
 
     struct Provider: AppIntentControlValueProvider {
@@ -42,7 +45,8 @@ struct TrackerStatusControl: ControlWidget {
                 url: WiggleRoomDeepLink.url(forTrackerId: tracker.id),
                 name: tracker.name,
                 status: pace.displayDifference(for: tracker),
-                glyph: tracker.glyphSymbol
+                symbol: pace.status.symbolName,
+                accessibilityStatus: pace.status.label(for: tracker)
             )
         }
     }
@@ -50,7 +54,8 @@ struct TrackerStatusControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(kind: "TrackerStatusControl", provider: Provider()) { value in
             ControlWidgetButton(action: OpenURLIntent(value.url)) {
-                Label("\(value.name): \(value.status)", systemImage: value.glyph)
+                Label("\(value.name): \(value.status)", systemImage: value.symbol)
+                    .accessibilityLabel("\(value.name), \(value.accessibilityStatus), \(value.status)")
             }
         }
         .displayName("Tracker Status")

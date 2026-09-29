@@ -22,6 +22,10 @@ nonisolated struct TrackerActivityAttributes: ActivityAttributes {
         var statusLine: String
         var difference: String
         var isOnPace: Bool
+        /// `PaceStatus.rawValue`, so the activity can tell amber from red.
+        /// Optional so a state written by an older build (without it) still
+        /// decodes; `isOnPace` stays as the fallback for that case.
+        var statusRawValue: String?
     }
 
     var trackerId: UUID
@@ -49,7 +53,8 @@ enum TrackerLiveActivity {
         return .init(
             statusLine: pace.statusLine(for: tracker),
             difference: pace.displayDifference(for: tracker),
-            isOnPace: pace.status == .good
+            isOnPace: pace.status == .good,
+            statusRawValue: pace.status.rawValue
         )
     }
 

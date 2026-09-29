@@ -88,7 +88,7 @@ private struct WatchTrackerRow: View {
                 }
             }
             if tracker.latestReading != nil {
-                Text(pace.displayDifference(for: tracker))
+                pace.iconDifference(for: tracker)
                     .font(.wiggleText(.subheadline, weight: .semibold))
                     .foregroundStyle(pace.status.color)
             } else {
