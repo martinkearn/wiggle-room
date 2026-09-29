@@ -45,7 +45,7 @@ final class CloudKitSchemaTests: XCTestCase {
         let fields = Set(Self.expectedFields(for: tracker).map(\.field))
 
         XCTAssertTrue(fields.contains("CD_entityName"))
-        XCTAssertTrue(fields.contains("CD_isZoomed"), "a stored attribute gets a field")
+        XCTAssertTrue(fields.contains("CD_chartZoomRawValue"), "a stored attribute gets a field")
         XCTAssertTrue(fields.contains("CD_connectedSource"), "a to-one relationship gets a field")
         XCTAssertFalse(fields.contains("CD_readings"), "a to-many relationship gets no field")
         XCTAssertFalse(fields.contains("CD_sortedReadings"), "a computed property gets no field")

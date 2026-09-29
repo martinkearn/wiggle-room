@@ -12,8 +12,8 @@ final class RingMotionTests: XCTestCase {
     private let readingA = UUID()
     private let readingB = UUID()
 
-    private func key(_ outer: Double, _ inner: Double, reading: UUID?, zoomed: Bool = false) -> RingMotion.Key {
-        RingMotion.Key(outer: outer, inner: inner, readingID: reading, isZoomed: zoomed)
+    private func key(_ outer: Double, _ inner: Double, reading: UUID?) -> RingMotion.Key {
+        RingMotion.Key(outer: outer, inner: inner, readingID: reading)
     }
 
     // MARK: - Arrival
@@ -23,7 +23,6 @@ final class RingMotionTests: XCTestCase {
         let changes = [
             key(0.4, 0.3, reading: readingB),
             key(0.6, 0.5, reading: readingA),
-            key(0.4, 0.3, reading: readingA, zoomed: true),
             key(0.4001, 0.3, reading: readingA),
         ]
         for new in changes {
@@ -51,19 +50,6 @@ final class RingMotionTests: XCTestCase {
     func testRemovingTheLatestReadingIsAnUpdate() {
         let old = key(0.4, 0.3, reading: readingB)
         XCTAssertEqual(RingMotion.reason(from: old, to: key(0.4, 0.2, reading: readingA), hasArrived: true), .update)
-    }
-
-    // MARK: - Morph
-
-    func testTogglingZoomMorphs() {
-        let old = key(0.4, 0.3, reading: readingA)
-        XCTAssertEqual(RingMotion.reason(from: old, to: key(0.5, 0.5, reading: readingA, zoomed: true), hasArrived: true), .morph)
-        XCTAssertEqual(RingMotion.reason(from: key(0.5, 0.5, reading: readingA, zoomed: true), to: old, hasArrived: true), .morph)
-    }
-
-    func testZoomTakesPrecedenceOverANewReading() {
-        let old = key(0.4, 0.3, reading: readingA)
-        XCTAssertEqual(RingMotion.reason(from: old, to: key(0.5, 0.5, reading: readingB, zoomed: true), hasArrived: true), .morph)
     }
 
     // MARK: - Drift and its minimum delta

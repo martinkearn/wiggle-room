@@ -44,9 +44,11 @@ struct TrackerArchive: Codable, Identifiable {
         let sortOrder: Int
         let colorIndex: Int
         let glyph: String
-        /// Optional so archives written before zoom existed still decode;
-        /// a missing value imports as not zoomed.
-        var isZoomed: Bool? = nil
+        /// A `ChartZoom` raw value. Optional so archives written before
+        /// chart zoom existed still decode; a missing or unknown value
+        /// imports as the whole period. The retired `isZoomed` key in older
+        /// archives is ignored.
+        var chartZoom: String? = nil
         let readings: [Reading]
     }
 
@@ -123,7 +125,7 @@ enum TrackerArchiveService {
                     sortOrder: tracker.sortOrder,
                     colorIndex: tracker.colorIndex,
                     glyph: tracker.glyph,
-                    isZoomed: tracker.isZoomed,
+                    chartZoom: tracker.chartZoom.rawValue,
                     readings: tracker.sortedReadings.map {
                         TrackerArchive.Reading(
                             id: $0.id,
@@ -233,7 +235,7 @@ enum TrackerArchiveService {
             tracker.sortOrder = archived.sortOrder
             tracker.colorIndex = archived.colorIndex
             tracker.glyph = archived.glyph
-            tracker.isZoomed = archived.isZoomed ?? false
+            tracker.chartZoom = archived.chartZoom.flatMap(ChartZoom.init(rawValue:)) ?? .full
             modelContext.insert(tracker)
             importedTrackers.append(tracker)
 

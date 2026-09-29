@@ -30,16 +30,24 @@ struct TrendChartView: View {
 
     typealias ChartPoint = (date: Date, value: Double)
 
-    /// The five days the chart is magnified to when the tracker is zoomed
-    /// (see `TrackerZoom`), or `nil` to show the whole period.
+    /// The month or week, centred on today, the chart is magnified to when
+    /// the tracker is zoomed (see `ChartZoom`), or `nil` to show the whole
+    /// period.
     private var zoomWindow: DateInterval? {
-        tracker.zoomWindow(asOf: now)
+        tracker.chartZoomWindow(asOf: now)
     }
 
     /// The span the chart's x-axis covers: the zoom window, or the whole
     /// tracking period.
     private var window: DateInterval {
         zoomWindow ?? DateInterval(start: tracker.startDate, end: tracker.endDate)
+    }
+
+    /// Where the pace line starts and ends: the whole period, cut to the
+    /// zoom window when zoomed. A window centred on today can reach past
+    /// either end of the period, where there is no pace to draw.
+    private var paceLineSpan: (start: Date, end: Date) {
+        (max(window.start, tracker.startDate), min(window.end, tracker.endDate))
     }
 
     /// Where the pace line sits at a given instant.
@@ -82,8 +90,23 @@ struct TrendChartView: View {
     /// days up to a week, then weeks (up to ~3 months) or months beyond
     /// that. Ticks start at the tracker's own start and are thinned to at
     /// most ~6 so labels never collide.
+    ///
+    /// Zoomed, the ticks are placed around today instead, so today always
+    /// has one in the middle of the axis: every day for a week, every seven
+    /// days for a month.
     private var xAxisTicks: (dates: [Date], format: Date.FormatStyle) {
         let cal = Calendar.current
+        if let days = tracker.effectiveChartZoom(asOf: now).daysEitherSide {
+            let step = days > 7 ? 7 : 1
+            let today = cal.startOfDay(for: now)
+            let dates = stride(from: -(days / step) * step, through: days, by: step).compactMap {
+                cal.date(byAdding: .day, value: $0, to: today)
+            }
+            let format: Date.FormatStyle = step == 1
+                ? .dateTime.weekday(.abbreviated).day()
+                : .dateTime.day().month(.abbreviated)
+            return (dates, format)
+        }
         let start = window.start, end = window.end
         let days = window.duration / 86_400
         let component: Calendar.Component
@@ -143,14 +166,14 @@ struct TrendChartView: View {
     /// Zoomed, the scale is fitted to what's inside the window instead —
     /// the pace line, the readings (including where lines enter and leave
     /// across the window's edges) and the carried-forward "now" point — so
-    /// five days of movement fill the plot rather than sitting as a flat
-    /// sliver of the whole period's scale.
+    /// a week or a month of movement fills the plot rather than sitting as
+    /// a flat sliver of the whole period's scale.
     private var yDomain: ClosedRange<Double> {
         guard let zoomWindow else {
             let range = tracker.plausibleTrendRange
             return (range.lowerBound as NSDecimalNumber).doubleValue...(range.upperBound as NSDecimalNumber).doubleValue
         }
-        var values = [paceValue(at: zoomWindow.start), paceValue(at: zoomWindow.end)]
+        var values = [paceValue(at: paceLineSpan.start), paceValue(at: paceLineSpan.end)]
         values += segments.flatMap { [$0.start.value, $0.end.value] }
         values += visibleReadings.map { double($0.value) }
         values += liveContinuation.map(\.value)
@@ -329,8 +352,8 @@ struct TrendChartView: View {
             // mistaken for the green/red actual line beside it (see
             // `TrackerPalette`).
             ForEach(Array(wobbly(
-                from: (window.start, paceValue(at: window.start)),
-                to: (window.end, paceValue(at: window.end)),
+                from: (paceLineSpan.start, paceValue(at: paceLineSpan.start)),
+                to: (paceLineSpan.end, paceValue(at: paceLineSpan.end)),
                 seed: 0.7
             ).enumerated()), id: \.offset) { _, point in
                 LineMark(
@@ -426,12 +449,39 @@ struct TrendChartView: View {
             }
         }
         .chartYScale(domain: yDomain)
+        .modifier(ZoomedXScale(window: zoomWindow))
         .font(.wiggleText(.caption2))
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.4), value: zoomWindow)
-        .modifier(ZoomAccessibility(
-            description: zoomWindow.map { "Zoomed to \(Tracker.zoomRangeText($0))" },
-            combinesChildren: false
-        ))
+        .modifier(ZoomAccessibility(description: zoomWindow.map { "Zoomed to \(Tracker.zoomRangeText($0))" }))
+    }
+}
+
+/// Pins a zoomed chart's x-axis to its whole window, so today stays in the
+/// centre even where the window reaches past the period and nothing is
+/// drawn there. Unzoomed, Swift Charts fits the axis to the data as before.
+private struct ZoomedXScale: ViewModifier {
+    let window: DateInterval?
+
+    func body(content: Content) -> some View {
+        if let window {
+            content.chartXScale(domain: window.start...window.end)
+        } else {
+            content
+        }
+    }
+}
+
+/// Labels a zoomed chart with the days it covers, keeping its data points
+/// navigable. Leaves an unzoomed chart exactly as it was.
+private struct ZoomAccessibility: ViewModifier {
+    let description: String?
+
+    func body(content: Content) -> some View {
+        if let description {
+            content.accessibilityLabel(description)
+        } else {
+            content
+        }
     }
 }
 

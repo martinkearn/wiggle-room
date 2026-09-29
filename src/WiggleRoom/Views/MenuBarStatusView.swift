@@ -63,7 +63,6 @@ struct MenuBarStatusView: View {
                             .font(WiggleRoomFont.headline(17, weight: 650))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        ZoomIndicator(tracker: tracker, now: PaceClock.shared.now)
                     }
 
                     // showsStatusLabel: false — the status word ("JUST OVER

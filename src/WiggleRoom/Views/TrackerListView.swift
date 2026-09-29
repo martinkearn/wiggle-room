@@ -263,14 +263,11 @@ private struct TrackerRow: View {
                 .frame(width: Self.gutterWidth)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(tracker.name)
-                        .font(WiggleRoomFont.headline(18, weight: 650))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    ZoomIndicator(tracker: tracker, now: now, size: 12)
-                }
+                Text(tracker.name)
+                    .font(WiggleRoomFont.headline(18, weight: 650))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 periodLine
             }
 
@@ -407,9 +404,6 @@ private struct TrackerRow: View {
             parts.append("No readings yet")
         }
         parts.append("\(tracker.terminology.paceFigure) \(tracker.formattedValue(pace.targetValueToday))")
-        if let window = tracker.zoomWindow(asOf: now) {
-            parts.append("Zoomed to \(Tracker.zoomRangeText(window))")
-        }
         return parts.joined(separator: ", ")
     }
 }

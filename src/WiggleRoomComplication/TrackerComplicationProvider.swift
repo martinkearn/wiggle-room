@@ -30,11 +30,8 @@ struct TrackerComplicationProvider: AppIntentTimelineProvider {
         let now = Date.now
         let tracker = await resolvedTracker(for: configuration)
         let entry = TrackerComplicationEntry(date: now, tracker: tracker)
-        // A zoomed tracker's window moves at local midnight, so reload then
-        // at the latest rather than showing yesterday's window any longer.
         let nextUpdate = tracker.map {
-            let next = TrackerUpdateScheduling.nextWidgetReloadDate(after: now, until: $0.endDate)
-            return min(next, $0.nextZoomWindowChange(after: now) ?? next)
+            TrackerUpdateScheduling.nextWidgetReloadDate(after: now, until: $0.endDate)
         } ?? now.addingTimeInterval(TrackerUpdateScheduling.defaultWidgetFarInterval)
         return Timeline(entries: [entry], policy: .after(nextUpdate))
     }

@@ -186,12 +186,6 @@ struct TrackerDetailView: View {
                             )
                         )
                         .padding(.horizontal)
-
-                    if let zoomWindow = tracker.zoomWindow(asOf: now) {
-                        Label("Showing \(Tracker.zoomRangeText(zoomWindow))", systemImage: "plus.magnifyingglass")
-                            .font(.wiggleText(.caption, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
                 }
 
                 if isCompleted {
@@ -224,11 +218,16 @@ struct TrackerDetailView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 } else if tracker.sortedReadings.count > 1 {
-                    TrendChartView(tracker: tracker, now: now)
-                        .frame(height: 240)
-                        .padding(14)
-                        .trackerCard(tracker, variant: 1, strength: 0.08)
-                        .padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 10) {
+                        ChartZoomControls(tracker: tracker, now: now) {
+                            store.saveChanges()
+                        }
+                        TrendChartView(tracker: tracker, now: now)
+                            .frame(height: 240)
+                    }
+                    .padding(14)
+                    .trackerCard(tracker, variant: 1, strength: 0.08)
+                    .padding(.horizontal)
                 }
             }
             .padding(.bottom, 32)
@@ -286,11 +285,6 @@ struct TrackerDetailView: View {
         }
         #endif
         .toolbar {
-            if tracker.canZoom(asOf: now) {
-                ToolbarItem(placement: .primaryAction) {
-                    zoomButton
-                }
-            }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button {
@@ -388,22 +382,6 @@ struct TrackerDetailView: View {
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
         .padding(.horizontal)
-    }
-
-    /// Magnifies the rings and chart to the five days around today, or back
-    /// out to the whole period (see `TrackerZoom`). Saved on the tracker so
-    /// the choice syncs to every device and reaches the widgets.
-    private var zoomButton: some View {
-        Button {
-            tracker.isZoomed.toggle()
-            store.saveChanges()
-        } label: {
-            if tracker.isZoomed {
-                Label("Zoom Out", systemImage: "minus.magnifyingglass")
-            } else {
-                Label("Zoom In", systemImage: "plus.magnifyingglass")
-            }
-        }
     }
 
     /// The video-game-style completion celebration (see `CelebrationView`)
