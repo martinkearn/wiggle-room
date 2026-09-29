@@ -756,9 +756,9 @@ struct AddTrackerView: View {
               let remainder = Tracker.projectedRemainder(type: trackerType, startingValue: startingValue, totalAllowance: totalAllowance)
         else { return nil }
         if remainder > 0 {
-            return "\(Tracker.formattedValue(remainder, unit: unit)) left at the end."
+            return "\(Tracker.formattedValue(remainder, unit: unit, type: trackerType)) left at the end."
         } else {
-            return "This \(trackerType.targetValueLabel.lowercased()) is \(Tracker.formattedValue(abs(remainder), unit: unit)) more than the starting value."
+            return "This \(trackerType.targetValueLabel.lowercased()) is \(Tracker.formattedValue(abs(remainder), unit: unit, type: trackerType)) more than the starting value."
         }
     }
 

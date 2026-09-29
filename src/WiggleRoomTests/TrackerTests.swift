@@ -182,8 +182,6 @@ final class TrackerTests: XCTestCase {
     func testFormattedValue_unitlessType_showsTheBareNumber() {
         XCTAssertEqual(tracker(type: .numberRising).formattedValue(8400), "8,400", "no symbol, no stray space")
         XCTAssertEqual(tracker(type: .numberFalling).formattedValue(8400), "8,400")
-        XCTAssertEqual(tracker(type: .numberRising).formattedValue(-50, signed: true), "-50")
-        XCTAssertEqual(tracker(type: .numberRising).formattedValue(50, signed: true), "+50")
     }
 
     func testFormattedValue_spendingCredit_usesTheChosenCurrency() {
@@ -206,18 +204,64 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(tracker(type: .weightLoss, unit: .pounds).formattedValue(Decimal(string: "184.6")!), "185 lb")
     }
 
-    func testFormattedValue_negative_alwaysShowsMinusSignRegardlessOfSignedFlag() {
-        XCTAssertEqual(tracker().formattedValue(-50, signed: false), "-£50")
-        XCTAssertEqual(tracker().formattedValue(-50, signed: true), "-£50")
+    func testFormattedValue_positiveAndZero_showNoSign() {
+        XCTAssertEqual(tracker().formattedValue(50), "£50")
+        XCTAssertEqual(tracker().formattedValue(0), "£0")
     }
 
-    func testFormattedValue_nonNegativeWithSignedTrue_prefixesPlus() {
-        XCTAssertEqual(tracker().formattedValue(50, signed: true), "+£50")
-        XCTAssertEqual(tracker().formattedValue(0, signed: true), "+£0")
+    func testFormattedValue_belowZero_usesEachTypesWordInsteadOfASign() {
+        XCTAssertEqual(tracker(type: .spendingMoney).formattedValue(-20), "£20 overdrawn")
+        XCTAssertEqual(tracker(type: .savingMoney).formattedValue(-20), "£20 overdrawn")
+        XCTAssertEqual(tracker(type: .spendingCredit).formattedValue(-20), "£20 in credit")
+        XCTAssertEqual(tracker(type: .mileage).formattedValue(-20), "20 mi below zero")
+        XCTAssertEqual(tracker(type: .weightLoss).formattedValue(Decimal(string: "-1.5")!), "1.5 kg below zero")
+        XCTAssertEqual(tracker(type: .numberRising).formattedValue(-20), "20 below zero")
+        XCTAssertEqual(tracker(type: .numberFalling).formattedValue(-20), "20 below zero")
     }
 
-    func testFormattedValue_nonNegativeWithSignedFalse_showsNoSign() {
-        XCTAssertEqual(tracker().formattedValue(50, signed: false), "£50")
+    func testFormattedValue_neverContainsAMinusSign() {
+        let values: [Decimal] = [-1234.56, -50, Decimal(string: "-0.4")!, 0, 50]
+        for type in TrackerType.allCases {
+            for unit in type.permittedUnits {
+                for value in values {
+                    let text = Tracker.formattedValue(value, unit: unit, type: type)
+                    XCTAssertFalse(text.contains("-") || text.contains("\u{2212}"), "\(type) \(unit): \(text)")
+                }
+            }
+        }
+    }
+
+    func testFormattedValue_belowZeroButRoundingToZero_showsZeroWithNoWord() {
+        XCTAssertEqual(tracker().formattedValue(Decimal(string: "-0.001")!), "£0.00")
+        XCTAssertEqual(tracker(type: .mileage).formattedValue(Decimal(string: "-0.4")!), "0 mi")
+    }
+
+    // MARK: - Chart range (§6)
+
+    func testPlausibleTrendRange_startingAtZero_neverPadsBelowZero() {
+        // A card that opens the period empty.
+        let credit = tracker(type: .spendingCredit, startingValue: 0, totalAllowance: 600)
+        XCTAssertEqual(credit.plausibleTrendRange.lowerBound, 0)
+        XCTAssertEqual(credit.plausibleTrendRange.upperBound, 660)
+    }
+
+    func testPlausibleTrendRange_endingAtZero_neverPadsBelowZero() {
+        // "Spend it all": the budget is the whole balance, so pace ends at £0.
+        let spending = tracker(type: .spendingMoney, startingValue: 500, totalAllowance: 500)
+        XCTAssertEqual(spending.plausibleTrendRange.lowerBound, 0)
+    }
+
+    func testPlausibleTrendRange_belowZero_stillPadsBelowTheLowestValue() {
+        // A budget larger than the balance takes the pace line below zero.
+        let spending = tracker(type: .spendingMoney, startingValue: 100, totalAllowance: 300)
+        XCTAssertEqual(spending.plausibleTrendRange.lowerBound, -230, "-200 padded by 10% of the 300 range")
+    }
+
+    func testPaddedLowerBound_stopsAtZeroOnlyWhenTheLowestValueIsZeroOrAbove() {
+        XCTAssertEqual(Tracker.paddedLowerBound(40.0, padding: 10), 30)
+        XCTAssertEqual(Tracker.paddedLowerBound(5.0, padding: 10), 0)
+        XCTAssertEqual(Tracker.paddedLowerBound(0.0, padding: 10), 0)
+        XCTAssertEqual(Tracker.paddedLowerBound(-5.0, padding: 10), -15)
     }
 
     // MARK: - Goal-type allowance derivation (§6)

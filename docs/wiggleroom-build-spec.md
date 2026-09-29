@@ -86,6 +86,8 @@ The plain-number types use a unit with no symbol at all, so their figures render
 
 A whole value drops its decimals entirely, so values read as `£684`, `£692.40`, `8,400 mi`, `85 kg`, `84.6 kg`, `8,400`. A zero-precision unit rounds typed input up to a whole number, with the rounding stated inline on the log screen. Rounding is a property of the unit, so both plain-number types round the same way even though they run in opposite directions.
 
+No figure is ever shown with a sign, because a minus sign reads differently depending on which way a tracker runs. A value below zero shows its magnitude followed by a word from the type's terminology table: `£20 overdrawn` for Spending Money and Saving Money, `£20 in credit` for Spending Credit, and `20 below zero` for the rest. A value that rounds to zero at the unit's precision shows as zero, with no word. Stored values and exports keep real negative numbers, and editable number fields still accept a typed minus sign.
+
 Each reading is a separate timestamped `ValueSnapshot`. Reading history is append-oriented so CloudKit can merge updates made on different devices.
 
 A reading fetched from a source is recorded only when it is genuinely new: newer than the latest reading already held, and a different value at the unit's own precision. A source that reports historic readings carries its own timestamp into the record — an Apple Health weigh-in appears on the chart at the time it was taken, not the time it was collected — and a reading dated before the tracker's start is not recorded at all.
@@ -210,10 +212,29 @@ The interface should feel calm and informative rather than punitive.
 - Green indicates on pace or better, whichever side of the pace line the tracker's type treats as good.
 - Amber indicates a small shortfall, never narrower than the unit's own floor.
 - Red indicates a larger shortfall.
-- Status wording comes from the tracker type's terminology table, so no surface can drift from another.
+- Status wording comes from the tracker type's terminology table, so no surface can drift from another. Every status line is the label, then "by", then an unsigned figure ("Just Over Budget by £12"), amber included.
 - Tracker identity colours do not replace status colours.
 - Fraunces is used for names and headings; Nunito is the primary text face.
 - Numeric values remain the source of truth and accompany visual indicators.
+
+### Status icons
+
+A tracker's pace status also has an icon, for surfaces where colour can't be relied on. `PaceStatus.symbolName` is the only place the mapping lives, so swapping the icon set means changing only that property.
+
+| Status | Icon |
+|---|---|
+| On or ahead of pace (green) | `checkmark.circle.fill` |
+| Slightly behind (amber) | `exclamationmark.circle` |
+| Behind (red) | `exclamationmark.circle.fill` |
+
+The icon follows the status, never the direction the value moved, so it means the same for every tracker type. Amber is the only outlined icon, which keeps slightly behind and behind distinct on the monochrome Lock Screen, where amber and red look alike. The icons are built-in SF Symbols because inline Lock Screen widgets and Control Center controls can show only a symbol image.
+
+The icon appears only where the ahead/behind figure is shown **without** its status wording, directly before the figure and at its size (`TrackerPace.iconDifference(for:)`). VoiceOver reads the status label in its place.
+
+- **With the icon:** Lock Screen accessory widgets (including the circular one, above the name), watch complications, the small single-tracker widget, the small and medium chart widgets and the chart widget's accessory size, the all-trackers widget, the watch list row, the ring centre where the status label is hidden (the watch detail screen and the macOS menu bar dropdown), the compact Dynamic Island and the Control Center control, where the icon takes the control's symbol slot in place of the tracker glyph.
+- **Without the icon:** the iOS and iPadOS list row, the tracker screen's ring centre, the medium, large and extra-large status widgets, the large chart widget, the Live Activity's Lock Screen view and expanded Dynamic Island, the Mac sidebar row, notifications, and Siri and App Intent dialogs. Each of these shows the status wording.
+
+The Live Activity carries the status itself (`ContentState.statusRawValue`), so a red tracker's activity is red rather than amber. An activity started by an older build, which only recorded whether the tracker was on pace, reads as green or red.
 
 ### Tracker colours and status colours
 
@@ -224,6 +245,12 @@ A few surfaces draw that identity colour immediately against a status colour: th
 Every palette entry therefore has a second value, its **reference colour**, and those surfaces use it. It is the identity colour itself for entries already clear of the status hues, and a stand-in for those that are not. A stand-in keeps its entry's lightness and weight, so the tracker still reads as itself, and clears green, amber and red by a wide margin in both appearances. Peach, Toffee, Forest, Sunshine and Cherry currently need one; the remaining seven do not. Everything else keeps the identity colour, so a tracker still looks like the colour that was chosen for it.
 
 The palette is audited against the status colours whenever either changes. Only green, amber and red take part: the stale/error colour is text-only and never drawn on a ring or a chart.
+
+### Chart y-axis
+
+Both of the chart's y-ranges, the whole period's (`Tracker.plausibleTrendRange`) and a zoomed window's, pad 10% beyond the lowest and highest values. The padding never takes the range below zero unless a value is already there. A tracker that starts or ends at zero, such as a credit card from £0 or a budget spent down to £0, therefore has zero as its floor. Because `plausibleTrendRange` also clamps the "Estimated final" figure, that estimate doesn't go below zero either in those cases.
+
+When the chart does reach below zero, such as an overdrawn balance or a budget larger than its starting balance, the gridlines below zero are unlabelled, since Swift Charts would label them with a minus sign. The zero gridline is drawn solid so the crossing reads, and the figure cards give the amount in words. Labels at and above zero are plain numbers without a unit.
 
 ### Zoom
 

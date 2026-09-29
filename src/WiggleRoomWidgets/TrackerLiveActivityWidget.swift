@@ -58,9 +58,12 @@ struct TrackerLiveActivityWidget: Widget {
             } compactLeading: {
                 badge(context.attributes, size: 20)
             } compactTrailing: {
-                Text(context.state.difference)
+                // The compact island has no room for the status wording, so
+                // the icon says ahead or behind.
+                Text("\(Image(systemName: status(context.state).symbolName)) \(context.state.difference)")
                     .font(.wiggleNumber(.caption, weight: .bold))
                     .foregroundStyle(color(context.state))
+                    .accessibilityLabel("\(context.state.statusLine) \(context.state.difference)")
             } minimal: {
                 badge(context.attributes, size: 20)
             }
@@ -68,8 +71,14 @@ struct TrackerLiveActivityWidget: Widget {
         }
     }
 
+    /// The state's own status, or — for a state written by an older build
+    /// that only recorded `isOnPace` — green or red.
+    private func status(_ state: TrackerActivityAttributes.ContentState) -> PaceStatus {
+        state.statusRawValue.flatMap(PaceStatus.init(rawValue:)) ?? (state.isOnPace ? .good : .bad)
+    }
+
     private func color(_ state: TrackerActivityAttributes.ContentState) -> Color {
-        state.isOnPace ? WiggleRoomColors.good : WiggleRoomColors.warning
+        status(state).color
     }
 
     private func badge(_ attributes: TrackerActivityAttributes, size: CGFloat) -> some View {

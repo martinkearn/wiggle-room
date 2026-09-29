@@ -108,7 +108,7 @@ struct TrackerWidgetEntryView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            Text(pace(for: tracker).displayDifference(for: tracker))
+            pace(for: tracker).iconDifference(for: tracker)
                 .contentTransition(.numericText())
                 .font(.wiggleNumber(.caption, weight: .bold))
                 .foregroundStyle(pace(for: tracker).status.color)
@@ -191,9 +191,6 @@ struct TrackerWidgetEntryView: View {
                         .foregroundStyle(p.status.color)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    Text(tracker.terminology.differenceCaption)
-                        .font(.wiggleText(.caption2))
-                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -302,9 +299,15 @@ struct TrackerWidgetEntryView: View {
     #if !os(macOS)
     private func circularLockScreen(_ tracker: Tracker) -> some View {
         let fraction = tracker.ringFractions(asOf: entry.date).elapsed
+        let status = pace(for: tracker).status
         return WobblyGauge(fraction: fraction, color: .primary) {
-            Text(tracker.name.prefix(3))
-                .font(.wiggleText(size: 10))
+            VStack(spacing: 1) {
+                Image(systemName: status.symbolName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .accessibilityLabel(status.label(for: tracker))
+                Text(tracker.name.prefix(3))
+                    .font(.wiggleText(size: 10))
+            }
         }
         .containerBackground(for: .widget) { Color.clear }
     }
@@ -320,7 +323,7 @@ struct TrackerWidgetEntryView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text(p.displayDifference(for: tracker))
+                p.iconDifference(for: tracker)
                     .font(.wiggleNumber(.title3))
                     .foregroundStyle(p.status.color)
                     .lineLimit(1)
@@ -332,7 +335,7 @@ struct TrackerWidgetEntryView: View {
     }
 
     private func inlineLockScreen(_ tracker: Tracker) -> some View {
-        Text("\(tracker.name): \(pace(for: tracker).displayDifference(for: tracker))")
+        Text("\(tracker.name): \(pace(for: tracker).iconDifference(for: tracker))")
             .containerBackground(for: .widget) { Color.clear }
     }
     #endif
