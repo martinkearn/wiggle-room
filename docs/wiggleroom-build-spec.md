@@ -42,7 +42,7 @@ A `Tracker` represents one allowance over a date range.
 | `sourceTargetId` | Provider-specific account or target identifier |
 | `sortOrder` | Synced custom ordering |
 | `colorIndex`, `glyph` | Visual identity |
-| `chartZoomRawValue` | How closely the trend chart is zoomed: whole period, month or week (see Zoom) |
+| `chartZoomRawValue` | How closely the trend chart is zoomed: whole period, month, week or three days (see Zoom) |
 | `reminderCadenceMinutes` | Optional manual-entry reminder |
 
 ### Tracker types
@@ -256,11 +256,11 @@ When the chart does reach below zero, such as an overdrawn balance or a budget l
 
 Zoom applies to the trend chart only. It never changes stored data, the rings, the centre figure, the status colour, or the figure cards, which all stay whole-period.
 
-- **Levels.** The whole period (the default), a month, or a week. Month is offered when the period is two calendar months or longer; week when it is longer than seven days.
-- **Window.** Whole local calendar days centred on today: fifteen days either side for a month, three for a week. The window is never slid to stay inside the tracking period, so today is always the centre; near either end the chart has empty space on that side and the pace line stops at the period's edge. The window moves forward at local midnight.
+- **Levels.** The whole period (the default), a month, a week, or three days. Month is offered when the period is two calendar months or longer; week when it is longer than seven days; three days when it is three days or longer.
+- **Window.** Whole local calendar days centred on today: fifteen days either side for a month, three for a week, one for three days. The window is never slid to stay inside the tracking period, so today is always the centre; near either end the chart has empty space on that side and the pace line stops at the period's edge. The window moves forward at local midnight.
 - **Eligibility.** Zoom applies only while the tracker is in progress. Before the period starts, after it ends, or when the stored level is not offered for the period (for example after the dates are edited), the chart shows the whole period. The stored level is kept but ignored.
 - **Controls.** A caption and − and + magnifier buttons sit directly above the chart on the iOS, iPadOS, macOS and watchOS detail screens. The caption reads "Whole period" or the days the window covers. The buttons step through the offered levels and are disabled at either end. The controls are hidden when only the whole period is offered.
-- **Chart.** The x-axis is pinned to the window, with ticks placed around today: every day for a week, every seven days for a month. The y-axis is fitted to the pace line, the readings and the carried-forward "now" point inside the window. Lines crossing the window's edges are interpolated to the edge before reaching Swift Charts.
+- **Chart.** The x-axis is pinned to the window, with ticks placed around today: every day for a week or three days, every seven days for a month. The y-axis is fitted to the pace line, the readings and the carried-forward "now" point inside the window. Lines crossing the window's edges are interpolated to the edge before reaching Swift Charts.
 - **Widgets.** The chart widget follows the tracker's zoom, reloads at local midnight while zoomed, and marks a zoomed chart with a small magnifier beside the name in medium and larger sizes.
 - **State.** `chartZoomRawValue` syncs with the tracker and is included in exports as `chartZoom`. Archives without it import as the whole period. It replaces the retired `isZoomed` flag, which also zoomed the rings; that flag is ignored in both the store and older archives.
 

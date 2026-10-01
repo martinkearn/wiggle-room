@@ -7,8 +7,8 @@ import SwiftUI
 
 /// The trend chart's zoom caption and its − and + buttons, drawn directly
 /// above the chart they zoom. The buttons step through the levels that
-/// currently apply (`availableChartZooms`) — whole period, then month, then
-/// week — and the choice is saved on the tracker with `save`, so it syncs
+/// currently apply (`availableChartZooms`) — whole period, then month, week
+/// and three days — and the choice is saved on the tracker with `save`, so it syncs
 /// to every device and reaches the chart widget. Renders nothing when the
 /// chart can't zoom at all.
 struct ChartZoomControls: View {
