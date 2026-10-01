@@ -6,6 +6,7 @@
 #if os(iOS)
 import BackgroundTasks
 import SwiftData
+import UIKit
 
 /// Background refresh for auto-fetch connected sources (Starling, and any
 /// future provider) — via `BGAppRefreshTask`. iOS treats the requested
@@ -45,7 +46,11 @@ enum BackgroundRefreshScheduler {
     /// anywhere later in the app's lifecycle.
     static func register(container: ModelContainer) {
         Self.container = container
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: taskIdentifier, using: nil) { task in
+        // Delivered on the main queue, not a system-created one: the handler
+        // reaches the main-actor-isolated `mainContext` and its model
+        // objects, and releasing those from a background queue crashed in
+        // SwiftData's deallocation (TestFlight crash report).
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: taskIdentifier, using: .main) { task in
             guard let refreshTask = task as? BGAppRefreshTask else {
                 task.setTaskCompleted(success: false)
                 return
@@ -82,9 +87,15 @@ enum BackgroundRefreshScheduler {
         // background refresh for good.
         scheduleNext()
 
-        let refreshWork = Task {
+        // Keeps the process awake until the final save has finished, so the
+        // store's SQLite lock is never held when the app is suspended
+        // (the system kills such a process with 0xDEAD10CC).
+        let assertion = UIApplication.shared.beginBackgroundTask(withName: "starlingRefreshSave")
+
+        let refreshWork = Task { @MainActor in
             await refreshDueAutoFetchTrackers(container: container)
-            task.setTaskCompleted(success: true)
+            if assertion != .invalid { UIApplication.shared.endBackgroundTask(assertion) }
+            task.setTaskCompleted(success: !Task.isCancelled)
         }
 
         task.expirationHandler = {
@@ -126,6 +137,10 @@ enum BackgroundRefreshScheduler {
         let context = container.mainContext
         let store = TrackerStore(modelContext: context)
         guard let trackers = try? context.fetch(FetchDescriptor<Tracker>()) else { return }
+        // Saved on every exit, including cancellation: an early return that
+        // skipped it left pending changes for an autosave to write later,
+        // possibly while the app was suspended.
+        defer { try? context.save() }
         let now = Date.now
         for tracker in trackers where !tracker.isManualEntry && !tracker.isCompleted() {
             guard !Task.isCancelled else { return }
@@ -137,7 +152,6 @@ enum BackgroundRefreshScheduler {
             tracker.lastAutoFetchAttempt = now
             _ = try? await store.refreshFromSource(tracker)
         }
-        try? context.save()
     }
 }
 #endif

@@ -128,6 +128,13 @@ struct WiggleRoomApp: App {
                     if newPhase == .background {
                         BackgroundRefreshScheduler.scheduleNext()
                         TrackerSpotlightIndexer.reindex()
+                        // Flush pending changes while the app still has
+                        // runtime, under an assertion, so no write is left
+                        // for an autosave to attempt after suspension
+                        // (0xDEAD10CC: suspended holding the store's lock).
+                        let assertion = UIApplication.shared.beginBackgroundTask(withName: "saveOnBackground")
+                        try? modelContainer.mainContext.save()
+                        if assertion != .invalid { UIApplication.shared.endBackgroundTask(assertion) }
                     }
                     // A tracker entering its final stretch by time alone has
                     // no reading to trigger its Live Activity (§8.5).
