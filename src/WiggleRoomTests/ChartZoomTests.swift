@@ -85,16 +85,30 @@ final class ChartZoomTests: XCTestCase {
         let now = date(2026, 1, 2)
         let exactlyAWeek = makeTracker(end: date(2026, 1, 8))
         let justOver = makeTracker(end: date(2026, 1, 8, 1))
-        XCTAssertEqual(exactlyAWeek.availableChartZooms(asOf: now, calendar: calendar), [.full])
-        XCTAssertEqual(justOver.availableChartZooms(asOf: now, calendar: calendar), [.full, .week])
+        XCTAssertEqual(exactlyAWeek.availableChartZooms(asOf: now, calendar: calendar), [.full, .threeDays])
+        XCTAssertEqual(justOver.availableChartZooms(asOf: now, calendar: calendar), [.full, .week, .threeDays])
+    }
+
+    func testThreeDaysNeedsAPeriodOfThreeDays() {
+        let now = date(2026, 1, 2)
+        let justUnder = makeTracker(end: date(2026, 1, 3, 23))
+        let threeDays = makeTracker(end: date(2026, 1, 4))
+        XCTAssertEqual(justUnder.availableChartZooms(asOf: now, calendar: calendar), [.full])
+        XCTAssertEqual(threeDays.availableChartZooms(asOf: now, calendar: calendar), [.full, .threeDays])
+    }
+
+    func testThreeDaysWindowIsYesterdayTodayAndTomorrow() throws {
+        let window = try XCTUnwrap(window(.threeDays, now: date(2026, 1, 16, 10)))
+        XCTAssertEqual(window.start, date(2026, 1, 15))
+        XCTAssertEqual(window.end, date(2026, 1, 18))
     }
 
     func testMonthNeedsAPeriodOfTwoMonths() {
         let now = date(2026, 1, 2)
         let justUnder = makeTracker(end: date(2026, 2, 28))
         let twoMonths = makeTracker(end: date(2026, 3, 1))
-        XCTAssertEqual(justUnder.availableChartZooms(asOf: now, calendar: calendar), [.full, .week])
-        XCTAssertEqual(twoMonths.availableChartZooms(asOf: now, calendar: calendar), [.full, .month, .week])
+        XCTAssertEqual(justUnder.availableChartZooms(asOf: now, calendar: calendar), [.full, .week, .threeDays])
+        XCTAssertEqual(twoMonths.availableChartZooms(asOf: now, calendar: calendar), [.full, .month, .week, .threeDays])
     }
 
     func testNoZoomBeforeThePeriodStartsOrOnceItHasEnded() {

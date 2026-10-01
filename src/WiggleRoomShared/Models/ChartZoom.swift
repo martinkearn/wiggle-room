@@ -6,7 +6,7 @@
 import Foundation
 
 /// How closely a tracker's trend chart is zoomed: the whole period, or a
-/// month or a week centred on today. Zoom only ever changes what the chart
+/// month, a week or three days centred on today. Zoom only ever changes what the chart
 /// draws — the rings, centre figure, status colour and figure cards always
 /// stay whole-period — and never changes a reading or any other figure.
 ///
@@ -22,6 +22,8 @@ enum ChartZoom: String, CaseIterable {
     case month
     /// Three days either side of today. Only for periods longer than a week.
     case week
+    /// One day either side of today. Only for periods of three days or more.
+    case threeDays
 
     /// Local calendar days drawn either side of today, or `nil` for the
     /// whole period.
@@ -30,6 +32,7 @@ enum ChartZoom: String, CaseIterable {
         case .full: nil
         case .month: 15
         case .week: 3
+        case .threeDays: 1
         }
     }
 
@@ -38,6 +41,7 @@ enum ChartZoom: String, CaseIterable {
         case .full: "Whole period"
         case .month: "Month"
         case .week: "Week"
+        case .threeDays: "3 days"
         }
     }
 
@@ -77,6 +81,9 @@ extension Tracker {
         }
         if let oneWeek = calendar.date(byAdding: .day, value: 7, to: startDate), endDate > oneWeek {
             levels.append(.week)
+        }
+        if let threeDays = calendar.date(byAdding: .day, value: 3, to: startDate), endDate >= threeDays {
+            levels.append(.threeDays)
         }
         return levels
     }
