@@ -121,7 +121,7 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.difference, -400, "the raw consumption difference is still negative here…")
         XCTAssertEqual(pace.goodness, 400, "…but saving faster than planned is the good case")
         XCTAssertEqual(pace.status, .good)
-        XCTAssertEqual(pace.statusLine(for: tracker), "Ahead of Target by")
+        XCTAssertEqual(pace.statusLine(for: tracker), "Over Target by")
         XCTAssertEqual(pace.displayDifference(for: tracker), "£400")
     }
 
@@ -131,7 +131,7 @@ final class TrackerPaceTests: XCTestCase {
 
         XCTAssertEqual(pace.goodness, -600)
         XCTAssertEqual(pace.status, .bad, "600 short of a 4,800 goal is well past the 240 amber band")
-        XCTAssertEqual(pace.statusLine(for: tracker), "Behind Target by")
+        XCTAssertEqual(pace.statusLine(for: tracker), "Under Target by")
         XCTAssertEqual(pace.displayDifference(for: tracker), "£600")
     }
 
@@ -202,7 +202,7 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.goodness, 50)
         XCTAssertTrue(pace.isAheadOfPace)
         XCTAssertEqual(pace.status, .good)
-        XCTAssertEqual(pace.statusLine(for: tracker), "Below Limit by")
+        XCTAssertEqual(pace.statusLine(for: tracker), "Under Limit by")
         XCTAssertEqual(pace.displayDifference(for: tracker), "£50")
     }
 
@@ -416,7 +416,7 @@ final class TrackerPaceTests: XCTestCase {
 
     func testStatusLine_usesEachTypesOwnWording() {
         let spending = spendingTracker()
-        XCTAssertEqual(spending.pace(actualValue: 1600, asOf: halfway).statusLine(for: spending), "Below Budget by")
+        XCTAssertEqual(spending.pace(actualValue: 1600, asOf: halfway).statusLine(for: spending), "Under Budget by")
         XCTAssertEqual(spending.pace(actualValue: 1200, asOf: halfway).statusLine(for: spending), "Over Budget by")
         XCTAssertEqual(spending.pace(actualValue: 1440, asOf: halfway).statusLine(for: spending), "Just Over Budget by")
 
@@ -426,8 +426,8 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(mileage.pace(actualValue: 11700, asOf: halfway).statusLine(for: mileage), "Over Allowance by")
 
         let saving = savingTracker()
-        XCTAssertEqual(saving.pace(actualValue: 3000, asOf: halfway).statusLine(for: saving), "Ahead of Target by")
-        XCTAssertEqual(saving.pace(actualValue: 2000, asOf: halfway).statusLine(for: saving), "Behind Target by")
+        XCTAssertEqual(saving.pace(actualValue: 3000, asOf: halfway).statusLine(for: saving), "Over Target by")
+        XCTAssertEqual(saving.pace(actualValue: 2000, asOf: halfway).statusLine(for: saving), "Under Target by")
 
         let weight = weightTracker()
         XCTAssertEqual(weight.pace(actualValue: 89, asOf: halfway).statusLine(for: weight), "Ahead of Target by")
