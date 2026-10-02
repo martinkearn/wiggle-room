@@ -212,7 +212,7 @@ The interface should feel calm and informative rather than punitive.
 - Green indicates on pace or better, whichever side of the pace line the tracker's type treats as good.
 - Amber indicates a small shortfall, never narrower than the unit's own floor.
 - Red indicates a larger shortfall.
-- Status wording comes from the tracker type's terminology table, so no surface can drift from another. Currency types word their status as Under and Over ("Under Budget", "Over Target"). Every status line is the label, then "by", then an unsigned figure ("Just Over Budget by £12"), amber included.
+- Status wording comes from the tracker type's terminology table, so no surface can drift from another. Spending Money and Spending Credit word their status as Under and Over ("Under Budget", "Over Limit"). Every status line is the label, then "by", then an unsigned figure ("Just Over Budget by £12"), amber included.
 - Tracker identity colours do not replace status colours.
 - Fraunces is used for names and headings; Nunito is the primary text face.
 - Numeric values remain the source of truth and accompany visual indicators.
