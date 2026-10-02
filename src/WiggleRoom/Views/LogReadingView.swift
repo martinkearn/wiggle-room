@@ -37,6 +37,27 @@ struct LogReadingView: View {
                     .listRowBackground(tracker.accentColor.opacity(0.10))
                 }
 
+                if existingReading == nil, tracker.trackerType.isPlainNumber {
+                    Section {
+                        HStack(spacing: 12) {
+                            Button { step(by: -1) } label: {
+                                Label("Remove 1", systemImage: "minus.circle.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            Button { step(by: 1) } label: {
+                                Label("Add 1", systemImage: "plus.circle.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                    } footer: {
+                        Text("Adjust the current value by one without needing to know it, or enter a number below.")
+                    }
+                }
+
                 Section {
                     valueInput
                         .listRowInsets(EdgeInsets())
@@ -155,6 +176,14 @@ struct LogReadingView: View {
             return number.decimalValue
         }
         return Decimal(string: text)
+    }
+
+    /// Logs the latest value (or the starting value, before any reading)
+    /// moved by `delta`, at the chosen date.
+    private func step(by delta: Decimal) {
+        let current = tracker.latestReading?.value ?? tracker.startingValue
+        store.logReading(value: current + delta, date: date, for: tracker)
+        dismiss()
     }
 
     private func save() {

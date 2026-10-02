@@ -202,7 +202,7 @@ final class TrackerPaceTests: XCTestCase {
         XCTAssertEqual(pace.goodness, 50)
         XCTAssertTrue(pace.isAheadOfPace)
         XCTAssertEqual(pace.status, .good)
-        XCTAssertEqual(pace.statusLine(for: tracker), "Below Limit by")
+        XCTAssertEqual(pace.statusLine(for: tracker), "Under Limit by")
         XCTAssertEqual(pace.displayDifference(for: tracker), "£50")
     }
 
@@ -416,7 +416,7 @@ final class TrackerPaceTests: XCTestCase {
 
     func testStatusLine_usesEachTypesOwnWording() {
         let spending = spendingTracker()
-        XCTAssertEqual(spending.pace(actualValue: 1600, asOf: halfway).statusLine(for: spending), "Below Budget by")
+        XCTAssertEqual(spending.pace(actualValue: 1600, asOf: halfway).statusLine(for: spending), "Under Budget by")
         XCTAssertEqual(spending.pace(actualValue: 1200, asOf: halfway).statusLine(for: spending), "Over Budget by")
         XCTAssertEqual(spending.pace(actualValue: 1440, asOf: halfway).statusLine(for: spending), "Just Over Budget by")
 

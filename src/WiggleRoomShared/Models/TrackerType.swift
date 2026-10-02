@@ -237,6 +237,12 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
         }
     }
 
+    /// The two catch-all number types, whose log screen offers one-tap
+    /// "Add 1" and "Remove 1" alongside typing a value.
+    var isPlainNumber: Bool {
+        self == .numberRising || self == .numberFalling
+    }
+
     var orientation: TrackerOrientation {
         switch self {
         case .spendingMoney, .spendingCredit, .mileage: .allowance
@@ -389,12 +395,12 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 paceFigure: "Budget now",
                 wholePeriodFigure: "Budget",
                 finalFigure: "Final budget",
-                goodLabel: "Below Budget",
+                goodLabel: "Under Budget",
                 amberLabel: "Just Over Budget",
                 badLabel: "Over Budget",
                 remainingCaption: "left in this budget",
                 paceNoun: "Budget",
-                celebration: "Closed Below Budget!",
+                celebration: "Closed Under Budget!",
                 belowZero: "overdrawn"
             )
         case .spendingCredit:
@@ -403,12 +409,12 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
                 paceFigure: "Limit now",
                 wholePeriodFigure: "Limit",
                 finalFigure: "Final limit",
-                goodLabel: "Below Limit",
+                goodLabel: "Under Limit",
                 amberLabel: "Just Over Limit",
                 badLabel: "Over Limit",
                 remainingCaption: "left in this limit",
                 paceNoun: "Limit",
-                celebration: "Closed Below Limit!",
+                celebration: "Closed Under Limit!",
                 belowZero: "in credit"
             )
         case .savingMoney:

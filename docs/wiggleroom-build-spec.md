@@ -84,7 +84,7 @@ Precision and the amber floor belong to the unit, not the type: kg and lb differ
 
 The plain-number types use a unit with no symbol at all, so their figures render bare (`8,400`). It is still a real unit rather than a special case, so precision, rounding and the amber floor keep working the same way everywhere. Because a unit's raw value is its symbol for every unit that has one, `Tracker.unit` stores the raw value — the unitless one stores the word `number`.
 
-A whole value drops its decimals entirely, so values read as `£684`, `£692.40`, `8,400 mi`, `85 kg`, `84.6 kg`, `8,400`. A zero-precision unit rounds typed input up to a whole number, with the rounding stated inline on the log screen. Rounding is a property of the unit, so both plain-number types round the same way even though they run in opposite directions.
+A whole value drops its decimals entirely, so values read as `£684`, `£692.40`, `8,400 mi`, `85 kg`, `84.6 kg`, `8,400`. A zero-precision unit rounds typed input up to a whole number, with the rounding stated inline on the log screen. The log screen for the two plain-number types also offers Add 1 and Remove 1 buttons, which log the latest value (or the starting value before any reading) moved by one, so a count can be updated without knowing it. Rounding is a property of the unit, so both plain-number types round the same way even though they run in opposite directions.
 
 No figure is ever shown with a sign, because a minus sign reads differently depending on which way a tracker runs. A value below zero shows its magnitude followed by a word from the type's terminology table: `£20 overdrawn` for Spending Money and Saving Money, `£20 in credit` for Spending Credit, and `20 below zero` for the rest. A value that rounds to zero at the unit's precision shows as zero, with no word. Stored values and exports keep real negative numbers, and editable number fields still accept a typed minus sign.
 
@@ -212,7 +212,7 @@ The interface should feel calm and informative rather than punitive.
 - Green indicates on pace or better, whichever side of the pace line the tracker's type treats as good.
 - Amber indicates a small shortfall, never narrower than the unit's own floor.
 - Red indicates a larger shortfall.
-- Status wording comes from the tracker type's terminology table, so no surface can drift from another. Every status line is the label, then "by", then an unsigned figure ("Just Over Budget by £12"), amber included.
+- Status wording comes from the tracker type's terminology table, so no surface can drift from another. Spending Money and Spending Credit word their status as Under and Over ("Under Budget", "Over Limit"). Every status line is the label, then "by", then an unsigned figure ("Just Over Budget by £12"), amber included.
 - Tracker identity colours do not replace status colours.
 - Fraunces is used for names and headings; Nunito is the primary text face.
 - Numeric values remain the source of truth and accompany visual indicators.
