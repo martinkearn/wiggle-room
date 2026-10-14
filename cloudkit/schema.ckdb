@@ -12,7 +12,7 @@ DEFINE SCHEMA
         "___etag"                STRING,
         "___modTime"             TIMESTAMP,
         "___modifiedBy"          REFERENCE,
-        "___recordID"            REFERENCE QUERYABLE,
+        "___recordID"            REFERENCE,
         GRANT WRITE TO "_creator",
         GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
@@ -26,7 +26,7 @@ DEFINE SCHEMA
         "___etag"       STRING,
         "___modTime"    TIMESTAMP,
         "___modifiedBy" REFERENCE,
-        "___recordID"   REFERENCE QUERYABLE,
+        "___recordID"   REFERENCE,
         GRANT WRITE TO "_creator",
         GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
@@ -36,7 +36,7 @@ DEFINE SCHEMA
         CD_chartZoomRawValue       STRING QUERYABLE SEARCHABLE SORTABLE,
         CD_colorIndex              INT64 QUERYABLE SORTABLE,
         CD_connectedSource         STRING QUERYABLE SEARCHABLE SORTABLE,
-        CD_direction               BYTES,
+        CD_direction               BYTES QUERYABLE SORTABLE,
         CD_endDate                 TIMESTAMP QUERYABLE SORTABLE,
         CD_entityName              STRING QUERYABLE SEARCHABLE SORTABLE,
         CD_glyph                   STRING QUERYABLE SEARCHABLE SORTABLE,
@@ -60,7 +60,7 @@ DEFINE SCHEMA
         "___etag"                  STRING,
         "___modTime"               TIMESTAMP,
         "___modifiedBy"            REFERENCE,
-        "___recordID"              REFERENCE QUERYABLE,
+        "___recordID"              REFERENCE,
         GRANT WRITE TO "_creator",
         GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
@@ -70,6 +70,7 @@ DEFINE SCHEMA
         CD_date         TIMESTAMP QUERYABLE SORTABLE,
         CD_entityName   STRING QUERYABLE SEARCHABLE SORTABLE,
         CD_id           STRING QUERYABLE SEARCHABLE SORTABLE,
+        CD_note         STRING QUERYABLE SEARCHABLE SORTABLE,
         CD_tracker      STRING QUERYABLE SEARCHABLE SORTABLE,
         CD_value        DOUBLE QUERYABLE SORTABLE,
         "___createTime" TIMESTAMP,
@@ -77,7 +78,7 @@ DEFINE SCHEMA
         "___etag"       STRING,
         "___modTime"    TIMESTAMP,
         "___modifiedBy" REFERENCE,
-        "___recordID"   REFERENCE QUERYABLE,
+        "___recordID"   REFERENCE,
         GRANT WRITE TO "_creator",
         GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"

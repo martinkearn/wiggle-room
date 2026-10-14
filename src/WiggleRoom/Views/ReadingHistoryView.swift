@@ -120,8 +120,15 @@ struct ReadingHistoryView: View {
             BlobShape(seed: Double(tracker.resolvedColorIndex))
                 .fill(tracker.accentColor)
                 .frame(width: 10, height: 10)
-            Text(reading.date.formatted(date: .abbreviated, time: .shortened))
-                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(reading.date.formatted(date: .abbreviated, time: .shortened))
+                    .foregroundStyle(.primary)
+                if !reading.note.isEmpty {
+                    Text(reading.note)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Spacer()
             Text(tracker.formattedValue(reading.value))
                 .foregroundStyle(.secondary)
