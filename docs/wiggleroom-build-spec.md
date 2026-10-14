@@ -140,7 +140,7 @@ Values are clamped where needed for presentation, but stored readings remain unc
 
 ### Manual Entry
 
-Every tracker accepts manual readings from Balance History, including trackers connected to an external source. Any reading can be edited or deleted there regardless of how it was created. Manual trackers additionally retain their pull-to-update entry gesture. The internal Manual Entry `ConnectedSource` is plumbing rather than an external connection. Duplicate manual records are consolidated automatically without deleting trackers.
+Every tracker accepts manual readings from Balance History, including trackers connected to an external source. Any reading can be edited or deleted there regardless of how it was created. Manual trackers additionally retain their pull-to-update entry gesture. The internal Manual Entry `ConnectedSource` is plumbing rather than an external connection. Each reading can carry an optional single-line note of up to 100 characters (`ValueSnapshot.note`), entered between the value and the date and shown under the date in Balance History, so a large jump can say what it was for. Notes travel in archives. Duplicate manual records are consolidated automatically without deleting trackers.
 
 ### Starling
 

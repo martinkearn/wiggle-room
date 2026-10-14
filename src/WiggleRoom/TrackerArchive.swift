@@ -56,6 +56,8 @@ struct TrackerArchive: Codable, Identifiable {
         let id: UUID
         let value: String
         let date: Date
+        /// Optional so archives written before update notes existed still decode.
+        var note: String? = nil
     }
 
     var externalSources: [Source] {
@@ -130,7 +132,8 @@ enum TrackerArchiveService {
                         TrackerArchive.Reading(
                             id: $0.id,
                             value: NSDecimalNumber(decimal: $0.value).stringValue,
-                            date: $0.date
+                            date: $0.date,
+                            note: $0.note.isEmpty ? nil : $0.note
                         )
                     }
                 )
@@ -243,7 +246,8 @@ enum TrackerArchiveService {
                 let reading = ValueSnapshot(
                     id: archivedReading.id,
                     value: Decimal(string: archivedReading.value)!,
-                    date: archivedReading.date
+                    date: archivedReading.date,
+                    note: archivedReading.note ?? ""
                 )
                 reading.tracker = tracker
                 modelContext.insert(reading)
