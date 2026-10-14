@@ -55,7 +55,7 @@ struct LogReadingView: View {
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                     } footer: {
-                        Text("Adjust the current value by one without needing to know it, or enter a number below.")
+                        Text("Adjust the value by one, or enter a number below, then tap Save.")
                     }
                 }
 
@@ -116,10 +116,13 @@ struct LogReadingView: View {
                 }
             }
             .onAppear {
-                guard let existingReading else { return }
-                valueText = existingReading.value.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
-                date = existingReading.date
-                note = existingReading.note
+                if let existingReading {
+                    valueText = Self.editableText(existingReading.value)
+                    date = existingReading.date
+                    note = existingReading.note
+                } else {
+                    valueText = Self.editableText(currentValue)
+                }
             }
             .task {
                 isValueFieldFocused = true
@@ -186,15 +189,23 @@ struct LogReadingView: View {
         return Decimal(string: text)
     }
 
-    private var trimmedNote: String { note.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    /// Logs the latest value (or the starting value, before any reading)
-    /// moved by `delta`, at the chosen date.
-    private func step(by delta: Decimal) {
-        let current = tracker.latestReading?.value ?? tracker.startingValue
-        store.logReading(value: current + delta, date: date, note: trimmedNote, for: tracker)
-        dismiss()
+    /// The tracker's latest value, or its starting value before any reading.
+    private var currentValue: Decimal {
+        tracker.latestReading?.value ?? tracker.startingValue
     }
+
+    private static func editableText(_ value: Decimal) -> String {
+        value.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+    }
+
+    /// Moves the value field by `delta` without saving, so the user can still
+    /// adjust the date before tapping Save.
+    private func step(by delta: Decimal) {
+        let base = Self.parseDecimal(valueText) ?? currentValue
+        valueText = Self.editableText(base + delta)
+    }
+
+    private var trimmedNote: String { note.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private func save() {
         guard let typed = Self.parseDecimal(valueText) else { return }
