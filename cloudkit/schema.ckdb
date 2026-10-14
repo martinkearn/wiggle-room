@@ -94,3 +94,4 @@ DEFINE SCHEMA
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );
+
