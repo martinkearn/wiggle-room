@@ -112,3 +112,38 @@ jobs:
             -scheme "$SCHEME" \
             -destination "id=$SIMULATOR_ID" \
             -only-testing:WiggleRoomTests/CloudKitSchemaTests
+
+  schema-deploy-reminder:
+    name: Remind to deploy CloudKit schema changes
+    # Needs no Xcode, and posts nothing unless the pull request changes
+    # cloudkit/schema.ckdb. A Production deploy is only possible in CloudKit
+    # Console, so this comment is the nudge to do it before TestFlight.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Post or clear the reminder comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          marker='<!-- cloudkit-schema-deploy -->'
+          comment_id="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.body | startswith(\"$marker\"))][0].id // empty")"
+          if gh pr diff "$PR" --name-only | grep -qx 'cloudkit/schema.ckdb'; then
+            if [[ -n "$comment_id" ]]; then
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" \
+                -F body=@.github/schema-deploy-comment.md > /dev/null
+            else
+              gh pr comment "$PR" --body-file .github/schema-deploy-comment.md
+            fi
+          elif [[ -n "$comment_id" ]]; then
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id"
+          fi
