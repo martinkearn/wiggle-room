@@ -426,7 +426,9 @@ Two checks enforce the schema, each catching a different mistake:
 - **Model changed, schema file not updated.** `CloudKitSchemaTests` runs in the pull-request build check, with no secrets. For every model it expects `CD_entityName`, `CD_<name>` for each stored attribute and each to-one relationship, and `CD_<name>_ckAsset` for externally stored data (a to-many relationship has no field). It fails if any of these is missing from the committed file. It compares names only.
 - **Schema not deployed.** Both TestFlight workflows export the Production schema with `xcrun cktool` before installing any signing material, and `.github/scripts/check-cloudkit-schema.py` fails the run if Production lacks a record type or `CD_` field from the committed file, or types one differently. Extra fields in Production are fine. The step authenticates with the `CLOUDKIT_MANAGEMENT_TOKEN` repository secret, a CloudKit management token that expires after a year; an expired token fails the step with a message saying so.
 
-Neither check deploys anything. A Production deploy is only possible in CloudKit Console. CI also does not import the committed file into Development.
+A third job in the pull-request build check, `schema-deploy-reminder`, posts a step-by-step comment (from `.github/schema-deploy-comment.md`) on any pull request that changes `cloudkit/schema.ckdb`, and removes it if the change is dropped. It only reminds; it has no CloudKit access.
+
+None of these deploys anything. A Production deploy is only possible in CloudKit Console. CI also does not import the committed file into Development.
 
 A model change therefore goes:
 
