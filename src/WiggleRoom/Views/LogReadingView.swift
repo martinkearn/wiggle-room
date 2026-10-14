@@ -21,6 +21,7 @@ struct LogReadingView: View {
 
     @State private var valueText = ""
     @State private var date = Date.now
+    @State private var note = ""
     @State private var isPresentingDeleteConfirmation = false
     @FocusState private var isValueFieldFocused: Bool
 
@@ -62,6 +63,10 @@ struct LogReadingView: View {
                     valueInput
                         .listRowInsets(EdgeInsets())
                         .padding(.vertical, 12)
+                    TextField("Note (optional)", text: $note)
+                        .onChange(of: note) { _, new in
+                            if new.count > Self.noteLimit { note = String(new.prefix(Self.noteLimit)) }
+                        }
                     DatePicker("Date", selection: $date, in: ...Date.now)
                         .datePickerStyle(.compact)
                 } footer: {
@@ -114,6 +119,7 @@ struct LogReadingView: View {
                 if let existingReading {
                     valueText = Self.editableText(existingReading.value)
                     date = existingReading.date
+                    note = existingReading.note
                 } else {
                     valueText = Self.editableText(currentValue)
                 }
@@ -171,6 +177,8 @@ struct LogReadingView: View {
 
     /// See `AddTrackerView.parseDecimal` — plain `Decimal(string:)` silently
     /// truncates at a grouping separator ("2,800" → 2) instead of failing.
+    private static let noteLimit = 100
+
     private static func parseDecimal(_ text: String) -> Decimal? {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -197,6 +205,8 @@ struct LogReadingView: View {
         valueText = Self.editableText(base + delta)
     }
 
+    private var trimmedNote: String { note.trimmingCharacters(in: .whitespacesAndNewlines) }
+
     private func save() {
         guard let typed = Self.parseDecimal(valueText) else { return }
         // A zero-precision unit stores whole numbers only — see
@@ -205,9 +215,10 @@ struct LogReadingView: View {
         if let existingReading {
             existingReading.value = value
             existingReading.date = date
+            existingReading.note = trimmedNote
             store.saveChanges()
         } else {
-            store.logReading(value: value, date: date, for: tracker)
+            store.logReading(value: value, date: date, note: trimmedNote, for: tracker)
         }
         dismiss()
     }

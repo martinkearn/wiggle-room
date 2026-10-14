@@ -79,6 +79,9 @@ struct AddTrackerView: View {
     /// ("£5,000", "85 kg"). `Tracker.totalAllowance` is derived from it on
     /// save; see `TrackerType.totalAllowance(startingValue:targetValue:)`.
     @State private var targetValueText = ""
+    /// The whole-period figure spread over a day. Editable alongside
+    /// `targetValueText`: whichever the user last typed in drives the other.
+    @State private var dailyValueText = ""
     @State private var colorIndex = 0
     @State private var glyph = ""
     /// The other trackers' names and colours — a one-shot snapshot taken
@@ -134,7 +137,7 @@ struct AddTrackerView: View {
     @State private var isPresentingDeleteConfirmation = false
 
     private enum NumberField {
-        case startingValue, targetValue
+        case startingValue, targetValue, dailyValue
     }
     @FocusState private var focusedNumberField: NumberField?
 
@@ -230,6 +233,14 @@ struct AddTrackerView: View {
                     Text(trackerType.targetValueHint)
                         .font(.wiggleText(.caption))
                         .foregroundStyle(.secondary)
+                    if isDailyBudgetAvailable {
+                        LabeledContent("Daily") {
+                            unitValueField(text: $dailyValueText, field: .dailyValue)
+                        }
+                        Text("Set a daily figure instead and the total is worked out from it, or the other way round.")
+                            .font(.wiggleText(.caption))
+                            .foregroundStyle(.secondary)
+                    }
                     if let roundingHint = unit.roundingHint {
                         Text(roundingHint)
                             .font(.wiggleText(.caption))
@@ -243,11 +254,6 @@ struct AddTrackerView: View {
 
                     if let hourlyPaceDescription {
                         Text(hourlyPaceDescription)
-                            .font(.wiggleText(.footnote))
-                            .foregroundStyle(.secondary)
-                    }
-                    if let dailyPaceDescription {
-                        Text(dailyPaceDescription)
                             .font(.wiggleText(.footnote))
                             .foregroundStyle(.secondary)
                     }
@@ -392,6 +398,11 @@ struct AddTrackerView: View {
                     applyTypeDefaults(trackerType)
                 }
             }
+            .onChange(of: targetValueText) { syncDailyFromTotal() }
+            .onChange(of: startingValueText) { syncDailyFromTotal() }
+            .onChange(of: startDate) { syncDailyFromTotal() }
+            .onChange(of: endDate) { syncDailyFromTotal() }
+            .onChange(of: dailyValueText) { syncTotalFromDaily() }
             .navigationDestination(isPresented: $isShowingAddSource) {
                 AddSourcePickerView()
             }
@@ -723,28 +734,38 @@ struct AddTrackerView: View {
         let periodHours = endDate.timeIntervalSince(startDate) / 3600
         guard periodHours > 0 else { return nil }
         let hourlyRate = totalAllowance / Decimal(periodHours)
-        return "≈ \(Self.paceRate(hourlyRate, unit: unit)) / hour"
+        return "≈ \(Tracker.formattedRate(hourlyRate, unit: unit)) / hour"
     }
 
-    /// Only worth showing alongside the hourly rate once a tracker runs
-    /// longer than a day — for anything shorter, "per day" isn't a
-    /// meaningful way to think about the pace.
-    private var dailyPaceDescription: String? {
-        guard let totalAllowance = derivedTotalAllowance, endDate > startDate else { return nil }
-        let periodHours = endDate.timeIntervalSince(startDate) / 3600
-        guard periodHours > 24 else { return nil }
-        let dailyRate = totalAllowance / Decimal(periodHours / 24)
-        return "≈ \(Self.paceRate(dailyRate, unit: unit)) / day"
+    /// A daily figure only means something once the period runs longer than
+    /// a day.
+    private var isDailyBudgetAvailable: Bool {
+        endDate.timeIntervalSince(startDate) / 3600 > 24
     }
 
-    /// A pace rate for the two "per hour"/"per day" lines. Always shows up to
-    /// two decimal places whatever the unit's own precision — a rate of a
-    /// third of a mile a day is worth seeing even though a reading isn't —
-    /// and omits the unit entirely when it has no symbol, so a plain-number
-    /// tracker reads "≈ 12 / day" rather than carrying a stray space.
-    private static func paceRate(_ rate: Decimal, unit: TrackerUnit) -> String {
-        let magnitude = rate.formatted(.number.precision(.fractionLength(0...2)))
-        return unit.symbol.isEmpty ? magnitude : "\(magnitude) \(unit.symbol)"
+    /// Refreshes the daily field from the total, unless the user is typing in
+    /// the daily field themselves (which would fight their input).
+    private func syncDailyFromTotal() {
+        guard focusedNumberField != .dailyValue else { return }
+        guard let totalAllowance = derivedTotalAllowance,
+              let dailyRate = Tracker.dailyRate(totalAllowance: totalAllowance, startDate: startDate, endDate: endDate)
+        else {
+            dailyValueText = ""
+            return
+        }
+        let text = dailyRate.formatted(.number.grouping(.never).precision(.fractionLength(0...2)))
+        if text != dailyValueText { dailyValueText = text }
+    }
+
+    /// Works the total out from a typed daily figure.
+    private func syncTotalFromDaily() {
+        guard focusedNumberField == .dailyValue else { return }
+        guard isDailyBudgetAvailable, let daily = Self.parseDecimal(dailyValueText) else { return }
+        let days = Decimal(endDate.timeIntervalSince(startDate) / 86400)
+        let allowance = unit.rounded(daily * days)
+        let startingValue = parsedStartingValue ?? 0
+        let target = trackerType.targetValue(startingValue: startingValue, totalAllowance: allowance)
+        targetValueText = Self.editableText(target, unit: unit)
     }
 
     /// See `Tracker.projectedRemainder` — how much would be left over at the

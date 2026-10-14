@@ -505,4 +505,19 @@ enum TrackerType: String, CaseIterable, Hashable, Codable, Identifiable {
         case .goal: abs(targetValue - startingValue)
         }
     }
+
+    /// The inverse of `totalAllowance(startingValue:targetValue:)`: the form
+    /// value (a movement, or a goal's end value) that gives a stored
+    /// allowance. Used when the user states a daily budget and the whole-period
+    /// figure has to be worked out from it.
+    func targetValue(startingValue: Decimal, totalAllowance: Decimal) -> Decimal {
+        switch orientation {
+        case .allowance: totalAllowance
+        case .goal:
+            switch direction {
+            case .increasing: startingValue + totalAllowance
+            case .decreasing: startingValue - totalAllowance
+            }
+        }
+    }
 }

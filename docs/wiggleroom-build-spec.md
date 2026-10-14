@@ -65,6 +65,8 @@ Spending Credit is the mirror of Spending Money: the same spending, counted upwa
 
 Orientation decides how the whole-period figure is entered. An allowance type is entered as a movement ("a £500 budget"); a goal type is entered as an end value ("£5,000", "85 kg"). Storage is uniform: a goal type's `totalAllowance` is the distance from `startingValue` to the stated goal, recomputed if the starting value is later edited so the goal itself cannot drift.
 
+Add/Edit Tracker also offers a Daily field beside the whole-period figure, for periods longer than a day. The two stay in step: typing a daily figure works the whole-period figure out from it (`TrackerType.targetValue(startingValue:totalAllowance:)` inverts the storage rule above), and editing the whole-period figure, starting value or dates refreshes the daily one. Only the whole-period figure is stored. The dashboard's pace card shows the same per-day figure (`Tracker.dailyRate`) beneath its other captions.
+
 `TrackerType` owns a terminology table covering every type-dependent phrase — the current figure, the current pace figure ("Budget now", "Target now"), the whole-period figure, the final figure, the three status labels, the remaining-amount caption, and the completion celebration. Each type needs a whole-period noun and a current-pace noun, because the dashboard shows both figures side by side.
 
 `typeRawValue` is a plain `String` with a default rather than an enum attribute, and is read through an accessor that falls back to a known type. A newer build writing an unrecognised value must not fault an older device that syncs the record.
@@ -140,7 +142,7 @@ Values are clamped where needed for presentation, but stored readings remain unc
 
 ### Manual Entry
 
-Every tracker accepts manual readings from Balance History, including trackers connected to an external source. Any reading can be edited or deleted there regardless of how it was created. Manual trackers additionally retain their pull-to-update entry gesture. The internal Manual Entry `ConnectedSource` is plumbing rather than an external connection. Duplicate manual records are consolidated automatically without deleting trackers.
+Every tracker accepts manual readings from Balance History, including trackers connected to an external source. Any reading can be edited or deleted there regardless of how it was created. Manual trackers additionally retain their pull-to-update entry gesture. The internal Manual Entry `ConnectedSource` is plumbing rather than an external connection. Each reading can carry an optional single-line note of up to 100 characters (`ValueSnapshot.note`), entered between the value and the date and shown under the date in Balance History, so a large jump can say what it was for. Notes travel in archives. Duplicate manual records are consolidated automatically without deleting trackers.
 
 ### Starling
 
@@ -426,7 +428,9 @@ Two checks enforce the schema, each catching a different mistake:
 - **Model changed, schema file not updated.** `CloudKitSchemaTests` runs in the pull-request build check, with no secrets. For every model it expects `CD_entityName`, `CD_<name>` for each stored attribute and each to-one relationship, and `CD_<name>_ckAsset` for externally stored data (a to-many relationship has no field). It fails if any of these is missing from the committed file. It compares names only.
 - **Schema not deployed.** Both TestFlight workflows export the Production schema with `xcrun cktool` before installing any signing material, and `.github/scripts/check-cloudkit-schema.py` fails the run if Production lacks a record type or `CD_` field from the committed file, or types one differently. Extra fields in Production are fine. The step authenticates with the `CLOUDKIT_MANAGEMENT_TOKEN` repository secret, a CloudKit management token that expires after a year; an expired token fails the step with a message saying so.
 
-Neither check deploys anything. A Production deploy is only possible in CloudKit Console. CI also does not import the committed file into Development.
+A third job in the pull-request build check, `schema-deploy-reminder`, posts a step-by-step comment (from `.github/schema-deploy-comment.md`) on any pull request that changes `cloudkit/schema.ckdb`, and removes it if the change is dropped. It only reminds; it has no CloudKit access.
+
+None of these deploys anything. A Production deploy is only possible in CloudKit Console. CI also does not import the committed file into Development.
 
 A model change therefore goes:
 

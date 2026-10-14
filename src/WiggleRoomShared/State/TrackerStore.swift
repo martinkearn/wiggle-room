@@ -209,8 +209,8 @@ final class TrackerStore {
     /// Appends a manually-logged reading directly — the dashboard and log
     /// sheet already hold the `Tracker` reference, so this bypasses the
     /// target-id indirection `ManualEntryProvider` exists for.
-    func logReading(value: Decimal, date: Date, for tracker: Tracker) {
-        let reading = ValueSnapshot(value: value, date: date)
+    func logReading(value: Decimal, date: Date, note: String = "", for tracker: Tracker) {
+        let reading = ValueSnapshot(value: value, date: date, note: note)
         reading.tracker = tracker
         modelContext.insert(reading)
         try? modelContext.save()

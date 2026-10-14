@@ -310,6 +310,26 @@ extension Tracker {
         }
     }
 
+    /// The allowance spread over one day of the period, or `nil` when the
+    /// period isn't longer than a day (a per-day figure means little then).
+    var dailyRate: Decimal? {
+        Self.dailyRate(totalAllowance: totalAllowance, startDate: startDate, endDate: endDate)
+    }
+
+    static func dailyRate(totalAllowance: Decimal, startDate: Date, endDate: Date) -> Decimal? {
+        let periodHours = endDate.timeIntervalSince(startDate) / 3600
+        guard periodHours > 24 else { return nil }
+        return totalAllowance / Decimal(periodHours / 24)
+    }
+
+    /// A pace rate for "per hour"/"per day" lines. Shows up to two decimal
+    /// places whatever the unit's own precision, and omits the unit when it
+    /// has no symbol, so a plain-number tracker reads "12" without a stray space.
+    static func formattedRate(_ rate: Decimal, unit: TrackerUnit) -> String {
+        let magnitude = rate.formatted(.number.precision(.fractionLength(0...2)))
+        return unit.symbol.isEmpty ? magnitude : "\(magnitude) \(unit.symbol)"
+    }
+
     /// How much would be left over at the end of the tracker's period, worded
     /// for display — `nil` exactly when `projectedRemainder` is (i.e. the
     /// "spend it all" case needs no extra explanation). Shared by the
