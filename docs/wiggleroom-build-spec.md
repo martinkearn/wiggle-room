@@ -65,6 +65,8 @@ Spending Credit is the mirror of Spending Money: the same spending, counted upwa
 
 Orientation decides how the whole-period figure is entered. An allowance type is entered as a movement ("a £500 budget"); a goal type is entered as an end value ("£5,000", "85 kg"). Storage is uniform: a goal type's `totalAllowance` is the distance from `startingValue` to the stated goal, recomputed if the starting value is later edited so the goal itself cannot drift.
 
+Add/Edit Tracker also offers a Daily field beside the whole-period figure, for periods longer than a day. The two stay in step: typing a daily figure works the whole-period figure out from it (`TrackerType.targetValue(startingValue:totalAllowance:)` inverts the storage rule above), and editing the whole-period figure, starting value or dates refreshes the daily one. Only the whole-period figure is stored. The dashboard's pace card shows the same per-day figure (`Tracker.dailyRate`) beneath its other captions.
+
 `TrackerType` owns a terminology table covering every type-dependent phrase — the current figure, the current pace figure ("Budget now", "Target now"), the whole-period figure, the final figure, the three status labels, the remaining-amount caption, and the completion celebration. Each type needs a whole-period noun and a current-pace noun, because the dashboard shows both figures side by side.
 
 `typeRawValue` is a plain `String` with a default rather than an enum attribute, and is read through an accessor that falls back to a known type. A newer build writing an unrecognised value must not fault an older device that syncs the record.

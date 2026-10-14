@@ -422,7 +422,7 @@ struct TrackerDetailView: View {
             // `TrackerPalette`).
             card(tint: tracker.referenceColor, variant: 1) {
                 figureContent(title: tracker.terminology.paceFigure, value: pace.targetValueToday,
-                              captions: [wholePeriodCaption, finalFigureCaption, estimatedFinalCaption].compactMap { $0 })
+                              captions: [wholePeriodCaption, finalFigureCaption, estimatedFinalCaption, dailyBudgetCaption].compactMap { $0 })
             }
             // A little "just updated" flourish when a new reading lands —
             // a full turn rather than a half-flip so the card never rests
@@ -706,6 +706,13 @@ struct TrackerDetailView: View {
         guard !isCompleted, tracker.sortedReadings.count > 1,
               let estimatedFinalValue = tracker.estimatedFinalValue else { return nil }
         return "Estimated final \(tracker.formattedValue(estimatedFinalValue))"
+    }
+
+    /// The per-day pace, matching the "≈ … / day" line on Edit Tracker. Only
+    /// for periods longer than a day.
+    private var dailyBudgetCaption: String? {
+        guard let dailyRate = tracker.dailyRate else { return nil }
+        return "≈ \(Tracker.formattedRate(dailyRate, unit: tracker.trackerUnit)) / day"
     }
 
     /// Subtle "Checked / Changed" lines under the balance for a

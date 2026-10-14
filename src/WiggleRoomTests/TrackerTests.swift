@@ -476,4 +476,27 @@ final class TrackerTests: XCTestCase {
         XCTAssertTrue(t.isCompleted(asOf: t.endDate))
         XCTAssertTrue(t.isCompleted(asOf: t.endDate.addingTimeInterval(1)))
     }
+
+    // MARK: - Daily budget
+
+    func testDailyRate_spreadsAllowanceOverDays() {
+        let start = Date()
+        let t = tracker(totalAllowance: 200)
+        t.startDate = start
+        t.endDate = start.addingTimeInterval(20 * 86400)
+        XCTAssertEqual(t.dailyRate, 10)
+    }
+
+    func testDailyRate_isNilForPeriodOfADayOrLess() {
+        let t = tracker(totalAllowance: 200)
+        XCTAssertNil(t.dailyRate)
+    }
+
+    func testTargetValue_invertsTotalAllowance() {
+        for type in TrackerType.allCases {
+            let target: Decimal = type.direction == .increasing ? 700 : 300
+            let allowance = type.totalAllowance(startingValue: 500, targetValue: target)
+            XCTAssertEqual(type.targetValue(startingValue: 500, totalAllowance: allowance), target, "\(type)")
+        }
+    }
 }
