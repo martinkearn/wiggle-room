@@ -145,7 +145,7 @@ struct TrackerDetailView: View {
                 // The window title can't take Fraunces, so the header is
                 // drawn in the content instead — just the badge and the name
                 // now, with the range and connection moved down into
-                // `periodDetails` (§7.1).
+                // `periodBar` and `detailList` (§7.1).
                 HStack(spacing: 10) {
                     TrackerBadge(tracker: tracker, size: 34)
                     Text(tracker.name)
@@ -209,7 +209,7 @@ struct TrackerDetailView: View {
                         .padding(.horizontal)
                 }
 
-                periodDetails
+                periodBar
 
                 if tracker.latestReading == nil {
                     Text(emptyReadingsMessage)
@@ -229,6 +229,11 @@ struct TrackerDetailView: View {
                     .trackerCard(tracker, variant: 1, strength: 0.08)
                     .padding(.horizontal)
                 }
+
+                // Beneath the chart, and outside its condition: a tracker
+                // with no chart yet still has a budget, a daily rate and an
+                // account to show.
+                detailList
             }
             .padding(.bottom, 32)
             #if os(macOS)
@@ -250,8 +255,7 @@ struct TrackerDetailView: View {
         // subtitle shows only one line and reserves space of its own whether
         // or not it is used, so a two-line strip had to be drawn separately
         // and always left a gap above it. Rather than keep chasing that gap,
-        // both lines now sit in `periodDetails`, down with the days-remaining
-        // line they belong with.
+        // both lines now sit lower down, in `periodBar` and `detailList`.
         .navigationTitle(tracker.name)
         #if os(macOS)
         .toolbar(removing: .title)
@@ -364,25 +368,117 @@ struct TrackerDetailView: View {
         }
     }
 
-    /// Everything about *when* this tracker runs and *where* its figures come
-    /// from, in one block below the figures: how much of the period is left,
-    /// the period itself, and — for a connected tracker — the connection and
-    /// account behind it. All three used to be split between the header and
-    /// here; see `body`'s note on why they were brought together.
-    private var periodDetails: some View {
-        VStack(spacing: 3) {
-            Text(periodRemainingText)
-            Text(periodRangeText)
-            if let sourceCaption {
-                Text(sourceCaption)
-                    .lineLimit(2)
+    /// Where the tracker is in its period: the start and end dates either
+    /// side of how much is left, over a thin bar filled to the elapsed
+    /// fraction. The connection and account that used to sit here are rows
+    /// in `detailList`. With a set time of day the dates are long, so when
+    /// all three don't fit on one line the remaining text takes a line of
+    /// its own above the dates.
+    private var periodBar: some View {
+        let fraction = tracker.periodElapsedFraction(asOf: now)
+        let remaining = periodRemainingText
+        return VStack(spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    Text(periodStartText)
+                    Spacer(minLength: 8)
+                    Text(remaining).foregroundStyle(.primary)
+                    Spacer(minLength: 8)
+                    Text(periodEndText)
+                }
+                VStack(spacing: 2) {
+                    Text(remaining).foregroundStyle(.primary)
+                    HStack {
+                        Text(periodStartText)
+                        Spacer(minLength: 8)
+                        Text(periodEndText)
+                    }
+                }
+            }
+            .font(.wiggleText(.caption))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize(horizontal: false, vertical: true)
+
+            GeometryReader { geo in
+                let width = geo.size.width
+                let filled = width * fraction
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.primary.opacity(0.12)).frame(height: 6)
+                    Capsule().fill(tracker.accentColor).frame(width: max(filled, 6), height: 6)
+                    Circle()
+                        .fill(tracker.accentColor)
+                        .frame(width: 14, height: 14)
+                        .overlay(Circle().strokeBorder(.background, lineWidth: 2))
+                        .offset(x: min(max(filled - 7, 0), max(width - 14, 0)))
+                }
+            }
+            .frame(height: 14)
+        }
+        .padding(.horizontal)
+        .readableColumn()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Period progress")
+        .accessibilityValue("\(Int((fraction * 100).rounded())) percent, \(remaining)")
+    }
+
+    /// Everything that used to be a caption under the figure cards, as
+    /// aligned label and value rows. The rows themselves come from
+    /// `Tracker.detailRows(pace:asOf:account:)`.
+    private var detailList: some View {
+        let rows = tracker.detailRows(
+            pace: isCompleted ? (finalPace ?? pace) : pace,
+            asOf: now,
+            account: sourceCaption
+        )
+        return VStack(spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                detailRow(row)
+                if index < rows.count - 1 {
+                    Divider()
+                }
             }
         }
-        .font(.wiggleText(.caption))
-        .foregroundStyle(.secondary)
-        .multilineTextAlignment(.center)
         .padding(.horizontal)
+        .readableColumn()
     }
+
+    private func detailRow(_ row: TrackerDetailRow) -> some View {
+        // Label and value share a line when they fit; at an accessibility
+        // text size, or for a long account name, the value drops beneath.
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(row.label).foregroundStyle(.secondary)
+                Spacer(minLength: 12)
+                detailValue(row.value)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.label).foregroundStyle(.secondary)
+                detailValue(row.value)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(Self.detailRowFont)
+        .padding(.vertical, 10)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func detailValue(_ value: String) -> some View {
+        Text(value)
+            .font(Self.detailRowFont.weight(.medium))
+            .foregroundStyle(.primary)
+            .multilineTextAlignment(.trailing)
+            #if os(macOS)
+            .textSelection(.enabled)
+            #endif
+    }
+
+    #if os(macOS)
+    private static let detailRowFont = Font.wiggleText(.callout)
+    #else
+    private static let detailRowFont = Font.wiggleText(.subheadline)
+    #endif
 
     /// The video-game-style completion celebration (see `CelebrationView`)
     /// fires once, the first time this dashboard sees the tracker's period
@@ -412,8 +508,7 @@ struct TrackerDetailView: View {
     private var figuresRow: some View {
         HStack(alignment: .top, spacing: 12) {
             card(tint: pace.status.color) {
-                figureContent(title: tracker.terminology.currentFigure, value: pace.currentValue,
-                              captions: [remainingInAllowanceCaption].compactMap { $0 } + sourceTimingCaptions)
+                figureContent(title: tracker.terminology.currentFigure, value: pace.currentValue)
             }
 
             // The tracker's reference colour, not its identity colour: this
@@ -421,8 +516,7 @@ struct TrackerDetailView: View {
             // green tracker tinted both of them the same (see
             // `TrackerPalette`).
             card(tint: tracker.referenceColor, variant: 1) {
-                figureContent(title: tracker.terminology.paceFigure, value: pace.targetValueToday,
-                              captions: [wholePeriodCaption, finalFigureCaption, estimatedFinalCaption, dailyBudgetCaption].compactMap { $0 })
+                figureContent(title: tracker.terminology.paceFigure, value: pace.targetValueToday)
             }
             // A little "just updated" flourish when a new reading lands —
             // a full turn rather than a half-flip so the card never rests
@@ -435,6 +529,7 @@ struct TrackerDetailView: View {
             )
         }
         .padding(.horizontal)
+        .readableColumn()
     }
 
     /// Final-state replacement for `figuresRow` once the tracker has
@@ -450,6 +545,7 @@ struct TrackerDetailView: View {
             )
         }
         .padding(.horizontal)
+        .readableColumn()
     }
 
     private var finalSummaryCaption: String? {
@@ -651,6 +747,7 @@ struct TrackerDetailView: View {
         .controlSize(.large)
         .tint(WiggleRoomColors.brand)
         .padding(.horizontal)
+        .readableColumn()
         .disabled(isRefreshingFromSource && !tracker.isManualEntry)
     }
     #endif
@@ -674,66 +771,6 @@ struct TrackerDetailView: View {
                 .strokeBorder(.foreground.opacity(0.20), lineWidth: 1)
                 .crossFadingForeground(tint)
         }
-    }
-
-    private var remainingInAllowanceCaption: String? {
-        pace.remainingInAllowanceCaption(for: tracker)
-    }
-
-    /// The small, subtle line under the pace card's own number — same
-    /// weight/position as the current figure's "£X left in this budget" —
-    /// stating the whole-period figure the user actually entered: the budget
-    /// or allowance for an allowance type, the goal itself for a goal type
-    /// (§6).
-    private var wholePeriodCaption: String {
-        "\(tracker.terminology.wholePeriodFigure) \(tracker.formattedValue(tracker.wholePeriodValue))"
-    }
-
-    /// Where the number above is designed to land by the very end of the
-    /// period. Only shown for an allowance type: for a goal type the final
-    /// figure *is* the goal, which `wholePeriodCaption` has already printed
-    /// directly above, and repeating it would just be the same line twice.
-    private var finalFigureCaption: String? {
-        guard tracker.trackerType.orientation == .allowance else { return nil }
-        return "\(tracker.terminology.finalFigure) \(tracker.formattedValue(tracker.projectedFinalValue))"
-    }
-
-    /// A second subtle line under Current Budget: where the trend line
-    /// (§3.5) says this tracker is actually headed, as opposed to the
-    /// target's own final figure above it. Only once there's a trend to
-    /// speak of (2+ readings) and while the tracker is still running.
-    private var estimatedFinalCaption: String? {
-        guard !isCompleted, tracker.sortedReadings.count > 1,
-              let estimatedFinalValue = tracker.estimatedFinalValue else { return nil }
-        return "Estimated final \(tracker.formattedValue(estimatedFinalValue))"
-    }
-
-    /// The per-day pace, matching the "≈ … / day" line on Edit Tracker. Only
-    /// for periods longer than a day.
-    private var dailyBudgetCaption: String? {
-        guard let dailyRate = tracker.dailyRate else { return nil }
-        return "≈ \(Tracker.formattedRate(dailyRate, unit: tracker.trackerUnit)) / day"
-    }
-
-    /// Subtle "Checked / Changed" lines under the balance for a
-    /// connected-source tracker: when the source was last asked, and when
-    /// the balance last actually moved (the latest reading's date).
-    private var sourceTimingCaptions: [String] {
-        guard !tracker.isManualEntry else { return [] }
-        return [
-            tracker.lastCheckedDate.map { "Checked \(Self.timingText($0))" },
-            tracker.latestReading.map { "Changed \(Self.timingText($0.date))" }
-        ].compactMap { $0 }
-    }
-
-    /// Time only when it's today, otherwise day and month (no year) plus time.
-    private static func timingText(_ date: Date) -> String {
-        guard !Calendar.current.isDateInToday(date) else {
-            return "at " + date.formatted(date: .omitted, time: .shortened)
-        }
-        let day = date.formatted(.dateTime.day().month(.abbreviated))
-        let time = date.formatted(date: .omitted, time: .shortened)
-        return "\(day) at \(time)"
     }
 
     private func figureContent(title: String, value: Decimal, captions: [String] = []) -> some View {
@@ -760,24 +797,31 @@ struct TrackerDetailView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private static let periodRangeFormatter: Date.FormatStyle = .init()
+    private static let periodDateFormatter: Date.FormatStyle = .init()
         .month(.abbreviated)
         .day()
 
-    private static let periodRangeWithTimeFormatter: Date.FormatStyle = .init()
+    private static let periodDateWithTimeFormatter: Date.FormatStyle = .init()
         .month(.abbreviated)
         .day()
         .hour()
         .minute()
 
-    /// "12 Jan – 19 Jan", or "12 Jan, 9:00 AM – 19 Jan, 9:00 AM" only once
-    /// the tracker actually has a set time of day (`hasExplicitTimes`) —
-    /// otherwise both bounds sit at an implicit midnight, and printing that
-    /// out as "12:00 AM" reads as a real, deliberately-chosen time rather
-    /// than the meaningless default it actually is.
-    private var periodRangeText: String {
-        let formatter = tracker.hasExplicitTimes ? Self.periodRangeWithTimeFormatter : Self.periodRangeFormatter
-        return "\(tracker.startDate.formatted(formatter)) \u{2013} \(tracker.endDate.formatted(formatter))"
+    /// "12 Jan", or "12 Jan, 9:00 AM" only once the tracker actually has a
+    /// set time of day (`hasExplicitTimes`) — otherwise both bounds sit at an
+    /// implicit midnight, and printing that out as "12:00 AM" reads as a
+    /// real, deliberately-chosen time rather than the meaningless default it
+    /// actually is.
+    private var periodDateFormatter: Date.FormatStyle {
+        tracker.hasExplicitTimes ? Self.periodDateWithTimeFormatter : Self.periodDateFormatter
+    }
+
+    private var periodStartText: String {
+        tracker.startDate.formatted(periodDateFormatter)
+    }
+
+    private var periodEndText: String {
+        tracker.endDate.formatted(periodDateFormatter)
     }
 
     private var periodRemainingText: String {
@@ -791,4 +835,15 @@ struct TrackerDetailView: View {
     }
     .modelContainer(PreviewData.container)
     .environment(PreviewData.store)
+}
+
+private extension View {
+    /// Caps the cards, the period bar and the detail list at a width that
+    /// reads well, centred. A phone is narrower than this and is unaffected;
+    /// it is for a wide Mac window or an iPad, where a label at one edge and
+    /// its value 1,000 points away at the other would not scan. The rings
+    /// and chart keep their own widths.
+    func readableColumn() -> some View {
+        frame(maxWidth: 560)
+    }
 }
