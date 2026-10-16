@@ -135,9 +135,16 @@ struct TrackerPace: Equatable {
     /// once the allowance is used up, reached or exceeded — the ring/status
     /// wording already covers being past it.
     func remainingInAllowanceCaption(for tracker: Tracker) -> String? {
-        let remaining = totalAllowance - consumedSoFar
-        guard remaining > 0 else { return nil }
+        guard let remaining = remainingInAllowance else { return nil }
         return "\(tracker.formattedValue(remaining)) \(tracker.terminology.remainingCaption)"
+    }
+
+    /// What is left of the allowance, or `nil` once none is. The figure
+    /// behind `remainingInAllowanceCaption(for:)`, for a surface that sets
+    /// the amount and its wording apart.
+    var remainingInAllowance: Decimal? {
+        let remaining = totalAllowance - consumedSoFar
+        return remaining > 0 ? remaining : nil
     }
 }
 
