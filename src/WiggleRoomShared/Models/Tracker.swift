@@ -171,6 +171,14 @@ extension Tracker {
         now >= endDate
     }
 
+    /// Whether `now` falls inside the tracking window (`startDate` up to, but
+    /// not including, `endDate`) — the only time a tracker takes updates from
+    /// its connected source, so one can be set up in advance without
+    /// collecting anything before it begins.
+    func isWithinWindow(asOf now: Date = .now) -> Bool {
+        now >= startDate && now < endDate
+    }
+
     /// Whether `startDate`/`endDate` carry a meaningful time of day, rather
     /// than both sitting at midnight — mirrors the "Set specific times"
     /// toggle in the Add/Edit Tracker form (`AddTrackerView`), so a date

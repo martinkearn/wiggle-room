@@ -92,7 +92,7 @@ No figure is ever shown with a sign, because a minus sign reads differently depe
 
 Each reading is a separate timestamped `ValueSnapshot`. Reading history is append-oriented so CloudKit can merge updates made on different devices.
 
-A reading fetched from a source is recorded only when it is genuinely new: newer than the latest reading already held, and a different value at the unit's own precision. A source that reports historic readings carries its own timestamp into the record — an Apple Health weigh-in appears on the chart at the time it was taken, not the time it was collected — and a reading dated before the tracker's start is not recorded at all.
+A reading fetched from a source is recorded only when it is genuinely new: newer than the latest reading already held, and a different value at the unit's own precision. A source that reports historic readings carries its own timestamp into the record — an Apple Health weigh-in appears on the chart at the time it was taken, not the time it was collected — and a reading dated before the tracker's start or at or after its end is not recorded at all. A tracker only takes updates inside its start and end window: `refreshFromSource` makes no fetch from its source before the tracker starts or after it has completed, so a tracker can be set up in advance.
 
 A tracker's `name` must be unique (case-insensitive) among the user's other trackers; Add/Edit Tracker blocks Save on a collision.
 
