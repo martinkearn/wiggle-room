@@ -287,4 +287,27 @@ final class TrackerStoreTests: XCTestCase {
         XCTAssertTrue(tracker.sortedReadings.isEmpty)
         XCTAssertNil(tracker.lastCheckedDate)
     }
+
+    func testRefreshFromSource_trackerNotYetStarted_doesNotFetch() async throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        // No credentialToken: a fetch would throw `notConnected`.
+        let starlingSource = ConnectedSource(providerId: "starling", displayName: "My Starling")
+        context.insert(starlingSource)
+        let store = TrackerStore(modelContext: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id, name: "Test", type: .spendingMoney,
+            connectedSource: starlingSource, sourceTargetId: "abc-123",
+            startDate: Date().addingTimeInterval(3600), endDate: Date().addingTimeInterval(7200),
+            startingValue: 100, totalAllowance: 100
+        )
+        store.addTracker(tracker)
+
+        let changed = try await store.refreshFromSource(tracker, force: true)
+
+        XCTAssertFalse(changed)
+        XCTAssertTrue(tracker.sortedReadings.isEmpty)
+        XCTAssertNil(tracker.lastCheckedDate)
+    }
 }
