@@ -10,6 +10,7 @@ import XCTest
 /// hands back. Fictional weights throughout.
 final class SourceReadingPolicyTests: XCTestCase {
     private let periodStart = Date(timeIntervalSince1970: 1_800_000_000)
+    private var periodEnd: Date { periodStart.addingTimeInterval(30 * 86_400) }
 
     private func shouldLog(
         value: Decimal,
@@ -17,6 +18,7 @@ final class SourceReadingPolicyTests: XCTestCase {
         latestValue: Decimal? = nil,
         latestDate: Date? = nil,
         startDate: Date? = nil,
+        endDate: Date? = nil,
         force: Bool = false
     ) -> Bool {
         SourceReadingPolicy.shouldLog(
@@ -25,6 +27,7 @@ final class SourceReadingPolicyTests: XCTestCase {
             latestValue: latestValue,
             latestDate: latestDate,
             trackerStartDate: startDate ?? periodStart,
+            trackerEndDate: endDate ?? periodEnd,
             force: force
         )
     }
@@ -85,6 +88,19 @@ final class SourceReadingPolicyTests: XCTestCase {
         XCTAssertFalse(shouldLog(value: 84, at: periodStart.addingTimeInterval(-86_400)))
     }
 
+    func testReadingAtOrAfterTheTrackerEnded_isNotLogged() {
+        XCTAssertFalse(shouldLog(value: 84, at: periodEnd))
+        XCTAssertFalse(shouldLog(value: 84, at: periodEnd.addingTimeInterval(3600)))
+    }
+
+    func testReadingJustBeforeTheTrackerEnds_isLogged() {
+        XCTAssertTrue(shouldLog(value: 84, at: periodEnd.addingTimeInterval(-1)))
+    }
+
+    func testForce_doesNotLogAReadingFromAfterTheTrackerEnded() {
+        XCTAssertFalse(shouldLog(value: 84, at: periodEnd.addingTimeInterval(60), force: true))
+    }
+
     func testForce_logsAnUnchangedValue() {
         // Used right after a tracker is created or connected, so its first
         // reading always lands.
@@ -113,6 +129,7 @@ final class SourceReadingPolicyTests: XCTestCase {
                 latestValue: Decimal(string: "84.6")!,
                 latestDate: periodStart.addingTimeInterval(86_400),
                 trackerStartDate: periodStart,
+                trackerEndDate: periodEnd,
                 force: false
             )
         )

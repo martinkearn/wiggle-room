@@ -263,4 +263,28 @@ final class TrackerStoreTests: XCTestCase {
             XCTFail("unexpected error: \(error)")
         }
     }
+
+    func testRefreshFromSource_completedTracker_doesNotFetch() async throws {
+        let container = makeInMemoryModelContainer()
+        let context = container.mainContext
+        // No credentialToken: a fetch would throw `notConnected`, so
+        // returning normally shows the source was never contacted.
+        let starlingSource = ConnectedSource(providerId: "starling", displayName: "My Starling")
+        context.insert(starlingSource)
+        let store = TrackerStore(modelContext: context)
+        let id = UUID()
+        let tracker = Tracker(
+            id: id, name: "Test", type: .spendingMoney,
+            connectedSource: starlingSource, sourceTargetId: "abc-123",
+            startDate: Date().addingTimeInterval(-7200), endDate: Date().addingTimeInterval(-3600),
+            startingValue: 100, totalAllowance: 100
+        )
+        store.addTracker(tracker)
+
+        let changed = try await store.refreshFromSource(tracker, force: true)
+
+        XCTAssertFalse(changed)
+        XCTAssertTrue(tracker.sortedReadings.isEmpty)
+        XCTAssertNil(tracker.lastCheckedDate)
+    }
 }

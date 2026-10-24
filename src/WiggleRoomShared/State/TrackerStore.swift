@@ -307,6 +307,9 @@ final class TrackerStore {
     @discardableResult
     func refreshFromSource(_ tracker: Tracker, force: Bool = false) async throws -> Bool {
         guard !tracker.isManualEntry,
+              // A tracker only takes updates inside its own window. Callers
+              // guard too, but this is the one check every path goes through.
+              !tracker.isCompleted(),
               let sourceTargetId = tracker.sourceTargetId,
               let provider = provider(for: tracker),
               // A device-bound source that can't be read here isn't a
@@ -333,6 +336,7 @@ final class TrackerStore {
             latestValue: latest?.value,
             latestDate: latest?.date,
             trackerStartDate: tracker.startDate,
+            trackerEndDate: tracker.endDate,
             force: force
         ) else {
             // Still a successful check — `lastCheckedDate` above already

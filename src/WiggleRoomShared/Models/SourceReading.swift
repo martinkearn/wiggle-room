@@ -42,6 +42,7 @@ nonisolated enum SourceReadingPolicy {
     ///     none yet.
     ///   - latestDate: that reading's date.
     ///   - trackerStartDate: the tracker's own `startDate`.
+    ///   - trackerEndDate: the tracker's own `endDate`.
     ///   - force: set when a reading should be recorded even if unchanged —
     ///     used right after a tracker is created or connected, so its first
     ///     reading always lands.
@@ -51,6 +52,7 @@ nonisolated enum SourceReadingPolicy {
         latestValue: Decimal?,
         latestDate: Date?,
         trackerStartDate: Date,
+        trackerEndDate: Date,
         force: Bool
     ) -> Bool {
         // A reading from before the tracker began isn't this tracker's
@@ -59,6 +61,10 @@ nonisolated enum SourceReadingPolicy {
         // override this, which also means a tracker whose period hasn't
         // started yet collects nothing until it does.
         guard reading.date >= trackerStartDate else { return false }
+        // Likewise nothing dated at or after the end: once the period is
+        // over the tracker's figures are final, and `force` doesn't override
+        // this either.
+        guard reading.date < trackerEndDate else { return false }
         guard !force else { return true }
         guard let latestValue, let latestDate else { return true }
         // Nothing new: either the value hasn't moved, or the provider is
