@@ -22,8 +22,7 @@ private struct TargetLoadKey: Hashable {
     let attempt: Int
 }
 
-private struct TrackerSummary: Identifiable {
-    let id: UUID
+private struct TrackerSummary {
     let name: String
     let colorIndex: Int
 }
@@ -168,10 +167,6 @@ struct AddTrackerView: View {
     var body: some View {
         NavigationStack {
             Form {
-                if existingTracker == nil {
-                    copyFromSection
-                }
-
                 Section {
                     TextField("Name", text: $name)
                         .focused($focusedField, equals: .name)
@@ -679,35 +674,6 @@ struct AddTrackerView: View {
         }
     }
 
-    /// The "Copy from existing tracker" menu. Picking a tracker replaces the
-    /// form with a copy set up for that tracker's next period, so it is also
-    /// reachable from a plain Add Tracker; the row's Duplicate action and the
-    /// tracker screen's open the form already copied.
-    @ViewBuilder
-    private var copyFromSection: some View {
-        if !otherTrackers.isEmpty {
-            Section {
-                Menu {
-                    ForEach(otherTrackers.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }) { candidate in
-                        Button(candidate.name) { copy(trackerWithId: candidate.id) }
-                    }
-                } label: {
-                    Label("Copy from existing tracker", systemImage: "doc.on.doc")
-                }
-            } footer: {
-                Text("Fills in the next period of a tracker you already have. Its readings aren't copied.")
-            }
-        }
-    }
-
-    /// Looks the tracker up when it is picked, since `otherTrackers` holds
-    /// only a snapshot of names rather than live objects.
-    private func copy(trackerWithId id: UUID) {
-        let trackers = (try? modelContext.fetch(FetchDescriptor<Tracker>())) ?? []
-        guard let tracker = trackers.first(where: { $0.id == id }) else { return }
-        apply(template: tracker)
-    }
-
     /// Prefills the form as the next period of `template`. Carries over the
     /// tracker's identity and source, never its readings or progress.
     private func apply(template: Tracker) {
@@ -934,7 +900,7 @@ struct AddTrackerView: View {
         let ownID = existingTracker?.id
         otherTrackers = trackers
             .filter { $0.id != ownID }
-            .map { TrackerSummary(id: $0.id, name: $0.name, colorIndex: $0.resolvedColorIndex) }
+            .map { TrackerSummary(name: $0.name, colorIndex: $0.resolvedColorIndex) }
     }
 
     private var isValid: Bool {

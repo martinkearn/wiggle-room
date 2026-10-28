@@ -98,7 +98,7 @@ A tracker's `name` must be unique (case-insensitive) among the user's other trac
 
 ### Duplicating a tracker
 
-A recurring tracker, such as a monthly budget, is set up again for its next period by duplicating it. Duplicate Tracker is on the tracker list's row (context menu, plus a leading swipe on iOS and iPadOS) and in the tracker screen's menu, and both open Add Tracker already filled in. Add Tracker also offers Copy from existing tracker, which fills in the same way. Nothing is saved until the user taps Save, and the original is never changed.
+A recurring tracker, such as a monthly budget, is set up again for its next period by duplicating it. Duplicate Tracker is on the tracker list's row (context menu, plus a leading swipe on iOS and iPadOS) and in the tracker screen's menu, and both open Add Tracker already filled in. A plain Add Tracker has no copy option. Nothing is saved until the user taps Save, and the original is never changed.
 
 The copy carries the original's type, unit, glyph, colour, source and account, reminder cadence, starting value and whole-period figure, all editable. Its dates and name come from `TrackerClone`:
 
