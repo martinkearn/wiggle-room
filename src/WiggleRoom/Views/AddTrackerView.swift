@@ -15,7 +15,8 @@ private enum SourceOption: Hashable {
 /// `AddTrackerView.loadOtherTrackers()` — a plain value, not a `Tracker`
 /// reference, so the form never holds live SwiftData objects it doesn't
 /// own and can't be invalidated by their changes mid-edit.
-private struct TrackerSummary {
+private struct TrackerSummary: Identifiable {
+    let id: UUID
     let name: String
     let colorIndex: Int
 }
@@ -46,6 +47,12 @@ struct AddTrackerView: View {
     /// new one. Existing connections are fixed, while a read-only imported
     /// tracker with no source can be connected here.
     var existingTracker: Tracker?
+
+    /// When set, the form creates a new tracker prefilled from this one, for
+    /// the next period: same identity and source, the next period's dates
+    /// and a suffixed name. Nothing is saved until the user taps Save, and
+    /// none of the original's readings come along. Unused when editing.
+    var templateTracker: Tracker?
 
     /// Called after the user confirms deleting `existingTracker`, right
     /// before this view dismisses itself — lets a presenting screen (e.g.
@@ -112,6 +119,14 @@ struct AddTrackerView: View {
     @State private var targetLoadErrorMessage: String?
     @State private var isPrefillingStartingValue = false
 
+    /// A cloned tracker's account, held until the source's target list has
+    /// loaded: `loadAvailableTargetsIfNeeded()` clears the selection first,
+    /// so the account can only be re-applied once its list is back.
+    @State private var pendingTargetId: String?
+    /// Set when copying a tracker changes the type, so the type picker's
+    /// `onChange` doesn't reset the unit and reminder the copy just set.
+    @State private var keepsCopiedTypeSettings = false
+
     /// The bound account's display name, resolved read-only when editing an
     /// existing tracker on a real (non-manual) source — `Tracker` only
     /// stores `sourceTargetId` (a bare id like a Starling `accountUid`), not
@@ -144,6 +159,10 @@ struct AddTrackerView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if existingTracker == nil {
+                    copyFromSection
+                }
+
                 Section {
                     TextField("Name", text: $name)
                     if isDuplicateName {
@@ -158,6 +177,10 @@ struct AddTrackerView: View {
                             }
                         }
                         .onChange(of: trackerType) { _, newValue in
+                            if keepsCopiedTypeSettings {
+                                keepsCopiedTypeSettings = false
+                                return
+                            }
                             applyTypeDefaults(newValue)
                         }
                     } else {
@@ -389,6 +412,8 @@ struct AddTrackerView: View {
                     colorIndex = existingTracker.resolvedColorIndex
                     glyph = existingTracker.glyph
                     await resolveAccountNameIfNeeded(for: existingTracker)
+                } else if sourceSelection == nil, let templateTracker {
+                    apply(template: templateTracker)
                 } else if sourceSelection == nil {
                     // New trackers start on the first colour no other tracker
                     // is using, so a list fills with distinct colours.
@@ -503,6 +528,10 @@ struct AddTrackerView: View {
         else {
             return
         }
+        // Taken only once there is a source to load for, so the initial run
+        // before a cloned source is applied can't consume it.
+        let wantedTargetId = pendingTargetId
+        pendingTargetId = nil
         isLoadingTargets = true
         defer { isLoadingTargets = false }
         do {
@@ -511,6 +540,8 @@ struct AddTrackerView: View {
             // stay off screen entirely (see `showsTargetPicker`).
             if availableTargets.count == 1 {
                 selectedTargetId = availableTargets.first?.id
+            } else if let wantedTargetId, availableTargets.contains(where: { $0.id == wantedTargetId }) {
+                selectedTargetId = wantedTargetId
             }
         } catch {
             targetLoadErrorMessage = "Couldn't load \(selectedTargetLabel.lowercased())s — try again."
@@ -611,6 +642,73 @@ struct AddTrackerView: View {
            selectedSourceId != store.manualEntrySource.id,
            !compatibleSources.contains(where: { $0.id == selectedSourceId }) {
             sourceSelection = .source(store.manualEntrySource.id)
+        }
+    }
+
+    /// The "Copy from existing tracker" menu. Picking a tracker replaces the
+    /// form with a copy set up for that tracker's next period, so it is also
+    /// reachable from a plain Add Tracker; the row's Duplicate action and the
+    /// tracker screen's open the form already copied.
+    @ViewBuilder
+    private var copyFromSection: some View {
+        if !otherTrackers.isEmpty {
+            Section {
+                Menu {
+                    ForEach(otherTrackers.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }) { candidate in
+                        Button(candidate.name) { copy(trackerWithId: candidate.id) }
+                    }
+                } label: {
+                    Label("Copy from existing tracker", systemImage: "doc.on.doc")
+                }
+            } footer: {
+                Text("Fills in the next period of a tracker you already have. Its readings aren't copied.")
+            }
+        }
+    }
+
+    /// Looks the tracker up when it is picked, since `otherTrackers` holds
+    /// only a snapshot of names rather than live objects.
+    private func copy(trackerWithId id: UUID) {
+        let trackers = (try? modelContext.fetch(FetchDescriptor<Tracker>())) ?? []
+        guard let tracker = trackers.first(where: { $0.id == id }) else { return }
+        apply(template: tracker)
+    }
+
+    /// Prefills the form as the next period of `template`. Carries over the
+    /// tracker's identity and source, never its readings or progress.
+    private func apply(template: Tracker) {
+        if trackerType != template.trackerType { keepsCopiedTypeSettings = true }
+        trackerType = template.trackerType
+        unit = template.trackerUnit
+
+        let period = TrackerClone.nextPeriod(startDate: template.startDate, endDate: template.endDate)
+        startDate = period.start
+        endDate = period.end
+        let calendar = Calendar.current
+        includesTime = calendar.startOfDay(for: period.start) != period.start
+            || calendar.startOfDay(for: period.end) != period.end
+
+        name = TrackerClone.name(from: template.name, originalStart: template.startDate, newStart: period.start)
+        startingValueText = Self.editableText(template.startingValue, unit: template.trackerUnit)
+        targetValueText = Self.editableText(template.wholePeriodValue, unit: template.trackerUnit)
+        colorIndex = template.resolvedColorIndex
+        glyph = template.glyph
+        reminderCadenceMinutes = template.reminderCadenceMinutes
+        errorMessage = nil
+
+        let sourceId = template.connectedSource.flatMap { source in
+            resolveSource(withId: source.id) != nil ? source.id : nil
+        } ?? store.manualEntrySource.id
+        let isManual = sourceId == store.manualEntrySource.id
+        pendingTargetId = isManual ? nil : template.sourceTargetId
+        if selectedSourceId == sourceId {
+            // The source hasn't changed, so its target list isn't reloaded.
+            if let target = pendingTargetId, availableTargets.contains(where: { $0.id == target }) {
+                selectedTargetId = target
+                pendingTargetId = nil
+            }
+        } else {
+            sourceSelection = .source(sourceId)
         }
     }
 
@@ -802,7 +900,7 @@ struct AddTrackerView: View {
         let ownID = existingTracker?.id
         otherTrackers = trackers
             .filter { $0.id != ownID }
-            .map { TrackerSummary(name: $0.name, colorIndex: $0.resolvedColorIndex) }
+            .map { TrackerSummary(id: $0.id, name: $0.name, colorIndex: $0.resolvedColorIndex) }
     }
 
     private var isValid: Bool {

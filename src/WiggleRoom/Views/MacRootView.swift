@@ -21,6 +21,8 @@ struct MacRootView: View {
 
     @State private var selection: Tracker.ID?
     @State private var isPresentingAddTracker = false
+    /// The tracker being duplicated; the add sheet opens prefilled from it.
+    @State private var trackerToDuplicate: Tracker?
 
     var body: some View {
         NavigationSplitView {
@@ -53,6 +55,11 @@ struct MacRootView: View {
                                 // never be confirmed for either, so there was
                                 // no other way to remove them from the UI).
                                 .contextMenu {
+                                    Button {
+                                        trackerToDuplicate = tracker
+                                    } label: {
+                                        Label("Duplicate Tracker", systemImage: "doc.on.doc")
+                                    }
                                     Button(role: .destructive) {
                                         store.deleteTracker(tracker)
                                     } label: {
@@ -99,6 +106,9 @@ struct MacRootView: View {
         }
         .sheet(isPresented: $isPresentingAddTracker) {
             AddTrackerView()
+        }
+        .sheet(item: $trackerToDuplicate) { tracker in
+            AddTrackerView(templateTracker: tracker)
         }
         .onAppear {
             if selection == nil {

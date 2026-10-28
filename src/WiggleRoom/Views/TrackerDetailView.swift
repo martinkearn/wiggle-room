@@ -29,6 +29,7 @@ struct TrackerDetailView: View {
 
     @State private var isPresentingLogReading = false
     @State private var isPresentingEditTracker = false
+    @State private var isPresentingDuplicateTracker = false
     @State private var isPresentingReadingHistory = false
 
     /// **Fully manual as of 2026-09-18** — this screen no longer ticks or
@@ -297,6 +298,11 @@ struct TrackerDetailView: View {
                         Label("Edit Tracker", systemImage: "pencil")
                     }
                     Button {
+                        isPresentingDuplicateTracker = true
+                    } label: {
+                        Label("Duplicate Tracker", systemImage: "doc.on.doc")
+                    }
+                    Button {
                         isPresentingReadingHistory = true
                     } label: {
                         Label("\(tracker.terminology.currentFigure) History", systemImage: "clock")
@@ -317,6 +323,9 @@ struct TrackerDetailView: View {
             // iOS. `onDelete` dismisses this dashboard too, since the
             // tracker it was showing no longer exists once the sheet closes.
             AddTrackerView(existingTracker: tracker, onDelete: { dismiss() })
+        }
+        .sheet(isPresented: $isPresentingDuplicateTracker) {
+            AddTrackerView(templateTracker: tracker)
         }
         .sheet(isPresented: $isPresentingReadingHistory) {
             NavigationStack {
