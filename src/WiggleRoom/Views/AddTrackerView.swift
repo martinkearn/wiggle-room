@@ -15,6 +15,13 @@ private enum SourceOption: Hashable {
 /// `AddTrackerView.loadOtherTrackers()` — a plain value, not a `Tracker`
 /// reference, so the form never holds live SwiftData objects it doesn't
 /// own and can't be invalidated by their changes mid-edit.
+/// What the account load runs for: a different source, or the same one asked
+/// again after a failure.
+private struct TargetLoadKey: Hashable {
+    let sourceId: UUID?
+    let attempt: Int
+}
+
 private struct TrackerSummary {
     let name: String
     let colorIndex: Int
@@ -46,6 +53,12 @@ struct AddTrackerView: View {
     /// new one. Existing connections are fixed, while a read-only imported
     /// tracker with no source can be connected here.
     var existingTracker: Tracker?
+
+    /// When set, the form creates a new tracker prefilled from this one, for
+    /// the next period: same identity and source, the next period's dates
+    /// and a suffixed name. Nothing is saved until the user taps Save, and
+    /// none of the original's readings come along. Unused when editing.
+    var templateTracker: Tracker?
 
     /// Called after the user confirms deleting `existingTracker`, right
     /// before this view dismisses itself — lets a presenting screen (e.g.
@@ -109,8 +122,18 @@ struct AddTrackerView: View {
     @State private var availableTargets: [SourceTarget] = []
     @State private var selectedTargetId: String?
     @State private var isLoadingTargets = false
+    /// Bumped by the Try Again button to run the account load again.
+    @State private var targetLoadAttempt = 0
     @State private var targetLoadErrorMessage: String?
     @State private var isPrefillingStartingValue = false
+
+    /// A cloned tracker's account, held until the source's target list has
+    /// loaded: `loadAvailableTargetsIfNeeded()` clears the selection first,
+    /// so the account can only be re-applied once its list is back.
+    @State private var pendingTargetId: String?
+    /// Set when copying a tracker changes the type, so the type picker's
+    /// `onChange` doesn't reset the unit and reminder the copy just set.
+    @State private var keepsCopiedTypeSettings = false
 
     /// The bound account's display name, resolved read-only when editing an
     /// existing tracker on a real (non-manual) source — `Tracker` only
@@ -136,16 +159,18 @@ struct AddTrackerView: View {
     @State private var isSaving = false
     @State private var isPresentingDeleteConfirmation = false
 
-    private enum NumberField {
-        case startingValue, targetValue, dailyValue
+    private enum FormField {
+        case name, startingValue, targetValue, dailyValue
     }
-    @FocusState private var focusedNumberField: NumberField?
+    @FocusState private var focusedField: FormField?
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     TextField("Name", text: $name)
+                        .focused($focusedField, equals: .name)
+                        .onSubmit { focusedField = nil }
                     if isDuplicateName {
                         Text("A tracker named \u{201C}\(name.trimmingCharacters(in: .whitespaces))\u{201D} already exists.")
                             .font(.wiggleText(.caption))
@@ -158,6 +183,10 @@ struct AddTrackerView: View {
                             }
                         }
                         .onChange(of: trackerType) { _, newValue in
+                            if keepsCopiedTypeSettings {
+                                keepsCopiedTypeSettings = false
+                                return
+                            }
                             applyTypeDefaults(newValue)
                         }
                     } else {
@@ -354,6 +383,13 @@ struct AddTrackerView: View {
                 }
             }
             .formStyle(.grouped)
+            #if os(iOS)
+            // Scrolling away from the field being edited puts the keyboard
+            // away and releases its focus. Otherwise Name stays focused while
+            // the user works down to the dates, and closing a date picker
+            // scrolls the form back up to reveal it.
+            .scrollDismissesKeyboard(.immediately)
+            #endif
             .navigationTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
             .leadingSheetTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
             .toolbar {
@@ -389,6 +425,8 @@ struct AddTrackerView: View {
                     colorIndex = existingTracker.resolvedColorIndex
                     glyph = existingTracker.glyph
                     await resolveAccountNameIfNeeded(for: existingTracker)
+                } else if sourceSelection == nil, let templateTracker {
+                    apply(template: templateTracker)
                 } else if sourceSelection == nil {
                     // New trackers start on the first colour no other tracker
                     // is using, so a list fills with distinct colours.
@@ -400,13 +438,18 @@ struct AddTrackerView: View {
             }
             .onChange(of: targetValueText) { syncDailyFromTotal() }
             .onChange(of: startingValueText) { syncDailyFromTotal() }
-            .onChange(of: startDate) { syncDailyFromTotal() }
-            .onChange(of: endDate) { syncDailyFromTotal() }
+            // A date picker takes focus while its calendar is open and hands
+            // it back to whichever field had it before, which dropped the
+            // cursor back into Name after every date. Letting go of focus
+            // once a date is chosen leaves nothing to hand it back to.
+            .onChange(of: startDate) { focusedField = nil; syncDailyFromTotal() }
+            .onChange(of: endDate) { focusedField = nil; syncDailyFromTotal() }
+            .onChange(of: includesTime) { focusedField = nil }
             .onChange(of: dailyValueText) { syncTotalFromDaily() }
             .navigationDestination(isPresented: $isShowingAddSource) {
                 AddSourcePickerView()
             }
-            .task(id: selectedSourceId) {
+            .task(id: TargetLoadKey(sourceId: selectedSourceId, attempt: targetLoadAttempt)) {
                 await loadAvailableTargetsIfNeeded()
             }
             .task(id: selectedTargetId) {
@@ -445,6 +488,11 @@ struct AddTrackerView: View {
             } else if let targetLoadErrorMessage {
                 Text(targetLoadErrorMessage)
                     .foregroundStyle(WiggleRoomColors.error)
+                Button("Try Again") {
+                    // Keep what a copied tracker wanted across the retry.
+                    if pendingTargetId == nil { pendingTargetId = templateTracker?.sourceTargetId }
+                    targetLoadAttempt += 1
+                }
             } else if availableTargets.isEmpty {
                 Text("No \(selectedTargetLabel.lowercased())s found for this source.")
                     .foregroundStyle(.secondary)
@@ -503,6 +551,10 @@ struct AddTrackerView: View {
         else {
             return
         }
+        // Taken only once there is a source to load for, so the initial run
+        // before a cloned source is applied can't consume it.
+        let wantedTargetId = pendingTargetId
+        pendingTargetId = nil
         isLoadingTargets = true
         defer { isLoadingTargets = false }
         do {
@@ -511,8 +563,16 @@ struct AddTrackerView: View {
             // stay off screen entirely (see `showsTargetPicker`).
             if availableTargets.count == 1 {
                 selectedTargetId = availableTargets.first?.id
+            } else if let wantedTargetId, availableTargets.contains(where: { $0.id == wantedTargetId }) {
+                selectedTargetId = wantedTargetId
             }
         } catch {
+            // A load that was replaced by a newer one (the source changed
+            // under it, or the form was copied from a tracker) is cancelled,
+            // and the newer load owns the result: it mustn't report a failure.
+            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+                return
+            }
             targetLoadErrorMessage = "Couldn't load \(selectedTargetLabel.lowercased())s — try again."
         }
     }
@@ -614,6 +674,44 @@ struct AddTrackerView: View {
         }
     }
 
+    /// Prefills the form as the next period of `template`. Carries over the
+    /// tracker's identity and source, never its readings or progress.
+    private func apply(template: Tracker) {
+        if trackerType != template.trackerType { keepsCopiedTypeSettings = true }
+        trackerType = template.trackerType
+        unit = template.trackerUnit
+
+        let period = TrackerClone.nextPeriod(startDate: template.startDate, endDate: template.endDate)
+        startDate = period.start
+        endDate = period.end
+        let calendar = Calendar.current
+        includesTime = calendar.startOfDay(for: period.start) != period.start
+            || calendar.startOfDay(for: period.end) != period.end
+
+        name = TrackerClone.name(from: template.name, originalStart: template.startDate, newStart: period.start)
+        startingValueText = Self.editableText(template.startingValue, unit: template.trackerUnit)
+        targetValueText = Self.editableText(template.wholePeriodValue, unit: template.trackerUnit)
+        colorIndex = template.resolvedColorIndex
+        glyph = template.glyph
+        reminderCadenceMinutes = template.reminderCadenceMinutes
+        errorMessage = nil
+
+        let sourceId = template.connectedSource.flatMap { source in
+            resolveSource(withId: source.id) != nil ? source.id : nil
+        } ?? store.manualEntrySource.id
+        let isManual = sourceId == store.manualEntrySource.id
+        pendingTargetId = isManual ? nil : template.sourceTargetId
+        if selectedSourceId == sourceId {
+            // The source hasn't changed, so its target list isn't reloaded.
+            if let target = pendingTargetId, availableTargets.contains(where: { $0.id == target }) {
+                selectedTargetId = target
+                pendingTargetId = nil
+            }
+        } else {
+            sourceSelection = .source(sourceId)
+        }
+    }
+
     /// The added sources whose provider can actually supply a reading for
     /// the chosen type (§8) — declared by the provider, not hard-coded per
     /// type. Manual Entry is listed separately and always applies.
@@ -635,7 +733,7 @@ struct AddTrackerView: View {
     /// is tappable to focus the field — a value like "0" is otherwise a tiny
     /// target sitting flush against the row's trailing edge, with the
     /// `Spacer` next to it absorbing taps that land just to its left.
-    private func unitValueField(text: Binding<String>, field: NumberField) -> some View {
+    private func unitValueField(text: Binding<String>, field: FormField) -> some View {
         HStack(spacing: 4) {
             Spacer(minLength: 0)
             if unit.placement == .prefix {
@@ -657,7 +755,7 @@ struct AddTrackerView: View {
                 TextField("", text: text)
                     .decimalKeyboardIfAvailable()
                     .multilineTextAlignment(.trailing)
-                    .focused($focusedNumberField, equals: field)
+                    .focused($focusedField, equals: field)
             }
             .frame(minWidth: 60, maxWidth: 120)
             if unit.placement == .suffix {
@@ -667,7 +765,7 @@ struct AddTrackerView: View {
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
         .contentShape(Rectangle())
-        .onTapGesture { focusedNumberField = field }
+        .onTapGesture { focusedField = field }
     }
 
     private var selectedSourceId: UUID? {
@@ -746,7 +844,7 @@ struct AddTrackerView: View {
     /// Refreshes the daily field from the total, unless the user is typing in
     /// the daily field themselves (which would fight their input).
     private func syncDailyFromTotal() {
-        guard focusedNumberField != .dailyValue else { return }
+        guard focusedField != .dailyValue else { return }
         guard let totalAllowance = derivedTotalAllowance,
               let dailyRate = Tracker.dailyRate(totalAllowance: totalAllowance, startDate: startDate, endDate: endDate)
         else {
@@ -759,7 +857,7 @@ struct AddTrackerView: View {
 
     /// Works the total out from a typed daily figure.
     private func syncTotalFromDaily() {
-        guard focusedNumberField == .dailyValue else { return }
+        guard focusedField == .dailyValue else { return }
         guard isDailyBudgetAvailable, let daily = Self.parseDecimal(dailyValueText) else { return }
         let days = Decimal(endDate.timeIntervalSince(startDate) / 86400)
         let allowance = unit.rounded(daily * days)

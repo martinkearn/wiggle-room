@@ -96,6 +96,18 @@ A reading fetched from a source is recorded only when it is genuinely new: newer
 
 A tracker's `name` must be unique (case-insensitive) among the user's other trackers; Add/Edit Tracker blocks Save on a collision.
 
+### Duplicating a tracker
+
+A recurring tracker, such as a monthly budget, is set up again for its next period by duplicating it. Duplicate Tracker is on the tracker list's row (context menu, plus a leading swipe on iOS and iPadOS) and in the tracker screen's menu, and both open Add Tracker already filled in. A plain Add Tracker has no copy option. Nothing is saved until the user taps Save, and the original is never changed.
+
+The copy carries the original's type, unit, glyph, colour, source and account, reminder cadence, starting value and whole-period figure, all editable. Its dates and name come from `TrackerClone`:
+
+- A calendar-month period, one that starts at midnight on the 1st and ends on the 1st of the next month or on the last day of its own month, becomes the next calendar month.
+- Any other period starts the day after the original ends and keeps its length in days.
+- The name gains a month suffix for the new period ("Groceries – Nov 2026"), replacing a suffix from an earlier copy, so it clears the uniqueness rule above. The user can rename it.
+
+The copy starts with an empty history: no readings, notes, celebration state or fetch timestamps are copied, and it is seeded with its starting value like any new tracker. A duplicate adds no stored properties, so it needs no CloudKit schema change.
+
 ### Pace calculation
 
 For a point in time inside the tracking period:
@@ -333,6 +345,7 @@ macOS keeps its own compact sidebar row, which is a navigation list rather than 
 - Tracker list and detail navigation
 - Chart zoom controls directly above the detail screen's trend chart (see Zoom)
 - Pull-to-refresh/update behavior
+- Duplicate a tracker for its next period from its list row or its screen (see Duplicating a tracker)
 - Add and edit trackers and connected sources, reached from a `+` in the tracker list's top-right toolbar; the empty state keeps its own prominent button, since there is no list for a `+` to sit above yet
 - Settings for General app preferences, sources, ordering, CloudKit diagnostics, Siri phrases, and an About screen reporting the running version, build number and source commit, with a separate Danger Zone menu for reset operations
 - JSON export and import of tracker configuration and complete reading history

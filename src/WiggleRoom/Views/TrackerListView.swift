@@ -39,6 +39,8 @@ struct TrackerListView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var isPresentingAddTracker = false
+    /// The tracker being duplicated; the add sheet opens prefilled from it.
+    @State private var trackerToDuplicate: Tracker?
     @State private var isPresentingSettings = false
     @State private var navigationPath = NavigationPath()
 
@@ -66,6 +68,21 @@ struct TrackerListView: View {
                                     .modifier(NewRowArrival(isArriving: tracker.id == arrivingTrackerID) {
                                         arrivingTrackerID = nil
                                     })
+                            }
+                            .contextMenu {
+                                Button {
+                                    trackerToDuplicate = tracker
+                                } label: {
+                                    Label("Duplicate Tracker", systemImage: "doc.on.doc")
+                                }
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    trackerToDuplicate = tracker
+                                } label: {
+                                    Label("Duplicate", systemImage: "doc.on.doc")
+                                }
+                                .tint(WiggleRoomColors.brand)
                             }
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
@@ -107,6 +124,12 @@ struct TrackerListView: View {
             }
             .sheet(isPresented: $isPresentingAddTracker, onDismiss: releaseNewTracker) {
                 AddTrackerView(onCreate: { id in
+                    heldBackTrackerID = id
+                    arrivingTrackerID = id
+                })
+            }
+            .sheet(item: $trackerToDuplicate, onDismiss: releaseNewTracker) { tracker in
+                AddTrackerView(templateTracker: tracker, onCreate: { id in
                     heldBackTrackerID = id
                     arrivingTrackerID = id
                 })
