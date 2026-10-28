@@ -160,10 +160,10 @@ struct AddTrackerView: View {
     @State private var isSaving = false
     @State private var isPresentingDeleteConfirmation = false
 
-    private enum NumberField {
-        case startingValue, targetValue, dailyValue
+    private enum FormField {
+        case name, startingValue, targetValue, dailyValue
     }
-    @FocusState private var focusedNumberField: NumberField?
+    @FocusState private var focusedField: FormField?
 
     var body: some View {
         NavigationStack {
@@ -174,6 +174,8 @@ struct AddTrackerView: View {
 
                 Section {
                     TextField("Name", text: $name)
+                        .focused($focusedField, equals: .name)
+                        .onSubmit { focusedField = nil }
                     if isDuplicateName {
                         Text("A tracker named \u{201C}\(name.trimmingCharacters(in: .whitespaces))\u{201D} already exists.")
                             .font(.wiggleText(.caption))
@@ -434,8 +436,13 @@ struct AddTrackerView: View {
             }
             .onChange(of: targetValueText) { syncDailyFromTotal() }
             .onChange(of: startingValueText) { syncDailyFromTotal() }
-            .onChange(of: startDate) { syncDailyFromTotal() }
-            .onChange(of: endDate) { syncDailyFromTotal() }
+            // A date picker takes focus while its calendar is open and hands
+            // it back to whichever field had it before, which dropped the
+            // cursor back into Name after every date. Letting go of focus
+            // once a date is chosen leaves nothing to hand it back to.
+            .onChange(of: startDate) { focusedField = nil; syncDailyFromTotal() }
+            .onChange(of: endDate) { focusedField = nil; syncDailyFromTotal() }
+            .onChange(of: includesTime) { focusedField = nil }
             .onChange(of: dailyValueText) { syncTotalFromDaily() }
             .navigationDestination(isPresented: $isShowingAddSource) {
                 AddSourcePickerView()
@@ -753,7 +760,7 @@ struct AddTrackerView: View {
     /// is tappable to focus the field — a value like "0" is otherwise a tiny
     /// target sitting flush against the row's trailing edge, with the
     /// `Spacer` next to it absorbing taps that land just to its left.
-    private func unitValueField(text: Binding<String>, field: NumberField) -> some View {
+    private func unitValueField(text: Binding<String>, field: FormField) -> some View {
         HStack(spacing: 4) {
             Spacer(minLength: 0)
             if unit.placement == .prefix {
@@ -775,7 +782,7 @@ struct AddTrackerView: View {
                 TextField("", text: text)
                     .decimalKeyboardIfAvailable()
                     .multilineTextAlignment(.trailing)
-                    .focused($focusedNumberField, equals: field)
+                    .focused($focusedField, equals: field)
             }
             .frame(minWidth: 60, maxWidth: 120)
             if unit.placement == .suffix {
@@ -785,7 +792,7 @@ struct AddTrackerView: View {
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
         .contentShape(Rectangle())
-        .onTapGesture { focusedNumberField = field }
+        .onTapGesture { focusedField = field }
     }
 
     private var selectedSourceId: UUID? {
@@ -864,7 +871,7 @@ struct AddTrackerView: View {
     /// Refreshes the daily field from the total, unless the user is typing in
     /// the daily field themselves (which would fight their input).
     private func syncDailyFromTotal() {
-        guard focusedNumberField != .dailyValue else { return }
+        guard focusedField != .dailyValue else { return }
         guard let totalAllowance = derivedTotalAllowance,
               let dailyRate = Tracker.dailyRate(totalAllowance: totalAllowance, startDate: startDate, endDate: endDate)
         else {
@@ -877,7 +884,7 @@ struct AddTrackerView: View {
 
     /// Works the total out from a typed daily figure.
     private func syncTotalFromDaily() {
-        guard focusedNumberField == .dailyValue else { return }
+        guard focusedField == .dailyValue else { return }
         guard isDailyBudgetAvailable, let daily = Self.parseDecimal(dailyValueText) else { return }
         let days = Decimal(endDate.timeIntervalSince(startDate) / 86400)
         let allowance = unit.rounded(daily * days)
