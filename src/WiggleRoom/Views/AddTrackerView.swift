@@ -15,6 +15,13 @@ private enum SourceOption: Hashable {
 /// `AddTrackerView.loadOtherTrackers()` — a plain value, not a `Tracker`
 /// reference, so the form never holds live SwiftData objects it doesn't
 /// own and can't be invalidated by their changes mid-edit.
+/// What the account load runs for: a different source, or the same one asked
+/// again after a failure.
+private struct TargetLoadKey: Hashable {
+    let sourceId: UUID?
+    let attempt: Int
+}
+
 private struct TrackerSummary: Identifiable {
     let id: UUID
     let name: String
@@ -116,6 +123,8 @@ struct AddTrackerView: View {
     @State private var availableTargets: [SourceTarget] = []
     @State private var selectedTargetId: String?
     @State private var isLoadingTargets = false
+    /// Bumped by the Try Again button to run the account load again.
+    @State private var targetLoadAttempt = 0
     @State private var targetLoadErrorMessage: String?
     @State private var isPrefillingStartingValue = false
 
@@ -431,7 +440,7 @@ struct AddTrackerView: View {
             .navigationDestination(isPresented: $isShowingAddSource) {
                 AddSourcePickerView()
             }
-            .task(id: selectedSourceId) {
+            .task(id: TargetLoadKey(sourceId: selectedSourceId, attempt: targetLoadAttempt)) {
                 await loadAvailableTargetsIfNeeded()
             }
             .task(id: selectedTargetId) {
@@ -470,6 +479,11 @@ struct AddTrackerView: View {
             } else if let targetLoadErrorMessage {
                 Text(targetLoadErrorMessage)
                     .foregroundStyle(WiggleRoomColors.error)
+                Button("Try Again") {
+                    // Keep what a copied tracker wanted across the retry.
+                    if pendingTargetId == nil { pendingTargetId = templateTracker?.sourceTargetId }
+                    targetLoadAttempt += 1
+                }
             } else if availableTargets.isEmpty {
                 Text("No \(selectedTargetLabel.lowercased())s found for this source.")
                     .foregroundStyle(.secondary)
@@ -544,6 +558,12 @@ struct AddTrackerView: View {
                 selectedTargetId = wantedTargetId
             }
         } catch {
+            // A load that was replaced by a newer one (the source changed
+            // under it, or the form was copied from a tracker) is cancelled,
+            // and the newer load owns the result: it mustn't report a failure.
+            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+                return
+            }
             targetLoadErrorMessage = "Couldn't load \(selectedTargetLabel.lowercased())s — try again."
         }
     }
