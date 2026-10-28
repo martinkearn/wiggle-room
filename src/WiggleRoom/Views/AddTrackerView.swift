@@ -388,6 +388,13 @@ struct AddTrackerView: View {
                 }
             }
             .formStyle(.grouped)
+            #if os(iOS)
+            // Scrolling away from the field being edited puts the keyboard
+            // away and releases its focus. Otherwise Name stays focused while
+            // the user works down to the dates, and closing a date picker
+            // scrolls the form back up to reveal it.
+            .scrollDismissesKeyboard(.immediately)
+            #endif
             .navigationTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
             .leadingSheetTitle(existingTracker == nil ? "New Tracker" : "Edit Tracker")
             .toolbar {
